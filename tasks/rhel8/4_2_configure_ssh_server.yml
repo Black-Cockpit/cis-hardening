@@ -1447,3 +1447,366 @@
     - "server_level_1"
     - "workstation_level_1"
     when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled
+  #
+  # The PermitEmptyPasswords parameter specifies if the SSH server allows login to
+  # accounts with empty password strings.
+  - name: "4.2.18 Ensure sshd PermitEmptyPasswords is disabled"
+    block:
+    # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Audit
+    - name: 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              # Get ssh permit empty password value
+              audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i permitemptypasswords | awk '{print $2}')
+
+              [[ "$audit_out" == "no" ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_empty_password_status_check
+
+    # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Audit
+    - name: 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              grep -Pis '^\h*PermitEmptyPasswords\h+"?yes\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_empty_password_conf_check
+
+    # Extract audit result
+    - set_fact:
+        ssh_permit_empty_password_config_check:
+          name: 4.2.18 Ensure sshd PermitEmptyPasswords is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (ssh_permit_empty_password_status_check.stdout == 'configured' and ssh_permit_empty_password_conf_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ssh_permit_empty_password_config_check] }}"
+      changed_when: false
+
+    # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation
+    - name: "4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitEmptyPasswords|#PermitEmptyPasswords)"
+        state: absent
+      when: not audit_only and not ssh_permit_empty_password_config_check.remediation_status
+
+    # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation
+    - name: "4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitEmptyPasswords)"
+        line: 'PermitEmptyPasswords no'
+        state: present
+      when: not audit_only and not ssh_permit_empty_password_config_check.remediation_status
+
+    # 4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation
+    - name: "4.2.18 Ensure sshd PermitEmptyPasswords is disabled | Remediation"
+      systemd:
+        name: sshd
+        state: reloaded
+      when: not audit_only and not ssh_permit_empty_password_config_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.2.19 Ensure sshd PermitRootLogin is disabled
+  #
+  # The PermitRootLogin parameter specifies if the root user can log in using SSH. The
+  # default is prohibit-password .
+  - name: "4.2.19 Ensure sshd PermitRootLogin is disabled"
+    block:
+    # 4.2.19 Ensure sshd PermitRootLogin is disabled | Audit
+    - name: 4.2.19 Ensure sshd PermitRootLogin is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              # Get ssh permit root login value
+              audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i permitrootlogin | awk '{print $2}')
+
+              [[ "$audit_out" == "no" ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_root_login_status_check
+
+    # 4.2.19 Ensure sshd PermitRootLogin is disabled | Audit
+    - name: 4.2.19 Ensure sshd PermitRootLogin is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              grep -Pis '^\h*PermitRootLogin\h+"?(yes|prohibit-password|forced-commands-only)"?\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_root_login_conf_check
+
+    # Extract audit result
+    - set_fact:
+        ssh_permit_root_login_config_check:
+          name: 4.2.19 Ensure sshd PermitRootLogin is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (ssh_permit_root_login_status_check.stdout == 'configured' and ssh_permit_root_login_conf_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ssh_permit_root_login_config_check] }}"
+      changed_when: false
+
+    # 4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation
+    - name: "4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitRootLogin|#PermitRootLogin)"
+        state: absent
+      when: not audit_only and not ssh_permit_root_login_config_check.remediation_status
+
+    # 4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation
+    - name: "4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitRootLogin)"
+        line: 'PermitRootLogin no'
+        state: present
+      when: not audit_only and not ssh_permit_root_login_config_check.remediation_status
+
+    # 4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation
+    - name: "4.2.19 Ensure sshd PermitRootLogin is disabled | Remediation"
+      systemd:
+        name: sshd
+        state: reloaded
+      when: not audit_only and not ssh_permit_root_login_config_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.2.20 Ensure sshd PermitUserEnvironment is disabled
+  #
+  # The PermitUserEnvironment option allows users to present environment options to the
+  # SSH daemon.
+  - name: "4.2.20 Ensure sshd PermitUserEnvironment is disabled"
+    block:
+    # 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Audit
+    - name: 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              # Get ssh permit user environment value
+              audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i permituserenvironment | awk '{print $2}')
+
+              [[ "$audit_out" == "no" ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_user_env_status_check
+
+    # 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Audit
+    - name: 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              grep -Pis '^\h*PermitUserEnvironment\h+"?yes"?\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_permit_user_env_conf_check
+
+    # Extract audit result
+    - set_fact:
+        ssh_permit_user_env_config_check:
+          name: 4.2.20 Ensure sshd PermitUserEnvironment is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (ssh_permit_user_env_status_check.stdout == 'configured' and ssh_permit_user_env_conf_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ssh_permit_user_env_config_check] }}"
+      changed_when: false
+
+    # 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation
+    - name: "4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitUserEnvironment|#PermitUserEnvironment)"
+        state: absent
+      when: not audit_only and not ssh_permit_user_env_config_check.remediation_status
+
+    # 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation
+    - name: "4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(PermitUserEnvironment)"
+        line: 'PermitUserEnvironment no'
+        state: present
+      when: not audit_only and not ssh_permit_user_env_config_check.remediation_status
+
+    # 4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation
+    - name: "4.2.20 Ensure sshd PermitUserEnvironment is disabled | Remediation"
+      systemd:
+        name: sshd
+        state: reloaded
+      when: not audit_only and not ssh_permit_user_env_config_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.2.21 Ensure sshd UsePAM is enabled
+  #
+  # The PermitUserEnvironment option allows users to present environment options to the
+  # SSH daemon.
+  - name: "4.2.21 Ensure sshd UsePAM is enabled"
+    block:
+    # 4.2.21 Ensure sshd UsePAM is enabled | Audit
+    - name: 4.2.21 Ensure sshd UsePAM is enabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              # Get ssh use pam value
+              audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i usepam | awk '{print $2}')
+
+              [[ "$audit_out" == "yes" ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_use_pam_status_check
+
+    # 4.2.21 Ensure sshd UsePAM is enabled | Audit
+    - name: 4.2.21 Ensure sshd UsePAM is enabled | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              grep -Pis '^\h*UsePAM\h+"?no"?\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      register: ssh_use_pam_conf_check
+
+    # Extract audit result
+    - set_fact:
+        ssh_use_pam_config_check:
+          name: 4.2.21 Ensure sshd UsePAM is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (ssh_use_pam_status_check.stdout == 'configured' and ssh_use_pam_conf_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ssh_use_pam_config_check] }}"
+      changed_when: false
+
+    # 4.2.21 Ensure sshd UsePAM is enabled | Remediation
+    - name: "4.2.21 Ensure sshd UsePAM is enabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(UsePAM|#UsePAM)"
+        state: absent
+      when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+    # 4.2.21 Ensure sshd UsePAM is enabled | Remediation
+    - name: "4.2.21 Ensure sshd UsePAM is enabled | Remediation"
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^(UsePAM)"
+        line: 'UsePAM yes'
+        state: present
+      when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+    # 4.2.21 Ensure sshd UsePAM is enabled | Remediation
+    - name: "4.2.21 Ensure sshd UsePAM is enabled | Remediation"
+      systemd:
+        name: sshd
+        state: reloaded
+      when: not audit_only and not ssh_use_pam_config_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.2.22 Ensure sshd crypto_policy is not set
+  #
+  # System-wide Crypto policy can be over-ridden or opted out of for openSSH
+  - name: "4.2.22 Ensure sshd crypto_policy is not set"
+    block:
+    # 4.2.22 Ensure sshd crypto_policy is not set | Audit
+    - name: 4.2.22 Ensure sshd crypto_policy is not set | Audit
+      shell:
+        cmd: |
+          if [ -d /etc/sysconfig/sshd ]; then
+              # Check openssh crypto policy is enabled
+              grep -Pi '^\h*CRYPTO_POLICY\h*=' /etc/sysconfig/sshd && echo 'enabled' || echo 'disabled'
+          else
+              echo 'disabled'
+          fi
+      changed_when: false
+      register: ssh_crypto_policy_status_check
+
+    # Extract audit result
+    - set_fact:
+        ssh_crypto_policy_config_check:
+          name: 4.2.22 Ensure sshd crypto_policy is not set
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ssh_crypto_policy_status_check.stdout == 'disabled' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ssh_crypto_policy_config_check] }}"
+      changed_when: false
+
+    # 4.2.22 Ensure sshd crypto_policy is not set | Remediation
+    - name: "4.2.22 Ensure sshd crypto_policy is not set | Remediation"
+      shell:
+        cmd: |
+          if [ -d /etc/sysconfig/sshd ]; then
+              # Disable openssh crypto policy
+              sed -ri "s/^\s*(CRYPTO_POLICY\s*=.*)$/# \1/" /etc/sysconfig/sshd
+          fi
+      when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+    # 4.2.22 Ensure sshd crypto_policy is not set | Remediation
+    - name: "4.2.22 Ensure sshd crypto_policy is not set | Remediation"
+      systemd:
+        name: sshd
+        state: reloaded
+      when: not audit_only and not ssh_use_pam_config_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
