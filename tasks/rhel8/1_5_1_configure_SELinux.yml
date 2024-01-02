@@ -1,0 +1,391 @@
+# 1.5.1 Configure SELinux
+- name: 1.5.1 Configure SELinux
+  block:
+  # Check SELinux configuration type
+  - name: Pre Audit | Check SELinux configuration type
+    shell:
+      cmd: grep -Eq '^\s*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config && echo configured || echo not_configured
+    changed_when: false
+    register: selinux_config_check
+
+
+
+  # 1.5.1.1 Ensure SELinux is installed
+  #
+  # SELinux provides Mandatory Access Control.
+  - name: "1.5.1.1 Ensure SELinux is installed"
+    block:
+    # 1.5.1.1 Ensure SELinux is installed | Audit
+    - name: 1.5.1.1 Ensure SELinux is installed | Audit
+      shell:
+        cmd: rpm -qa | grep -q libselinux && echo installed || not_installed
+      changed_when: false
+      register: libselinux_status_check
+
+    # Extract audit result
+    - set_fact:
+        libselinux_check:
+          name: 1.5.1.1 Ensure SELinux is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if libselinux_status_check.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [libselinux_check] }}"
+      changed_when: false
+
+    # 1.5.1.1 Ensure SELinux is installed | Remediation
+    - name: 1.5.1.1 Ensure SELinux is installed | Remediation
+      package:
+        name: libselinux
+        state: present
+      when: not audit_only and not libselinux_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration
+  #
+  # SELinux provides Mandatory Access Control.
+  - name: "1.5.1.2 Ensure SELinux is not disabled in bootloader configuration"
+    block:
+    # 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Audit
+    - name: 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Audit
+      shell:
+        cmd: grubby --info=ALL | grep -Pqo '(selinux|enforcing)=0\b' && echo disabled || echo not_disabled
+      changed_when: false
+      register: selinux_status_check
+
+    # Extract audit result
+    - set_fact:
+        selinux_check:
+          name: 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration
+          scored: true
+          automated: true
+          remediation_status: "{{ true if selinux_status_check.stdout == 'not_disabled' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [selinux_check] }}"
+      changed_when: false
+
+    # 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Remediation
+    - name: "1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Remediation"
+      replace:
+        path: /etc/default/grub
+        regexp: '(selinux|enforcing)\s*=\s*0\s*'
+        replace: ''
+      ignore_errors: true # noqa ignore-errors
+      when: not audit_only and not selinux_check.remediation_status
+
+    # 1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Remediation
+    - name: "1.5.1.2 Ensure SELinux is not disabled in bootloader configuration | Remediation"
+      shell:
+        cmd: |
+          grep -Prsq -- '\h*([^#\n\r]+\h+)?kernelopts=([^#\n\r]+\h+)?(selinux|enforcing)=0\b' /boot/grub2/boot/efi && \
+          grub2-mkconfig -o "$(grep -Prl --'\h*([^#\n\r]+\h+)?kernelopts=([^#\n\r]+\h+)?(selinux|enforcing)=0\b' /boot/grub2/boot/efi)"
+      when: not audit_only and not selinux_check.remediation_status and is_uefi_boot
+      ignore_errors: true
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.5.1.3 Ensure SELinux policy is configured
+  #
+  # Configure SELinux to meet or exceed the default targeted policy, which constrains
+  # daemons and system software only.
+  - name: "1.5.1.3 Ensure SELinux policy is configured"
+    block:
+    # 1.5.1.3 Ensure SELinux policy is configured | Audit
+    - name: 1.5.1.3 Ensure SELinux policy is configured | Audit
+      shell:
+        cmd: "sestatus | grep Loaded | awk -F: '{print $2}' | grep -Eq '(targeted|mls)' && echo configured || echo not_configured"
+      changed_when: false
+      register: selinux_status_config_check
+
+    # Extract audit result
+    - set_fact:
+        selinux_status_check:
+          name: 1.5.1.3 Ensure SELinux policy is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (selinux_config_check.stdout == 'configured' and selinux_status_config_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [selinux_status_check] }}"
+      changed_when: false
+
+    # Assert compliant policy status
+    - assert:
+        that:
+        - '{{ rhel8.selinux_policy is defined and (rhel8.selinux_policy == "targeted" or rhel8.selinux_policy == "mls")}}'
+        fail_msg: "SELinux policy should be either `targeted` or `mls`"
+      when: not audit_only and not selinux_status_check.remediation_status
+
+    # 1.5.1.3 Ensure SELinux policy is configured | Remediation
+    - name: "1.5.1.3 Ensure SELinux policy is configured | Remediation"
+      ansible.posix.selinux:
+        conf: /etc/selinux/config
+        policy: "{{ rhel8.selinux_policy  if rhel8.selinux_policy is defined else 'targeted' }}"
+        state: "{{ rhel8.selinux_policy_mode  if rhel8.selinux_policy_mode is defined else 'enforcing' }}"
+      when: not audit_only and not selinux_status_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 1.5.1.4 Ensure the SELinux mode is not disabled
+  #
+  # SELinux can run in one of three modes: disabled, permissive, or enforcing
+  # - Enforcing: Is the default, and recommended, mode of operation; in enforcing
+  #   mode SELinux operates normally, enforcing the loaded security policy on the
+  #   entire system.
+  #
+  # - Permissive: The system acts as if SELinux is enforcing the loaded security
+  #   policy, including labeling objects and emitting access denial entries in the logs,
+  #   but it does not actually deny any operations. While not recommended for
+  #   production systems, permissive mode can be helpful for SELinux policy
+  #   development.
+  #
+  # - Disabled: Is strongly discouraged; not only does the system avoid enforcing the
+  #   SELinux policy, it also avoids labeling any persistent objects such as files,
+  #   making it difficult to enable SELinux in the future
+  - name: "1.5.1.4 Ensure the SELinux mode is not disabled"
+    block:
+    # 1.5.1.4 Ensure the SELinux mode is not disabled | Audit
+    - name: 1.5.1.4 Ensure the SELinux mode is not disabled | Audit
+      shell:
+        cmd: "getenforce | grep -Eiq '(Enforcing|Permissive)' && echo configured || echo not_configured"
+      changed_when: false
+      register: selinux_mode_config_check
+
+    # Extract audit result
+    - set_fact:
+        selinux_mode_check:
+          name: 1.5.1.4 Ensure the SELinux mode is not disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (selinux_config_check.stdout == 'configured' and selinux_mode_config_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [selinux_mode_check] }}"
+      changed_when: false
+
+    # Assert compliant policy status
+    - assert:
+        that:
+        - '{{ rhel8.selinux_policy_mode is defined and (rhel8.selinux_policy_mode == "enforcing" or rhel8.selinux_policy_mode == "permissive")}}'
+        fail_msg: "SELinux policy mode should be either `enforcing` or `permissive`"
+      when: not audit_only and not selinux_mode_check.remediation_status
+
+    # 1.5.1.4 Ensure the SELinux mode is not disabled | Remediation
+    - name: "1.5.1.4 Ensure the SELinux mode is not disabled | Remediation"
+      ansible.posix.selinux:
+        conf: /etc/selinux/config
+        policy: "{{ rhel8.selinux_policy  if rhel8.selinux_policy is defined else 'targeted' }}"
+        state: "{{ rhel8.selinux_policy_mode  if rhel8.selinux_policy_mode is defined else 'enforcing' }}"
+      when: not audit_only and not selinux_mode_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.5.1.5 Ensure the SELinux mode is enforcing
+  #
+  # SELinux can run in one of three modes: disabled, permissive, or enforcing
+  # - Enforcing: Is the default, and recommended, mode of operation; in enforcing
+  #   mode SELinux operates normally, enforcing the loaded security policy on the
+  #   entire system.
+  #
+  # - Permissive: The system acts as if SELinux is enforcing the loaded security
+  #   policy, including labeling objects and emitting access denial entries in the logs,
+  #   but it does not actually deny any operations. While not recommended for
+  #   production systems, permissive mode can be helpful for SELinux policy
+  #   development.
+  #
+  # - Disabled: Is strongly discouraged; not only does the system avoid enforcing the
+  #   SELinux policy, it also avoids labeling any persistent objects such as files,
+  #   making it difficult to enable SELinux in the future
+  - name: "1.5.1.5 Ensure the SELinux mode is enforcing"
+    block:
+    # 1.5.1.5 Ensure the SELinux mode is enforcing | Audit
+    - name: 1.5.1.5 Ensure the SELinux mode is enforcing | Audit
+      shell:
+        cmd: "getenforce | grep -Eiq '(Enforcing)' && echo configured || echo not_configured"
+      changed_when: false
+      register: selinux_mode_config_check
+
+    # Extract audit result
+    - set_fact:
+        selinux_mode_check:
+          name: 1.5.1.5 Ensure the SELinux mode is enforcing
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (selinux_config_check.stdout == 'configured' and selinux_mode_config_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [selinux_mode_check] }}"
+      changed_when: false
+
+    # 1.5.1.5 Ensure the SELinux mode is enforcing | Remediation
+    - name: "1.5.1.5 Ensure the SELinux mode is enforcing | Remediation"
+      ansible.posix.selinux:
+        conf: /etc/selinux/config
+        policy: "{{ rhel8.selinux_policy  if rhel8.selinux_policy is defined else 'targeted' }}"
+        state: "enforcing"
+      when: not audit_only and not selinux_mode_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 1.5.1.6 Ensure no unconfined services exist
+  #
+  # Unconfined processes run in unconfined domains
+  - name: "Ensure no unconfined services exist"
+    block:
+    # 1.5.1.6 Ensure no unconfined services exist | Audit
+    - name: 1.5.1.6 Ensure no unconfined services exist | Audit
+      shell:
+        cmd: "ps -eZ | grep unconfined_service_t | awk '{print $NF}'"
+      changed_when: false
+      register: unconfined_service_list
+
+    # Extract audit result
+    - set_fact:
+        unconfined_service_check:
+          name: 1.5.1.6 Ensure no unconfined services exist
+          scored: true
+          automated: false
+          remediation_status: "{{ true if (unconfined_service_list.stdout_lines | list | length) == 0 else false }}"
+      changed_when: false
+
+    # Define remediation message
+    - set_fact:
+        unconfined_service_recommandation:
+          remediation: "Consider to investigate any unconfined processes list bellow : \n {% for item in (unconfined_service_list.stdout_lines | list) %}{{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not unconfined_service_check.remediation_status
+
+    # Append remediation
+    - set_fact:
+        unconfined_service_check: "{{ unconfined_service_check | combine(unconfined_service_check) }}"
+      changed_when: false
+      when: not unconfined_service_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [unconfined_service_check] }}"
+      changed_when: false
+
+    - name: 1.5.1.6 Ensure no unconfined services exist | Remediation
+      # 1.5.1.6 Ensure no unconfined services exist| Remediation
+      debug:
+        msg: "Consider to investigate any unconfined processes list"
+      when: not audit_only and not unconfined_service_check.remediation_status
+      changed_when: false
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed
+  #
+  # The mcstransd daemon provides category label information to client processes
+  # requesting information. The label translations are defined in /etc/selinux/targeted/setrans.conf
+  - name: "1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed"
+    block:
+    # 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed | Audit
+    - name: 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed | Audit
+      shell:
+        cmd: rpm -qa | grep -q mcstrans && echo installed || echo not_installed
+      changed_when: false
+      register: mcstrans_status_check
+
+    # Extract audit result
+    - set_fact:
+        mcstrans_check:
+          name: 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if mcstrans_status_check.stdout == 'not_installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [mcstrans_check] }}"
+      changed_when: false
+
+    # 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed | Remediation
+    - name: 1.5.1.7 Ensure the MCS Translation Service (mcstrans) is not installed | Remediation
+      package:
+        name: mcstrans
+        state: absent
+      when: not audit_only and not mcstrans_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 1.5.1.8 Ensure SETroubleshoot is not installed
+  #
+  # The SETroubleshoot service notifies desktop users of SELinux denials through a user-
+  # friendly interface. The service provides important information around configuration
+  # errors, unauthorized intrusions, and other potential errors.
+  - name: "1.5.1.8 Ensure SETroubleshoot is not installed"
+    block:
+    # 1.5.1.8 Ensure SETroubleshoot is not installed | Audit
+    - name: 1.5.1.8 Ensure SETroubleshoot is not installed | Audit
+      shell:
+        cmd: rpm -qa | grep -q setroubleshoot && echo installed || echo not_installed
+      changed_when: false
+      register: setroubleshoot_status_check
+
+    # Extract audit result
+    - set_fact:
+        setroubleshoot_check:
+          name: 1.5.1.8 Ensure SETroubleshoot is not installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if setroubleshoot_status_check.stdout == 'not_installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [setroubleshoot_check] }}"
+      changed_when: false
+
+    # 1.5.1.8 Ensure SETroubleshoot is not installed | Remediation
+    - name: 1.5.1.8 Ensure SETroubleshoot is not installed | Remediation
+      package:
+        name: setroubleshoot
+        state: absent
+      when: not audit_only and not setroubleshoot_check.remediation_status
+    tags:
+    - "server_level_1"
+    when: "'server_level_1' in levels"

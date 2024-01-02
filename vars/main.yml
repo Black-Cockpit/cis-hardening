@@ -1,0 +1,36 @@
+# Remediation will not be applied unless the audit_only is set to false
+audit_only: true
+# Benchmark level
+# Allowed values are `server_level_1`, `server_level_2`, `workstation_level_1` or `workstation_level_2`
+levels:
+- workstation_level_1
+- workstation_level_2
+
+# Time synchronization ntp servers
+time_synchronization_servers:
+- 0.pool.ntp.org
+- 1.pool.ntp.org
+- 2.pool.ntp.org
+- 3.pool.ntp.org
+
+# Chrony server options
+chrony_server_options: "minpoll 8"
+
+# SELinux policy
+rhel8:
+  selinux_policy: targeted
+  selinux_policy_mode: enforcing
+  crypto_policy: DEFAULT
+
+  # sshd values
+  sshd:
+    client_alive_interval: 45 # Value should be greater than 0
+    client_alive_count_max: 3
+    login_grace_time: 60 # Value should be equal or less than 60
+    log_level: INFO
+    auth_max_retry: 4 # Value should be equal or less than 4
+    max_session: 10 # Value should be equal or less than 10
+    max_startups:
+      start: 10 # Value should be equal or less than 10
+      rate: 30 # Value should be equal or less than 30
+      full: 60 # Value should be equal or less than 60

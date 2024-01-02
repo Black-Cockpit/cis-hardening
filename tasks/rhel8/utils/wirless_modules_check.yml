@@ -1,0 +1,37 @@
+- name: 3.1.2 Ensure wireless interfaces are disabled | Audit
+  shell:
+    cmd: modprobe -nqv {{ item }} && echo loaded || echo not_loaded
+  changed_when: false
+  register: wireless_module_loaded_check_result
+
+# Update remediation status
+- set_fact:
+    wireless_remediation_status: "{{ true if (wireless_remediation_status and wireless_module_loaded_check_result.stdout == 'not_loaded') else false }}"
+  changed_when: false
+
+# Check if module is disabled
+- name: "3.1.2 Ensure wireless interfaces are disabled | Audit"
+  shell:
+    cmd: 'grep -r -E "^(#)?install {{ item }} /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled'
+  changed_when: false
+  register: wireless_module_check_disabled_result
+  when: wireless_remediation_status 
+
+# Update remediation status
+- set_fact:
+    wireless_remediation_status: "{{ true if (wireless_remediation_status and wireless_module_check_disabled_result.stdout != 'disabled') else false }}"
+  changed_when: false
+  when: wireless_remediation_status 
+
+# Check if module is blacklisted
+- name: "3.1.2 Ensure wireless interfaces are disabled | Audit"
+  shell:
+    cmd: 'grep -r -E "^(#)?blacklist {{ item }}" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted'
+  changed_when: false
+  register: wireless_module_blacklisted_check_result
+
+# Update remediation status
+- set_fact:
+    wireless_remediation_status: "{{ true if (wireless_remediation_status and wireless_module_blacklisted_check_result.stdout != 'blacklisted') else false }}"
+  changed_when: false
+  when: wireless_remediation_status 

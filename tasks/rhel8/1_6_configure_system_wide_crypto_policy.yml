@@ -1,0 +1,274 @@
+# 1.6 Configure system wide crypto policy
+- name: 1.6 Configure system wide crypto policy
+  block:
+  # 1.6.1 Ensure system wide crypto policy is not set to legacy
+  #
+  # When a system-wide policy is set up, the default behavior of applications will be to
+  # follow the policy. Applications will be unable to use algorithms and protocols that do not
+  # meet the policy, unless you explicitly request the application to do so.
+  # The system-wide crypto-policies followed by the crypto core components allow
+  # consistently deprecating and disabling algorithms system-wide.
+  # The LEGACY policy ensures maximum compatibility with version 5 of the operating
+  # system and earlier; it is less secure due to an increased attack surface. In addition to
+  # the DEFAULT level algorithms and protocols, it includes support for the TLS 1.0 and 1.1
+  # protocols. The algorithms DSA , 3DES , and RC4 are allowed, while RSA keys and Diffie-
+  # Hellman parameters are accepted if they are at least 1023 bits long.
+  - name: "1.6.1 Ensure system wide crypto policy is not set to legacy"
+    block:
+    # 1.6.1 Ensure system wide crypto policy is not set to legacy | Audit
+    - name: 1.6.1 Ensure system wide crypto policy is not set to legacy | Audit
+      shell:
+        cmd: grep -Pi '^\h*LEGACY\b' /etc/crypto-policies/config && echo is_legacy || echo not_legacy
+      changed_when: false
+      register: crypto_policy_status_check
+
+    # Extract audit result
+    - set_fact:
+        crypto_policy_check:
+          name: 1.6.1 Ensure system wide crypto policy is not set to legacy
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crypto_policy_status_check.stdout == 'not_legacy' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crypto_policy_check] }}"
+      changed_when: false
+
+    # Assert compliant crypto policy
+    - assert:
+        that:
+        - '{{ rhel8.crypto_policy is defined and (rhel8.crypto_policy != "LEGACY")}}'
+        fail_msg: "`LEGACY` crypto policy is not allowed"
+      when: not audit_only and not crypto_policy_check.remediation_status
+
+    # 1.6.1 Ensure system wide crypto policy is not set to legacy | Remediation
+    - name: 1.6.1 Ensure system wide crypto policy is not set to legacy | Remediation
+      shell:
+        cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}"
+      when: not audit_only and not crypto_policy_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support
+  #
+  # SHA-1 (Secure Hash Algorithm) is a cryptographic hash function that produces a 160 bit
+  # hash value.
+  - name: "1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support"
+    block:
+    # 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Audit
+    - name: 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Audit
+      shell:
+        cmd: |
+          grep -Piq -- '^\h*(hash|sign)\h*=\h*([^\n\r#]+)?-sha1\b' /etc/crypto-policies/state/CURRENT.pol \
+          && echo not_compliant || echo compliant
+      changed_when: false
+      register: sha1_sign_status_check
+      
+    # 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Audit
+    - name: 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Audit
+      shell:
+        cmd: |
+          grep -Pi -- '^\h*sha1_in_certs\h*=\h*' /etc/crypto-policies/state/CURRENT.pol \
+          | grep -Eq '(^\s{0,}sha1_in_certs\s{0,}=\s{0,}0)' && echo compliant || echo not_compliant
+      changed_when: false
+      register: sha1_certs_status_check
+
+    # Extract audit result
+    - set_fact:
+        sha1_check:
+          name: 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (sha1_sign_status_check.stdout == 'compliant' and sha1_certs_status_check.stdout == 'compliant') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [sha1_check] }}"
+      changed_when: false
+
+    # 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Remediation
+    - name: 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Remediation
+      blockinfile:
+        path: /etc/crypto-policies/policies/modules/NO-SHA1.pmod
+        mode: "0644"
+        owner: root
+        group: root
+        block: |
+          # This is a subpolicy dropping the SHA1 hash and signature support
+          hash = -SHA1
+          sign = -*-SHA1
+          sha1_in_certs = 0
+        state: present
+        create: true
+      when: not audit_only and not sha1_check.remediation_status
+
+    # 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Remediation
+    - name: 1.6.2 Ensure system wide crypto policy disables sha1 hash and signature support | Remediation
+      shell:
+        cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1"
+      when: not audit_only and not sha1_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 1.6.3 Ensure system wide crypto policy disables cbc for ssh
+  #
+  # SHA-1 (Secure Hash Algorithm) is a cryptographic hash function that produces a 160 bit
+  # hash value.
+  - name: "1.6.3 Ensure system wide crypto policy disables cbc for ssh"
+    block:
+    # 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+    - name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+      shell:
+        cmd: |
+          grep -Piq -- '^\h*cipher\h*=\h*([^#\n\r]+)?-CBC\b' /etc/crypto-policies/state/CURRENT.pol \
+          && echo cbc_enabled || echo cbc_disabled
+      changed_when: false
+      register: cbc_status_check
+
+    # 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+    - name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+      shell:
+        cmd: |
+          grep -Piq -- '^\h*cipher@(lib|open)ssh(-server|-client)?\h*=\h*' /etc/crypto-policies/state/CURRENT.pol \
+          && echo ssh_cbc_enabled || echo ssh_cbc_disabled
+      changed_when: false
+      register: ssh_cbc_status_check
+      when: cbc_status_check.stdout == 'cbc_enabled'
+
+
+    # 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+    - name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh | Audit
+      shell:
+        cmd: |
+          grep -Piq -- '^\h*cipher@(lib|open)ssh(-server|-client)?\h*=\h*([^#\n\r]+)?-CBC\b' /etc/crypto-policies/state/CURRENT.pol \
+          && echo ssh_cbc_disabled || echo ssh_cbc_enabled
+      changed_when: false
+      register: ssh_cbc_policy_status_check
+      when: cbc_status_check.stdout == 'ssh_cbc_enabled'
+
+    # Define compliace status
+    - set_fact:
+        cbc_rule_remediation_status: "{{ true if (cbc_status_check.stdout == 'cbc_disabled') else false }}"
+      changed_when: false
+
+    # Append to compliace status
+    - set_fact:
+        cbc_rule_remediation_status: "{{ true if (cbc_rule_remediation_status and ssh_cbc_status_check.stdout == 'ssh_cbc_disabled') else false }}"
+      changed_when: false
+      when: (ssh_cbc_status_check is defined) and (ssh_cbc_status_check.stdout is defined)
+
+    # Append to compliace status
+    - set_fact:
+        cbc_rule_remediation_status: "{{ true if (cbc_rule_remediation_status and ssh_cbc_policy_status_check.stdout == 'ssh_cbc_disabled') else false }}"
+      changed_when: false
+      when: (ssh_cbc_policy_status_check is defined) and (ssh_cbc_policy_status_check.stdout is defined)
+
+    # Extract audit result
+    - set_fact:
+        cbc_check:
+          name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh 
+          scored: true
+          automated: true
+          remediation_status: "{{ true if cbc_rule_remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [cbc_check] }}"
+      changed_when: false
+
+    # 1.6.3 Ensure system wide crypto policy disables cbc for ssh  | Remediation
+    - name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh  | Remediation
+      blockinfile:
+        path: /etc/crypto-policies/policies/modules/NO-SSHCBC.pmod
+        mode: "0644"
+        owner: root
+        group: root
+        block: |
+          # This is a subpolicy to disable all CBC mode ciphers
+          # for the SSH protocol (libssh and OpenSSH)
+          cipher = -*-CBC
+        state: present
+        create: true
+      when: not audit_only and not cbc_check.remediation_status
+
+    # 1.6.3 Ensure system wide crypto policy disables cbc for ssh  | Remediation
+    - name: 1.6.3 Ensure system wide crypto policy disables cbc for ssh  | Remediation
+      shell:
+        cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC"
+      when: not audit_only and not cbc_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits
+  #
+  # Message Authentication Code (MAC) algorithm is a family of cryptographic functions
+  # that is parameterized by a symmetric key. Each of the functions can act on input data
+  # (called a “message”) of variable length to produce an output value of a specified length.
+  # The output value is called the MAC of the input message.
+  # A MAC algorithm can be used to provide data-origin authentication and data-integrity
+  # protection
+  - name: "1.6.4 Ensure system wide crypto policy disables macs less than 128 bits"
+    block:
+    # 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Audit
+    - name: 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Audit
+      shell:
+        cmd: |
+          grep -Piq -- '^\h*mac\h*=\h*([^#\n\r]+)?-64\b' /etc/crypto-policies/state/CURRENT.pol \
+          && echo not_compliant || echo compliant
+      changed_when: false
+      register: crypto_policy_mac_status_check
+
+    # Extract audit result
+    - set_fact:
+        crypto_policy_mac_check:
+          name: 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crypto_policy_mac_status_check.stdout == 'compliant' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crypto_policy_mac_check] }}"
+      changed_when: false
+
+    # 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Remediation
+    - name: 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Remediation
+      blockinfile:
+        path: /etc/crypto-policies/policies/modules/NO-WEAKMAC.pmod
+        mode: "0644"
+        owner: root
+        group: root
+        block: |
+          # This is a subpolicy to disable weak macs
+          mac = -*-64*
+        state: present
+        create: true
+      when: not audit_only and not crypto_policy_mac_check.remediation_status
+
+    # 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Remediation
+    - name: 1.6.4 Ensure system wide crypto policy disables macs less than 128 bits | Remediation
+      shell:
+        cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC:NO-WEAKMAC"
+      when: not audit_only and not crypto_policy_mac_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

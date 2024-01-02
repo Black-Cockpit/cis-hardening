@@ -1,0 +1,1063 @@
+# Check if gdm or gdm3 is installed
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+
+
+# 1.8 Configure GNOME Display Manager
+- name: 1.8 Configure GNOME Display Manager
+  block:
+  # 1.8.1 Ensure GNOME Display Manager is removed
+  #
+  # The GNOME Display Manager (GDM) is a program that manages graphical display
+  # servers and handles graphical user logins.
+  - name: "1.8.1 Ensure GNOME Display Manager is removed"
+    block:
+    # Extract audit result
+    - set_fact:
+        gdm_check:
+          name: 1.8.1 Ensure GNOME Display Manager is removed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if gdm_installed else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_check] }}"
+      changed_when: false
+
+    # 1.8.1 Ensure GNOME Display Manager is removed | Remediation
+    - name: 1.8.1 Ensure GNOME Display Manager is removed | Remediation
+      package:
+        name: gdm
+        state: absent
+      when: not audit_only and not gdm_check.remediation_status
+    # 1.8.1 Ensure GNOME Display Manager is removed | Remediation
+    - name: 1.8.1 Ensure GNOME Display Manager is removed | Remediation
+      package:
+        name: gdm3
+        state: absent
+      when: not audit_only and not gdm_check.remediation_status
+    tags:
+    - "server_level_2"
+    when: "'server_level_2' in levels in levels"
+
+
+
+  # 1.8.2 Ensure GDM login banner is configured
+  #
+  # GDM is the GNOME Display Manager which handles graphical login for GNOME based
+  # systems.
+  - name: "1.8.2 Ensure GDM login banner is configured"
+    block:
+    # 1.8.2 Ensure GDM login banner is configured | Audit
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: l_gdmfile="$(grep -Prils '^\h*banner-message-enable\b' /etc/dconf/db/*.d)" && echo $l_gdmfile || echo ''
+      changed_when: false
+      register: banner_key_file_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_login_banner_rule_status: "{{ true if banner_key_file_status_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Extract profile name for existing key file
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: grep -Prils '^\h*banner-message-enable\b' /etc/dconf/db/*.d | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+      changed_when: false
+      register: banner_profile_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_login_banner_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_key_file_status_check.stdout != '') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Check if banner-message-enable is set to true
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: "grep -Pisq '^\\h*banner-message-enable=true\\b' {{ banner_key_file_status_check.stdout }} && echo configured || echo not_configured "
+      changed_when: false
+      register: banner_message_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_login_banner_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_message_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Check if banner-message-text is not empty
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: "grep -Piosq '^\\h*banner-message-text=.*$' {{ banner_key_file_status_check.stdout }} && echo configured || echo not_configured "
+      changed_when: false
+      register: banner_message_content_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_login_banner_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_message_content_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Check profile exists
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+      changed_when: false
+      register: banner_profile_exist_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_login_banner_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_login_banner_check:
+          name: 1.8.2 Ensure GDM login banner is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_login_banner_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_login_banner_check] }}"
+      changed_when: false
+
+    # 1.8.2 Ensure GDM login banner is configured | Remediation
+    - name: 1.8.2 Ensure GDM login banner is configured | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_login_banner_check.remediation_status
+
+    # 1.8.2 Ensure GDM login banner is configured | Remediation
+    - name: 1.8.2 Ensure GDM login banner is configured | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_login_banner_check.remediation_status
+
+    # 1.8.2 Ensure GDM login banner is configured | Remediation
+    - name: 1.8.2 Ensure GDM login banner is configured | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_login_banner_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.8.3 Ensure GDM disable-user-list option is enabled
+  #
+  # GDM is the GNOME Display Manager which handles graphical login for GNOME based
+  # systems.
+  # The disable-user-list option controls if a list of users is displayed on the login screen
+  - name: "1.8.3 Ensure GDM disable-user-list option is enabled"
+    block:
+    # 1.8.3 Ensure GDM disable-user-list option is enabled | Audit
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Audit
+      shell:
+        cmd: l_gdmfile="$(grep -Prils '^\h*disable-user-list\b' /etc/dconf/db/*.d)" && echo $l_gdmfile || echo ''
+      changed_when: false
+      register: banner_key_file_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_display_user_rule_status: "{{ true if banner_key_file_status_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Extract profile name for existing key file
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Audit
+      shell:
+        cmd: grep -Prils '^\h*disable-user-list\b' /etc/dconf/db/*.d | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+      changed_when: false
+      register: banner_profile_status_check
+      when: gdm_display_user_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_key_file_status_check.stdout != '') else false }}"
+      changed_when: false
+      when: gdm_display_user_rule_status
+
+    # Check if disable-user-list is set to true
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Audit
+      shell:
+        cmd: "grep -Pisq '^\\h*disable-user-list=true\\b' {{ banner_key_file_status_check.stdout }} && echo configured || echo not_configured "
+      changed_when: false
+      register: banner_display_user_status_check
+      when: gdm_display_user_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_display_user_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_display_user_rule_status
+
+    # Check profile exists
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Audit
+      shell:
+        cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+      changed_when: false
+      register: banner_profile_exist_status_check
+      when: gdm_display_user_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_display_user_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_display_user_check:
+          name: 1.8.3 Ensure GDM disable-user-list option is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_display_user_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_display_user_check] }}"
+      changed_when: false
+
+    # 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_display_user_check.remediation_status
+
+    # 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_display_user_check.remediation_status
+
+    # 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+    - name: 1.8.3 Ensure GDM disable-user-list option is enabled | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_display_user_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.8.4 Ensure GDM screen locks when the user is idle
+  #
+  # GNOME Desktop Manager can make the screen lock automatically whenever the user
+  # is idle for some amount of time.
+  #
+  # - idle-delay=uint32 {n}: Number of seconds of inactivity before the screen goes blank
+  # - lock-delay=uint32 {n}: Number of seconds after the screen is blank before locking the screen
+  - name: "1.8.4 Ensure GDM screen locks when the user is idle"
+    block:
+    # 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+      shell:
+        cmd: l_kfile="$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/)" && echo $l_kfile || echo ''
+      changed_when: false
+      register: lock_key_file_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_screen_lock_rule_status: "{{ true if lock_key_file_status_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Extract profile name for existing key file
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+      shell:
+        cmd: grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+      changed_when: false
+      register: banner_profile_status_check
+      when: gdm_screen_lock_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and banner_key_file_status_check.stdout != '') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_rule_status
+
+    # Extract idle-delay value
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+      shell:
+        cmd: "awk -F 'uint32' '/idle-delay/{print $2}' {{ lock_key_file_status_check.stdout }} | xargs || ''"
+      changed_when: false
+      register: gdm_idle_delay_status
+      when: gdm_screen_lock_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and gdm_idle_delay_status.stdout != '' and (gdm_idle_delay_status.stdout | int ) > 0 and (gdm_idle_delay_status.stdout | int ) <= 900 ) else false }}"
+      changed_when: false
+      when: gdm_screen_lock_rule_status
+
+
+    # Extract idle-delay value
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+      shell:
+        cmd: "awk -F 'uint32' '/lock-delay/{print $2}' {{ lock_key_file_status_check.stdout }} | xargs || ''"
+      changed_when: false
+      register: gdm_lock_delay_status
+      when: gdm_screen_lock_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and gdm_lock_delay_status.stdout != '' and (gdm_lock_delay_status.stdout | int ) <= 5 ) else false }}"
+      changed_when: false
+      when: gdm_screen_lock_rule_status
+
+    # Check profile exists
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Audit
+      shell:
+        cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+      changed_when: false
+      register: banner_profile_exist_status_check
+      when: gdm_screen_lock_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_screen_lock_check:
+          name: 1.8.4 Ensure GDM screen locks when the user is idle
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_screen_lock_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_screen_lock_check] }}"
+      changed_when: false
+
+    # 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+    # 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+    # 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-screensaver
+        src: rhel/etc/gdm.d/00-screensaver.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+    # 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+    - name: 1.8.4 Ensure GDM screen locks when the user is idle | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_screen_lock_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.8.5 Ensure GDM screen locks cannot be overridden
+  #
+  # GNOME Desktop Manager can make the screen lock automatically whenever the user
+  # is idle for some amount of time.
+  #
+  # By using the lockdown mode in dconf, you can prevent users from changing specific
+  # settings.
+  # To lock down a dconf key or subpath, create a locks subdirectory in the keyfile directory.
+  # The files inside this directory contain a list of keys or subpaths to lock. Just as with the
+  # keyfiles, you may add any number of files to this directory.
+  - name: "1.8.5 Ensure GDM screen locks cannot be overridden"
+    block:
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+      shell:
+        cmd: l_kfile="$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/)" && echo $l_kfile || echo ''
+      changed_when: false
+      register: lock_key_file_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_screen_lock_protection_rule_status: "{{ true if lock_key_file_status_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Extract profile name for existing key file
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+      shell:
+        cmd: grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+      changed_when: false
+      register: banner_profile_status_check
+      when: gdm_screen_lock_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and banner_key_file_status_check.stdout != '') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_protection_rule_status
+
+    # Extract profile directory
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+      shell:
+        cmd: l_kfd="/etc/dconf/db/$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}').d" && echo $l_kfd || echo ''
+      changed_when: false
+      register: gdm_profile_directory_status
+      when: gdm_screen_lock_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_profile_directory_status.stdout != '') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_protection_rule_status
+
+    # Check screen idle-delay file is locked
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+      shell:
+        cmd: 'grep -Prilq "/org/gnome/desktop/session/idle-delay\b" {{ gdm_profile_directory_status.stdout }} && echo locked || echo not_locked'
+      changed_when: false
+      register: gdm_screen_idle_delay_protection_status
+      when: gdm_screen_lock_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_screen_idle_delay_protection_status.stdout == 'locked') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_protection_rule_status
+
+    # Check screen  file is locked
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Audit
+      shell:
+        cmd: 'grep -Prilq "/org/gnome/desktop/screensaver/lock-delay\b" {{ gdm_profile_directory_status.stdout }} && echo locked || echo not_locked'
+      changed_when: false
+      register: gdm_screen_lock_delay_protection_status
+      when: gdm_screen_lock_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_screen_lock_delay_protection_status.stdout == 'locked') else false }}"
+      changed_when: false
+      when: gdm_screen_lock_protection_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_screen_lock_protection_check:
+          name: 1.8.5 Ensure GDM screen locks cannot be overridden
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_screen_lock_protection_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_screen_lock_protection_check] }}"
+      changed_when: false
+
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-screensaver
+        src: rhel/etc/gdm.d/00-screensaver.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/locks/screensaver
+        src: rhel/etc/gdm.d/locks/screensaver.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+    # 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+    - name: 1.8.5 Ensure GDM screen locks cannot be overridden | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.8.6 Ensure GDM automatic mounting of removable media is disabled
+  #
+  # By default GNOME automatically mounts removable media when inserted as a
+  # convenience to the user.
+  - name: "1.8.6 Ensure GDM automatic mounting of removable media is disabled"
+    block:
+    # 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Audit
+    # Extract gdm profile if exists
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Audit
+      shell:
+        cmd: |
+          profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+          l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+          [[ -z $profile_conf ]] || echo $profile_conf | awk -F\/ '{split($(NF-1),a,".");print a[1]}' || echo ''
+      changed_when: false
+      register: banner_profile_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_automount_rule_status: "{{ true if banner_profile_status_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Check profile exists
+    - name: 1.8.2 Ensure GDM login banner is configured | Audit
+      shell:
+        cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+      changed_when: false
+      register: banner_profile_exist_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Check if automount is disabled
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Audit
+      shell:
+        cmd: |
+          profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+          l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+          grep -Pqrs -- '^\h*automount\h*=\h*false\b' $profile_conf && echo disabled || echo not_disabled
+      changed_when: false
+      register: gdm_automount_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and gdm_automount_status_check.stdout == 'disabled') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Audit
+      # Check if automount-open is disabled
+      shell:
+        cmd: |
+          profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+          l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+          grep -Pqrs -- '^\h*automount-open\h*=\h*false\b' $profile_conf && echo disabled || echo not_disabled
+      changed_when: false
+      register: gdm_automount_open_status_check
+      when: gdm_login_banner_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and gdm_automount_open_status_check.stdout == 'disabled') else false }}"
+      changed_when: false
+      when: gdm_login_banner_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_automount_check:
+          name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_automount_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_automount_check] }}"
+      changed_when: false
+
+    # 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_check.remediation_status
+
+    # 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_check.remediation_status
+
+    # 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-media-automount
+        src: rhel/etc/gdm.d/00-media-automount.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_check.remediation_status
+
+    # 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+    - name: 1.8.6 Ensure GDM automatic mounting of removable media is disabled | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_automount_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_2"
+    when: "'server_level_1' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden
+  #
+  # By default GNOME automatically mounts removable media when inserted as a
+  # convenience to the user
+  # By using the lockdown mode in dconf, you can prevent users from changing specific
+  # settings.
+  # To lock down a dconf key or subpath, create a locks subdirectory in the keyfile directory.
+  # The files inside this directory contain a list of keys or subpaths to lock. Just as with the
+  # keyfiles, you may add any number of files to this directory.
+  - name: "1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden"
+    block:
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Audit
+    #  Extract gdm dconf profile
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Audit
+      shell:
+        cmd: |
+          l_kfd="/etc/dconf/db/$(grep -Psril '^\h*automount\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}').d" && \
+          echo $l_kfd || l_kfd2="/etc/dconf/db/$(grep -Psril '^\h*automount-open\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}' ).d" && \
+          echo $l_kfd2 || echo ''
+      changed_when: false
+      register: automount_dconf_file_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_automount_protection_rule_status: "{{ true if automount_dconf_file_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Check if automount is locked
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Audit
+      shell:
+        cmd: 'grep -Prilq "/org/gnome/desktop/media-handling/automount\b" {{ automount_dconf_file_check.stdout }} && echo locked || echo not_locked'
+      changed_when: false
+      register: gdm_automount_protection_status
+      when: gdm_automount_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_automount_protection_rule_status: "{{ true if (gdm_automount_protection_rule_status and gdm_automount_protection_status.stdout == 'locked') else false }}"
+      changed_when: false
+      when: gdm_automount_protection_rule_status
+
+    # Check if automount-open is locked
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Audit
+      shell:
+        cmd: 'grep -Prilq "/org/gnome/desktop/media-handling/automount-open\b" {{ automount_dconf_file_check.stdout }} && echo locked || echo not_locked'
+      changed_when: false
+      register: gdm_automount_open_protection_status
+      when: gdm_automount_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_automount_protection_rule_status: "{{ true if (gdm_automount_protection_rule_status and gdm_automount_open_protection_status.stdout == 'locked') else false }}"
+      changed_when: false
+      when: gdm_automount_protection_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_automount_protection_check:
+          name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_automount_protection_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_automount_protection_check] }}"
+      changed_when: false
+
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_protection_check.remediation_status
+
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/01-banner-message
+        src: rhel/etc/gdm.d/01-banner-message.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_protection_check.remediation_status
+
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-media-automount
+        src: rhel/etc/gdm.d/00-media-automount.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_protection_check.remediation_status
+
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/locks/media-automount
+        src: rhel/etc/gdm.d/locks/media-automount.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_automount_protection_check.remediation_status
+
+    # 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+    - name: 1.8.7 Ensure GDM disabling automatic mounting of removable media is not overridden | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_automount_protection_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_2"
+    when: "'server_level_1' in levels or 'workstation_level_2' in levels"
+
+
+  # 1.8.8 Ensure GDM autorun-never is enabled
+  #
+  # The autorun-never setting allows the GNOME Desktop Display Manager to disable
+  # autorun through GDM.
+  - name: "1.8.8 Ensure GDM autorun-never is enabled"
+    block:
+    # 1.8.8 Ensure GDM autorun-never is enabled | Audit
+    # Extract gdm profile if exists
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Audit
+      shell:
+        cmd: grep -Prils -- '^\h*autorun-never\b' /etc/dconf/db/*.d | awk -F\/ '{split($(NF-1),a,".");print a[1]}' || echo ''
+      changed_when: false
+      register: banner_profile_status_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_autorun_rule_status: "{{ true if banner_profile_status_check.stdout != '' else false }}"
+      changed_when: false
+
+
+    # Check profile exists
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Audit
+      shell:
+        cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+      changed_when: false
+      register: banner_profile_exist_status_check
+      when: gdm_autorun_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_autorun_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+      when: gdm_autorun_rule_status
+
+    # Check if autorun-never is enabled
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Audit
+      shell:
+        cmd: |
+          profile_conf=$(l_kfile="$(grep -Prils -- '^\h*autorun-never\b' /etc/dconf/db/*.d)" && echo $l_kfile || echo '');
+          grep -Pqrs -- '^\h*autorun-never\h*=\h*true\b' $profile_conf && echo enabled || echo not_enabled
+      changed_when: false
+      register: gdm_autorunnever_status_check
+      when: gdm_autorun_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_autorun_rule_status: "{{ true if (gdm_autorun_rule_status and gdm_autorunnever_status_check.stdout == 'enabled') else false }}"
+      changed_when: false
+      when: gdm_autorun_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_autorun_check:
+          name: 1.8.8 Ensure GDM autorun-never is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_autorun_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_autorun_check] }}"
+      changed_when: false
+
+    # 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_autorun_check.remediation_status
+
+    # 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-media-autorun
+        src: rhel/etc/gdm.d/00-media-autorun.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_autorun_check.remediation_status
+
+    # 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+    - name: 1.8.8 Ensure GDM autorun-never is enabled | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_autorun_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.8.9 Ensure GDM autorun-never is not overridden
+  #
+  # The autorun-never setting allows the GNOME Desktop Display Manager to disable
+  # autorun through GDM.
+  # By using the lockdown mode in dconf, you can prevent users from changing specific
+  # settings.
+  # To lock down a dconf key or subpath, create a locks subdirectory in the keyfile directory.
+  # The files inside this directory contain a list of keys or subpaths to lock. Just as with the
+  # keyfiles, you may add any number of files to this directory.
+  - name: "1.8.9 Ensure GDM autorun-never is not overridden"
+    block:
+    # 1.8.9 Ensure GDM autorun-never is not overridden | Audit
+    # Extract gdm dconf profile
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Audit
+      shell:
+        cmd: |
+          l_kfd="/etc/dconf/db/$(grep -Psril '^\h*autorun-never\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}').d" && \
+          echo $l_kfd || echo ''
+      changed_when: false
+      register: autorun_never_dconf_file_check
+
+    # Define compliace status
+    - set_fact:
+        gdm_autorun_never_protection_rule_status: "{{ true if autorun_never_dconf_file_check.stdout != '' else false }}"
+      changed_when: false
+
+    # Check if autorun-never is locked
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Audit
+      shell:
+        cmd: 'grep -Prilq "/org/gnome/desktop/media-handling/autorun-never\b" {{ autorun_never_dconf_file_check.stdout }} && echo locked || echo not_locked'
+      changed_when: false
+      register: gdm_autorun_never_protection_status
+      when: gdm_autorun_never_protection_rule_status
+
+    # Update compliace status
+    - set_fact:
+        gdm_autorun_never_protection_rule_status: "{{ true if (gdm_autorun_never_protection_rule_status and gdm_autorun_never_protection_status.stdout == 'locked') else false }}"
+      changed_when: false
+      when: gdm_autorun_never_protection_rule_status
+
+    # Extract audit result
+    - set_fact:
+        gdm_autorun_never_protection_check:
+          name: 1.8.9 Ensure GDM autorun-never is not overridden
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_autorun_never_protection_rule_status)) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gdm_autorun_never_protection_check] }}"
+      changed_when: false
+
+    # 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+      template:
+        dest: /etc/dconf/profile/gdm
+        src: rhel/etc/gdm.d/gdm.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+    # 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/00-media-autorun
+        src: rhel/etc/gdm.d/00-media-autorun.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+    # 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+      template:
+        dest: /etc/dconf/db/gdm.d/locks/media-autorun
+        src: rhel/etc/gdm.d/locks/media-autorun.j2
+        mode: "0644"
+        owner: root
+        group: root
+        force: true
+      when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+    # 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+    - name: 1.8.9 Ensure GDM autorun-never is not overridden | Remediation
+      shell:
+        cmd: dconf update
+      when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 1.8.10 Ensure XDMCP is not enabled
+  #
+  # X Display Manager Control Protocol (XDMCP) is designed to provide authenticated
+  # access to display management services for remote displays
+  - name: "1.8.10 Ensure XDMCP is not enabled"
+    block:
+    # 1.8.10 Ensure XDMCP is not enabled | Audit
+    - name: 1.8.10 Ensure XDMCP is not enabled | Audit
+      shell:
+        cmd: grep -Eis '^\s*Enable\s*=\s*true' /etc/gdm/custom.conf && echo exists || echo not_exists
+      changed_when: false
+      register: xdmcp_status_check
+
+    # Extract audit result
+    - set_fact:
+        xdmcp_check:
+          name: 1.8.10 Ensure XDMCP is not enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (not gdm_installed or (gdm_installed and xdmcp_status_check.stdout == 'not_exists')) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [xdmcp_check] }}"
+      changed_when: false
+
+    # 1.8.10 Ensure XDMCP is not enabled | Remediation
+    - name: 1.8.10 Ensure XDMCP is not enabled | Remediation
+      replace:
+        path: /etc/gdm/custom.conf
+        regexp: "Enable=true"
+        replace: "#Enable=true"
+      when: not audit_only and not xdmcp_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+

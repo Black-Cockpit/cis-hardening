@@ -1,0 +1,116 @@
+# 4.1.2 Configure at
+- name: 4.1.2 Configure at
+  block:
+  # 4.1.2.1 Ensure at is restricted to authorized users
+  #
+  # at allows fairly complex time specifications, extending the POSIX.2 standard. It accepts
+  # times of the form HH:MM to run a job at a specific time of day. (If that time is already
+  # past, the next day is assumed.) You may also specify midnight, noon, or teatime (4pm)
+  # and you can have a time-of-day suffixed with AM or PM for running in the morning or
+  # the evening. You can also say what day the job will be run, by giving a date in the form
+  # month-name day with an optional year, or giving a date of the form MMDD[CC]YY,
+  # MM/DD/[CC]YY, DD.MM.[CC]YY or [CC]YY-MM-DD. The specification of a date must
+  # follow the specification of the time of day. You can also give times like now + count
+  # time-units, where the time-units can be minutes, hours, days, or weeks and you can tell
+  # at to run the job today by suffixing the time with today and to run the job tomorrow by
+  # suffixing the time with tomorrow.
+  # 
+  # The /etc/at.allow and /etc/at.deny files determine which user can submit commands
+  # for later execution via at or batch. The format of the files is a list of usernames, one on
+  # each line. Whitespace is not permitted. If the file /etc/at.allow exists, only usernames
+  # mentioned in it are allowed to use at. If /etc/at.allow does not exist, /etc/at.deny is
+  # checked, every username not mentioned in it is then allowed to use at. An empty
+  # /etc/at.deny means that every user may use at. If neither file exists, only the superuser
+  # is allowed to use at.
+  - name: "4.1.2.1 Ensure at is restricted to authorized users"
+    block:
+    # 4.1.2.1 Ensure at is restricted to authorized users | Audit
+    - name: 4.1.2.1 Ensure at is restricted to authorized users | Audit
+      shell:
+        cmd: rpm -qa | grep -qE "^at-[0-9]" && echo installed || echo not_installed
+      changed_when: false
+      register: at_installation_status_check
+
+    # Define at installation status
+    - set_fact:
+        is_at_installed: "{{ true if at_installation_status_check.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # 4.1.2.1 Ensure at is restricted to authorized users | Audit
+    - name: 4.1.2.1 Ensure at is restricted to authorized users | Audit
+      stat:
+        path: /etc/at.allow
+      changed_when: false
+      register: at_allow_stat
+      when: is_at_installed
+
+    # Audit /etc/at.allow
+    - set_fact:
+        at_allow_check: "{{ true if (at_allow_stat.stat.exists and at_allow_stat.stat.mode == '0640' and at_allow_stat.stat.pw_name == 'root' and at_allow_stat.stat.gr_name == 'root') else false}}"
+      changed_when: false
+      when: is_at_installed
+
+    # 4.1.2.1 Ensure at is restricted to authorized users | Audit
+    - name: 4.1.2.1 Ensure at is restricted to authorized users | Audit
+      stat:
+        path: /etc/at.deny
+      changed_when: false
+      register: at_deny_stat
+      when: is_at_installed
+
+    # Audit /etc/at.deny
+    - set_fact:
+        at_deny_check: "{{ true if ((at_allow_stat.stat.exists and not at_deny_stat.stat.exists) or (at_deny_stat.stat.exists and at_deny_stat.stat.mode == '0640' and at_deny_stat.stat.pw_name == 'root' and at_deny_stat.stat.gr_name == 'root')) else false}}"
+      changed_when: false
+      when: is_at_installed
+
+    # Extract audit result
+    - set_fact:
+        at_authorization_check:
+          name: 4.1.2.1 Ensure at is restricted to authorized users
+          scored: true
+          automated: true
+      changed_when: false
+      
+    # Set remidiation status
+    - set_fact:
+        at_authorization_remediation_status: 
+          remediation_status: "{{ true if  at_allow_check and at_deny_check else false }}"
+      changed_when: false
+      when: is_at_installed
+
+    # Append remediation status to audit result
+    - set_fact:
+        at_authorization_check: "{{ at_authorization_check | combine(at_authorization_remediation_status) }}"
+      changed_when: false
+      when: is_at_installed
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [at_authorization_check] }}"
+      changed_when: false
+
+    # 4.1.2.1 Ensure at is restricted to authorized users | Remediation
+    - name: 4.1.2.1 Ensure at is restricted to authorized users | Remediation
+      file:
+        path: /etc/at.allow
+        owner: root
+        group: root
+        mode: "0640"
+        state: file
+      when: not audit_only and is_at_installed and not at_authorization_check.remediation_status and at_allow_stat.stat.exists
+
+    # 4.1.2.1 Ensure at is restricted to authorized users | Remediation
+    - name: 4.1.2.1 Ensure at is restricted to authorized users | Remediation
+      file:
+        path: /etc/at.deny
+        owner: root
+        group: root
+        mode: "0640"
+        state: file
+      when: not audit_only and is_at_installed and not at_authorization_check.remediation_status and not at_allow_stat.stat.exists and not at_deny_check
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+

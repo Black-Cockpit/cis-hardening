@@ -1,0 +1,334 @@
+- name: 1.4 Configure Additional Process Hardening
+  block:
+  # 1.4.1 Ensure address space layout randomization (ASLR) is enabled
+  #
+  # Address space layout randomization (ASLR) is an exploit mitigation technique which
+  # randomly arranges the address space of key data areas of a process.
+  - name: "1.4.1 Ensure address space layout randomization (ASLR) is enabled"
+    block:
+    # Check ASLR configuration is set on sysctl.conf file
+    - name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}kernel.randomize_va_space\s{0,}=\s{0,}2" /etc/sysctl.conf && echo exists || echo not_exists'
+      changed_when: false
+      register: aslr_sysctl_conf_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Set ASLR configuration compliance tracker
+    - set_fact:
+        aslr_configured: "{{ true if aslr_sysctl_conf_check.stdout == 'exists' else false }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Check if one of sysctl configuration files has ASLR configuration
+    - name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}kernel.randomize_va_space\s{0,}=\s{0,}2" {{ item }} && echo exists || echo not_exists'
+      changed_when: false
+      register: aslr_sysctl_conf_files_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+      loop: "{{ sysctl_conf_files }}"
+
+    # Check if ASLR is configured in one of the sysctl listed files
+    - set_fact:
+        aslr_configured: "{{ true if (aslr_configured or item.stdout == 'exists') else false }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+      loop_control:
+        label: "{{ item.stdout }}"
+      loop: "{{ aslr_sysctl_conf_files_check.results | list }}"
+
+    # Check if ASLR is configured in one of the UFW sysctl configuration files
+    - name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Audit
+      shell:
+        cmd: | 
+          l_ufwscf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+          [[ -f $l_ufwscf ]] && grep -Eq "^\s{0,}kernel.randomize_va_space\s{0,}=\s{0,}2" $(echo $l_ufwscf) && \
+          echo exists || echo not_exists
+      changed_when: false
+      register: aslr_ufw_sysctl_conf_files_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Extract audit result
+    - set_fact:
+        aslr_configured_check: 
+          name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled
+          scored: true
+          automated: true
+      changed_when: false
+    
+    # Define if rule is applicable or not
+    - set_fact:
+        aslr_rule:
+          remediation_status: "{{ true if aslr_configured or aslr_ufw_sysctl_conf_files_check.stdout == 'exists' else false }}" 
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Append remidiation status
+    - set_fact:
+        aslr_configured_check: "{{ aslr_configured_check | combine(aslr_rule) }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [aslr_configured_check] }}"
+      changed_when: false
+
+    # 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Remediation
+    - name: "1.4.1 Ensure address space layout randomization (ASLR) is enabled | Remediation"
+      ansible.posix.sysctl:
+        name: kernel.randomize_va_space
+        value: 2
+        state: present
+        sysctl_set: true
+        reload: true
+      when: not audit_only and (aslr_configured_check.remediation_status is defined and not aslr_configured_check.remediation_status ) and not is_ipv6_disabled
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.4.2 Ensure ptrace_scope is restricted
+  #
+  # The ptrace() system call provides a means by which one process (the "tracer") may
+  # bserve and control the execution of another process (the "tracee"), and examine and
+  # change the tracee's memory and registers.
+  - name: "1.4.2 Ensure ptrace_scope is restricted"
+    block:
+    # Check ptrace_scope configuration is set on sysctl.conf file
+    - name: 1.4.2 Ensure ptrace_scope is restricted | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}kernel.yama.ptrace_scope\s{0,}=\s{0,}1" /etc/sysctl.conf && echo exists || echo not_exists'
+      changed_when: false
+      register: ptrace_scope_sysctl_conf_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Set ptrace_scope configuration compliance tracker
+    - set_fact:
+        ptrace_scope_configured: "{{ true if ptrace_scope_sysctl_conf_check.stdout == 'exists' else false }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Check if one of sysctl configuration files has ptrace_scope configuration
+    - name: 1.4.2 Ensure ptrace_scope is restricted | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}kernel.yama.ptrace_scope\s{0,}=\s{0,}1" {{ item }} && echo exists || echo not_exists'
+      changed_when: false
+      register: ptrace_scope_sysctl_conf_files_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+      loop: "{{ sysctl_conf_files }}"
+
+    # Check if ptrace_scope is configured in one of the sysctl listed files
+    - set_fact:
+        ptrace_scope_configured: "{{ true if (ptrace_scope_configured or item.stdout == 'exists') else false }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+      loop_control:
+        label: "{{ item.stdout }}"
+      loop: "{{ ptrace_scope_sysctl_conf_files_check.results | list }}"
+
+    # Check if ptrace_scope is configured in one of the UFW sysctl configuration files
+    - name: 1.4.2 Ensure ptrace_scope is restricted | Audit
+      shell:
+        cmd: | 
+          l_ufwscf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+          [[ -f $l_ufwscf ]] && grep -Eq "^\s{0,}kernel.yama.ptrace_scope\s{0,}=\s{0,}1" $(echo $l_ufwscf) && \
+          echo exists || echo not_exists
+      changed_when: false
+      register: ptrace_scope_ufw_sysctl_conf_files_check
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Extract audit result
+    - set_fact:
+        ptrace_scope_configured_check: 
+          name: 1.4.2 Ensure ptrace_scope is restricted
+          scored: true
+          automated: true
+      changed_when: false
+    
+    # Define if rule is applicable or not
+    - set_fact:
+        ptrace_scope_rule:
+          remediation_status: "{{ true if ptrace_scope_configured or ptrace_scope_ufw_sysctl_conf_files_check.stdout == 'exists' else false }}" 
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Append remidiation status
+    - set_fact:
+        ptrace_scope_configured_check: "{{ ptrace_scope_configured_check | combine(ptrace_scope_rule) }}"
+      changed_when: false
+      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ptrace_scope_configured_check] }}"
+      changed_when: false
+
+    # 1.4.2 Ensure ptrace_scope is restricted | Remediation
+    - name: "1.4.2 Ensure ptrace_scope is restricted | Remediation"
+      ansible.posix.sysctl:
+        name: kernel.yama.ptrace_scope
+        value: 1
+        state: present
+        sysctl_set: true
+        reload: true
+      when: not audit_only and (ptrace_scope_configured_check.remediation_status is defined and not ptrace_scope_configured_check.remediation_status ) and not is_ipv6_disabled
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.4.3 Ensure core dump backtraces are disabled
+  #
+  # A core dump is the memory of an executable program. It is generally used to determine
+  # why a program aborted. It can also be used to glean confidential information from a core
+  # file.
+  - name: "1.4.3 Ensure core dump backtraces are disabled"
+    block:
+    # List core dump files
+    - name: 1.4.3 Ensure core dump backtraces are disabled | Audit
+      shell:
+        cmd: "[[ -f /usr/bin/systemd-analyze ]] &&  /usr/bin/systemd-analyze cat-config /etc/systemd/coredump.conf | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
+      changed_when: false
+      register: core_dump_conf_files_list
+
+    # Check if one of core dump configuration files has ProcessSizeMax configuration
+    - name: 1.4.3 Ensure core dump backtraces are disabled | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}ProcessSizeMax\s{0,}=\s{0,}0" {{ item }} && echo exists || echo not_exists'
+      changed_when: false
+      register: process_size_max_conf_files_check
+      loop: "{{ core_dump_conf_files_list.stdout_lines | list }}"
+
+    # Set ProcessSizeMax configuration compliance tracker
+    - set_fact:
+        process_size_max_configured: false
+      changed_when: false
+
+    # Check if ProcessSizeMax is configured in one of the core dump listed files
+    - set_fact:
+        process_size_max_configured: "{{ true if (process_size_max_configured or item.stdout == 'exists') else false }}"
+      changed_when: false
+      loop_control:
+        label: "{{ item.stdout }}"
+      loop: "{{ process_size_max_conf_files_check.results | list }}"
+
+    # Extract audit result
+    - set_fact:
+        process_size_max_configured_check: 
+          name: 1.4.3 Ensure core dump backtraces are disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if process_size_max_configured  else false }}" 
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [process_size_max_configured_check] }}"
+      changed_when: false
+
+    # 1.4.3 Ensure core dump backtraces are disabled | Remediation
+    - name: "1.4.3 Ensure core dump backtraces are disabled | Remediation"
+      replace:
+        name: "/etc/systemd/coredump.conf"
+        regexp: "^[#]{0,}(ProcessSizeMax=)"
+        replace: "ProcessSizeMax=0"
+      when: not audit_only and not process_size_max_configured_check.remediation_status
+
+    # 1.4.3 Ensure core dump backtraces are disabled | Remediation
+    - name: "1.4.3 Ensure core dump backtraces are disabled | Remediation"
+      lineinfile:
+        path: "/etc/systemd/coredump.conf"
+        line: "ProcessSizeMax=0"
+        state: present
+        regexp: "^ProcessSizeMax=0"
+        create: true
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not process_size_max_configured_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.4.4 Ensure core dump storage is disabled
+  #
+  # A core dump is the memory of an executable program. It is generally used to determine
+  # why a program aborted. It can also be used to glean confidential information from a core
+  # file.
+  - name: "1.4.4 Ensure core dump storage is disabled"
+    block:
+    # List coredump files
+    - name: 1.4.4 Ensure core dump storage is disabled | Audit
+      shell:
+        cmd: "[[ -f /usr/bin/systemd-analyze ]] &&  /usr/bin/systemd-analyze cat-config /etc/systemd/coredump.conf | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
+      changed_when: false
+      register: core_dump_conf_files_list
+
+    # Check if one of core dump configuration files has Storage configuration
+    - name: 1.4.4 Ensure core dump storage is disabled | Audit
+      shell:
+        cmd: 'grep -Eq "^\s{0,}Storage\s{0,}=\s{0,}none" {{ item }} && echo exists || echo not_exists'
+      changed_when: false
+      register: core_dump_storage_conf_files_check
+      loop: "{{ core_dump_conf_files_list.stdout_lines | list }}"
+
+    # Set core dump storage configuration compliance tracker
+    - set_fact:
+        core_dump_storage_configured: false
+      changed_when: false
+
+    # Check if core dump storage is configured in one of the core dump listed files
+    - set_fact:
+        core_dump_storage_configured: "{{ true if (core_dump_storage_configured or item.stdout == 'exists') else false }}"
+      changed_when: false
+      loop_control:
+        label: "{{ item.stdout }}"
+      loop: "{{ core_dump_storage_conf_files_check.results | list }}"
+
+    # Extract audit result
+    - set_fact:
+        core_dump_storage_configured_check: 
+          name: 1.4.4 Ensure core dump storage is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if core_dump_storage_configured  else false }}" 
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [core_dump_storage_configured_check] }}"
+      changed_when: false
+
+    # 1.4.4 Ensure core dump storage is disabled | Remediation
+    - name: "1.4.4 Ensure core dump storage is disabled | Remediation"
+      replace:
+        name: "/etc/systemd/coredump.conf"
+        regexp: "^[#]{0,}(Storage=)"
+        replace: "Storage=none"
+      when: not audit_only and not core_dump_storage_configured_check.remediation_status
+
+    # 1.4.4 Ensure core dump storage is disabled | Remediation
+    - name: "1.4.4 Ensure core dump storage is disabled | Remediation"
+      lineinfile:
+        path: "/etc/systemd/coredump.conf"
+        line: "Storage=none"
+        state: present
+        regexp: "^Storage=none"
+        create: true
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not core_dump_storage_configured_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

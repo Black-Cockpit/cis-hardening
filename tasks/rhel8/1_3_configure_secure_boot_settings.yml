@@ -1,0 +1,111 @@
+- name: 1.3 Configure Secure Boot Settings
+  block:
+  # 1.3.1 Ensure bootloader password is set
+  #
+  # Setting the boot loader password will require that anyone rebooting the system must
+  # enter a password before being able to set command line boot parameters.
+  - name: "1.3.1 Ensure bootloader password is set"
+    block:
+    # 1.3.1 Ensure bootloader password is set | Audit
+    - name: "1.3.1 Ensure bootloader password is set | Audit"
+      shell:
+        cmd: find /boot -type f -name 'user.cfg' ! -empty
+      changed_when: false
+      register: grub_user_file
+
+    - name: "1.3.1 Ensure bootloader password is set | Audit"
+      shell:
+        cmd: "grep -E '^\\s*GRUB2_PASSWORD=\\S+' {{ grub_user_file.stdout }} | awk -F. '{print $1\".\"$2\".\"$3}'"
+      changed_when: false
+      register: grub_user_check_status
+      when: grub_user_file.stdout != ''
+
+    # Extract audit result
+    - set_fact:
+        grub_user_check:
+          name: 1.3.1 Ensure bootloader password is set
+          scored: true
+          automated: false
+          remediation_status: "{{ true if (grub_user_file.stdout != '' and grub_user_check_status.stdout == 'GRUB2_PASSWORD=grub.pbkdf2.sha512') else false }}"
+      changed_when: false
+
+    # Define remediation message
+    - set_fact:
+        bootloader_password:
+          remediation: "Consider to set a boot loader password using the command bellow: grub2-setpassword"
+      changed_when: false
+      when: not grub_user_check.remediation_status
+
+    # Append remediation
+    - set_fact:
+        grub_user_check: "{{ grub_user_check | combine(bootloader_password) }}"
+      changed_when: false
+      when: not grub_user_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [grub_user_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.3.2 Ensure permissions on bootloader config are configured
+  #
+  # The grub files contain information on boot settings and passwords for unlocking boot
+  # options.
+  - name: "1.3.2 Ensure permissions on bootloader config are configured"
+    block:
+    # Define expected bootloader files permissions
+    - set_fact:
+        expected_bootloader_files_permissions: "{{ '0700' if is_uefi_boot else '0600' }}"
+        bootloader_files_path: "{{ '/boot/grub2/' if not is_uefi_boot else '/boot/efi/EFI/' }}"
+    # 1.3.2 Ensure permissions on bootloader config are configured | Audit
+    - name: "1.3.2 Ensure permissions on bootloader config are configured | Audit"
+      shell:
+        cmd: 'find {{ bootloader_files_path }} -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: non_compliant_permission_count
+
+    # Extract audit result
+    - set_fact:
+        bootloader_files_permissions_check:
+          name: 1.3.2 Ensure permissions on bootloader config are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if non_compliant_permission_count.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [bootloader_files_permissions_check] }}"
+      changed_when: false
+
+    # 1.3.2 Ensure permissions on bootloader config are configured | Remediation
+    - name: "1.3.2 Ensure permissions on bootloader config are configured | Remediation"
+      find:
+        paths: "{{ bootloader_files_path }}"
+        file_type: file
+        recurse: true
+      register: bootloader_files_list
+      when: not audit_only and not bootloader_files_permissions_check.remediation_status
+
+    # 1.3.2 Ensure permissions on bootloader config are configured | Remediation
+    - name: "1.3.2 Ensure permissions on bootloader config are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "{{ expected_bootloader_files_permissions }}"
+        owner: root
+        group: root
+      with_items:
+      - "{{ bootloader_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not bootloader_files_permissions_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

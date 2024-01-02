@@ -1,0 +1,301 @@
+# Stat if /etc/motd exists
+- name: Pre Audit | Stat if /etc/motd exists
+  stat:
+    path: "/etc/motd"
+  changed_when: false
+  register: modt_file_stat
+
+# 1.7 Configure Command Line Warning Banners
+- name: 1.7 Configure Command Line Warning Banners
+  block:
+  # 1.7.1 Ensure message of the day is configured properly
+  #
+  # The contents of the /etc/motd file are displayed to users after login and function as a
+  # message of the day for authenticated users.
+  #
+  # Unix-based systems have typically displayed information about the OS release and
+  # patch level upon logging in to the system. This information can be useful to developers
+  # who are developing software for a particular OS platform. If mingetty(8) supports the
+  # following options, they display operating system information: \m - machine architecture
+  # \r - operating system release \s - operating system name \v - operating system version
+  - name: "1.7.1 Ensure message of the day is configured properly"
+    block:
+    # 1.7.1 Ensure message of the day is configured properly | Audit
+    - name: 1.7.1 Ensure message of the day is configured properly | Audit
+      shell:
+        cmd: grep -E -i "(\\\v|\\\r|\\\m|\\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/"//g'))" /etc/motd | wc -l
+      changed_when: false
+      register: day_message_status_check
+      when: modt_file_stat.stat.exists
+
+    # Extract audit result
+    - set_fact:
+        day_message_check:
+          name: 1.7.1 Ensure message of the day is configured properly
+          scored: true
+          automated: true
+      changed_when: false
+
+    # Define compliace status
+    - set_fact:
+        modt_content_remediation_status: 
+          remediation_status: "{{ true if day_message_status_check.stdout == '0' else false }}"
+      changed_when: false
+      when: modt_file_stat.stat.exists
+
+    # Append remediation status to audit result
+    - set_fact:
+        day_message_check: "{{ day_message_check | combine(modt_content_remediation_status) }}"
+      changed_when: false
+      when: modt_file_stat.stat.exists
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [day_message_check] }}"
+      changed_when: false
+
+    # 1.7.1 Ensure message of the day is configured properly | Remediation
+    - name: 1.7.1 Ensure message of the day is configured properly | Remediation
+      template:
+        src: rhel/etc/motd.j2
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: "0644"
+      when: modt_file_stat.stat.exists and not audit_only and not day_message_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.7.2 Ensure local login warning banner is configured properly
+  #
+  # The contents of the /etc/issue file are displayed to users prior to login for local
+  # terminals.
+  #
+  # Unix-based systems have typically displayed information about the OS release and
+  # patch level upon logging in to the system. This information can be useful to developers
+  # who are developing software for a particular OS platform. If mingetty(8) supports the
+  # following options, they display operating system information: \m - machine architecture
+  # \r - operating system release \s - operating system name \v - operating system version
+  - name: "1.7.2 Ensure local login warning banner is configured properly"
+    block:
+    # 1.7.2 Ensure local login warning banner is configured properly | Audit
+    - name: 1.7.2 Ensure local login warning banner is configured properly | Audit
+      shell:
+        cmd: grep -E -i "(\\\v|\\\r|\\\m|\\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/"//g'))" /etc/issue | wc -l
+      changed_when: false
+      register: issue_message_status_check
+
+    # Extract audit result
+    - set_fact:
+        issue_message_check:
+          name: 1.7.2 Ensure local login warning banner is configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if issue_message_status_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_message_check] }}"
+      changed_when: false
+
+    # 1.7.2 Ensure local login warning banner is configured properly | Remediation
+    - name: 1.7.2 Ensure local login warning banner is configured properly | Remediation
+      template:
+        src: rhel/etc/issue.j2
+        dest: /etc/issue
+        owner: root
+        group: root
+        mode: "0644"
+      when: not audit_only and not issue_message_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.7.3 Ensure remote login warning banner is configured properly
+  #
+  # The contents of the /etc/issue.net file are displayed to users prior to login for remote
+  # connections from configured services.
+  #
+  # Unix-based systems have typically displayed information about the OS release and
+  # patch level upon logging in to the system. This information can be useful to developers
+  # who are developing software for a particular OS platform. If mingetty(8) supports the
+  # following options, they display operating system information: \m - machine architecture
+  # \r - operating system release \s - operating system name \v - operating system version
+  - name: "1.7.3 Ensure remote login warning banner is configured properly"
+    block:
+    # 1.7.3 Ensure remote login warning banner is configured properly | Audit
+    - name: 1.7.3 Ensure remote login warning banner is configured properly | Audit
+      shell:
+        cmd: grep -E -i "(\\\v|\\\r|\\\m|\\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/"//g'))" /etc/issue.net | wc -l
+      changed_when: false
+      register: issue_net_message_status_check
+
+    # Extract audit result
+    - set_fact:
+        issue_net_message_check:
+          name: 1.7.3 Ensure remote login warning banner is configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if issue_net_message_status_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_net_message_check] }}"
+      changed_when: false
+
+    # 1.7.3 Ensure remote login warning banner is configured properly | Remediation
+    - name: 1.7.3 Ensure remote login warning banner is configured properly | Remediation
+      template:
+        src: rhel/etc/issue.net.j2
+        dest: /etc/issue.net
+        owner: root
+        group: root
+        mode: "0644"
+      when: not audit_only and not issue_net_message_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.7.4 Ensure access to /etc/motd is configured
+  #
+  # The contents of the /etc/motd file are displayed to users after login and function as a
+  # message of the day for authenticated users.
+  - name: "1.7.4 Ensure access to /etc/motd is configured"
+    block:
+    # Extract audit result
+    - set_fact:
+        modt_permission_check:
+          name: 1.7.4 Ensure access to /etc/motd is configured
+          scored: true
+          automated: true
+      changed_when: false
+
+    # Define compliace status
+    - set_fact:
+        modt_permission_remediation_status: 
+          remediation_status: "{{ true if (modt_file_stat.stat.mode == '0644' and modt_file_stat.stat.pw_name == 'root' and modt_file_stat.stat.gr_name == 'root') else false }}"
+      changed_when: false
+      when: modt_file_stat.stat.exists
+
+    # Append remediation status to audit result
+    - set_fact:
+        modt_permission_check: "{{ modt_permission_check | combine(modt_permission_remediation_status) }}"
+      changed_when: false
+      when: modt_file_stat.stat.exists
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [modt_permission_check] }}"
+      changed_when: false
+
+    # 1.7.4 Ensure access to /etc/motd is configured | Remediation
+    - name: 1.7.4 Ensure access to /etc/motd is configured | Remediation
+      template:
+        src: rhel/etc/motd.j2
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: "0644"
+      when: modt_file_stat.stat.exists and not audit_only and not modt_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.7.5 Ensure access to /etc/issue is configured
+  #
+  # The contents of the /etc/issue file are displayed to users prior to login for local
+  # terminals.
+  - name: "1.7.5 Ensure access to /etc/issue is configured"
+    block:
+    # 1.7.5 Ensure access to /etc/issue is configured | Audit
+    - name: 1.7.5 Ensure access to /etc/issue is configured | Audit
+      stat: 
+        path: /etc/issue
+      changed_when: false
+      register: issue_file_stat
+
+    # Extract audit result
+    - set_fact:
+        issue_file_permission_check:
+          name: 1.7.5 Ensure access to /etc/issue is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (issue_file_stat.stat.mode == '0644' and issue_file_stat.stat.pw_name == 'root' and issue_file_stat.stat.gr_name == 'root') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_file_permission_check] }}"
+      changed_when: false
+
+    # 1.7.5 Ensure access to /etc/issue is configured | Remediation
+    - name: 1.7.5 Ensure access to /etc/issue is configured | Remediation
+      template:
+        src: rhel/etc/issue.j2
+        dest: /etc/issue
+        owner: root
+        group: root
+        mode: "0644"
+      when: not audit_only and not issue_file_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.7.6 Ensure access to /etc/issue.net is configured
+  #
+  # The contents of the /etc/issue.net file are displayed to users prior to login for remote
+  # connections from configured services.
+  - name: "1.7.6 Ensure access to /etc/issue.net is configured"
+    block:
+    # 1.7.6 Ensure access to /etc/issue.net is configured | Audit
+    - name: 1.7.6 Ensure access to /etc/issue.net is configured | Audit
+      stat: 
+        path: /etc/issue.net
+      changed_when: false
+      register: issue_net_file_stat
+
+    # Extract audit result
+    - set_fact:
+        issue_net_file_permission_check:
+          name: 1.7.6 Ensure access to /etc/issue.net is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (issue_net_file_stat.stat.mode == '0644' and issue_net_file_stat.stat.pw_name == 'root' and issue_net_file_stat.stat.gr_name == 'root') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_net_file_permission_check] }}"
+      changed_when: false
+
+    # 1.7.6 Ensure access to /etc/issue.net is configured | Remediation
+    - name: 1.7.6 Ensure access to /etc/issue.net is configured | Remediation
+      template:
+        src: rhel/etc/issue.net.j2
+        dest: /etc/issue.net
+        owner: root
+        group: root
+        mode: "0644"
+      when: not audit_only and not issue_net_file_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
