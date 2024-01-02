@@ -35,8 +35,8 @@
       changed_when: false
       when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop_control:
-        label: "{{ item.stdout }}"
-      loop: "{{ aslr_sysctl_conf_files_check.results | list }}"
+        label: "{{ item.stdout | default() }}"
+      loop: "{{ (aslr_sysctl_conf_files_check.results | default([])) | list }}"
 
     # Check if ASLR is configured in one of the UFW sysctl configuration files
     - name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Audit
@@ -127,8 +127,8 @@
       changed_when: false
       when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop_control:
-        label: "{{ item.stdout }}"
-      loop: "{{ ptrace_scope_sysctl_conf_files_check.results | list }}"
+        label: "{{ item.stdout | default() }}"
+      loop: "{{ ptrace_scope_sysctl_conf_files_check.results | default([]) | list }}"
 
     # Check if ptrace_scope is configured in one of the UFW sysctl configuration files
     - name: 1.4.2 Ensure ptrace_scope is restricted | Audit

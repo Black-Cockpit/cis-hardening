@@ -61,5 +61,8 @@
 # - include_tasks:
 #     file: "./rhel8/4_1_2_configure_at.yml"
 
+# - include_tasks:
+#     file: "./rhel8/4_2_configure_ssh_server.yml"
+
 - include_tasks:
-    file: "./rhel8/4_2_configure_ssh_server.yml"
+    file: "./rhel8/4_3_configure_privilege_escalation.yml"

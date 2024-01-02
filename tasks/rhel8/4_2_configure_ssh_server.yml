@@ -680,7 +680,7 @@
               echo 'configured'
           fi
       changed_when: false
-      register: ssh_disable_forwaring_status_check
+      register: ssh_disable_forwarding_status_check
 
     # 4.2.8 Ensure sshd DisableForwarding is enabled | Audit
     - name: 4.2.8 Ensure sshd DisableForwarding is enabled | Audit
@@ -692,20 +692,20 @@
               echo 'configured'
           fi
       changed_when: false
-      register: ssh_disable_forwaring_conf_check
+      register: ssh_disable_forwarding_conf_check
 
     # Extract audit result
     - set_fact:
-        ssh_disable_forwaring_config_check:
+        ssh_disable_forwarding_config_check:
           name: 4.2.8 Ensure sshd DisableForwarding is enabled
           scored: true
           automated: true
-          remediation_status: "{{ true if (ssh_disable_forwaring_status_check.stdout == 'configured' and ssh_disable_forwaring_conf_check.stdout == 'configured') else false }}"
+          remediation_status: "{{ true if (ssh_disable_forwarding_status_check.stdout == 'configured' and ssh_disable_forwarding_conf_check.stdout == 'configured') else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [ssh_disable_forwaring_config_check] }}"
+        audit_result: "{{ (audit_result | default([])) + [ssh_disable_forwarding_config_check] }}"
       changed_when: false
 
     # 4.2.8 Ensure sshd DisableForwarding is enabled | Remediation
@@ -714,7 +714,7 @@
         path: "/etc/ssh/sshd_config"
         regexp: "^(DisableForwarding|#DisableForwarding)"
         state: absent
-      when: not audit_only and not ssh_disable_forwaring_config_check.remediation_status
+      when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
 
     # 4.2.8 Ensure sshd DisableForwarding is enabled | Remediation
     - name: "4.2.8 Ensure sshd DisableForwarding is enabled | Remediation"
@@ -723,14 +723,14 @@
         regexp: "^(DisableForwarding)"
         line: 'DisableForwarding yes'
         state: present
-      when: not audit_only and not ssh_disable_forwaring_config_check.remediation_status
+      when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
 
     # 4.2.8 Ensure sshd DisableForwarding is enabled | Remediation
     - name: "4.2.8 Ensure sshd DisableForwarding is enabled | Remediation"
       systemd:
         name: sshd
         state: reloaded
-      when: not audit_only and not ssh_disable_forwaring_config_check.remediation_status
+      when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
     tags:
     - "workstation_level_1"
     - "server_level_2"

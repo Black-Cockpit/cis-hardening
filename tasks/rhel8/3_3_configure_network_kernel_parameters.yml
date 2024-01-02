@@ -17,11 +17,11 @@
             ipv4="$(sysctl "net.ipv4.ip_forward" | awk -F= '{print $2}')";
             echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
         changed_when: false
-        register: ipv4_forwaring_current_status_conf_check
+        register: ipv4_forwarding_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if ipv4_forwaring_current_status_conf_check.stdout == 'configured' else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if ipv4_forwarding_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
       # Check net.ipv4.ip_forward is disabled on sysctl.conf file
@@ -29,13 +29,13 @@
         shell:
           cmd: 'grep -Eq "^\s{0,}net.ipv4.ip_forward\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
         changed_when: false
-        register: ipv4_forwaring_sysctl_conf_check
+        register: ipv4_forwarding_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status and ipv4_forwaring_sysctl_conf_check.stdout == 'configured') else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv4_forwarding_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: ip_forwaring_remediation_status
+        when: ip_forwarding_remediation_status
 
       # Check if one of sysctl configuration files has net.ipv4.ip_forward configuration
       - name: 3.3.1 Ensure ip forwarding is disabled | Audit
@@ -48,17 +48,17 @@
               echo configured
             fi;
         changed_when: false
-        register: ipv4_forwaring_conf_check
+        register: ipv4_forwarding_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status or item.stdout == 'configured') else false }}"
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
-        loop: "{{ ipv4_forwaring_conf_check.results | list }}"
-        when: ip_forwaring_remediation_status
+        loop: "{{ ipv4_forwarding_conf_check.results | list }}"
+        when: ip_forwarding_remediation_status
 
       # Check if net.ipv4.ip_forward is configured in one of the UFW sysctl configuration files
       - name: 3.3.1 Ensure ip forwarding is disabled | Audit
@@ -73,13 +73,13 @@
             fi;
         changed_when: false
         register: ipv4_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status and ipv4_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv4_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: ip_forwaring_remediation_status
-    
+        when: ip_forwarding_remediation_status
+
     # Audit net.ipv6.conf.all.forwarding status
     - name: 3.3.1 Ensure ip forwarding is disabled | Audit
       block:
@@ -90,50 +90,50 @@
             ipv6="$(sysctl "net.ipv6.conf.all.forwarding" | awk -F= '{print $2}')";
             echo $ipv6 | grep -q '0' && echo 'configured' || echo 'not_configured'
         changed_when: false
-        register: ipv6_forwaring_current_status_conf_check
+        register: ipv6_forwarding_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status and ipv6_forwaring_current_status_conf_check.stdout == 'configured') else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_forwarding_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: ip_forwaring_remediation_status
+        when: ip_forwarding_remediation_status
 
       # Check net.ipv6.conf.all.forwarding is disabled on sysctl.conf file
       - name: 3.3.1 Ensure ip forwarding is disabled | Audit
         shell:
           cmd: 'grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
         changed_when: false
-        register: ipv6_forwaring_sysctl_conf_check
+        register: ipv6_forwarding_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status and ipv6_forwaring_sysctl_conf_check.stdout == 'configured') else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_forwarding_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: ip_forwaring_remediation_status
+        when: ip_forwarding_remediation_status
 
       # Check if one of sysctl configuration files has net.ipv6.conf.all.forwarding configuration
       - name: 3.3.1 Ensure ip forwarding is disabled | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
-        register: ipv6_forwaring_conf_check
+        register: ipv6_forwarding_conf_check
         loop: "{{ sysctl_conf_files }}"
 
       # Update remediation status
       - set_fact:
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status or item.stdout == 'configured') else false }}"
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_forwaring_conf_check.results | list }}"
-        when: ip_forwaring_remediation_status
-      
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_forwarding_conf_check.results | default([]) | list }}"
+        when: ip_forwarding_remediation_status
+
       # Check if net.ipv6.conf.all.forwarding is configured in one of the UFW sysctl configuration files
       - name: 3.3.1 Ensure ip forwarding is disabled | Audit
         shell:
@@ -147,25 +147,26 @@
             fi;
         changed_when: false
         register: ipv6_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
-          ip_forwaring_remediation_status: "{{ true if (ip_forwaring_remediation_status and ipv6_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+      - set_fact:
+          ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: ip_forwaring_remediation_status
+        when: ip_forwarding_remediation_status
+      when: not is_ipv6_disabled
 
     # Extract audit result
     - set_fact:
-        ip_forwaring_check:
+        ip_forwarding_check:
           name: 3.3.1 Ensure ip forwarding is disabled
           scored: true
           automated: true
-          remediation_status: "{{ true if ip_forwaring_remediation_status else false }}"
+          remediation_status: "{{ true if ip_forwarding_remediation_status else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [ip_forwaring_check] }}"
+        audit_result: "{{ (audit_result | default([])) + [ip_forwarding_check] }}"
       changed_when: false
 
     # 3.3.1 Ensure ip forwarding is disabled | Remediation
@@ -176,8 +177,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ip_forwaring_check.remediation_status 
-    
+      when: not audit_only and not ip_forwarding_check.remediation_status
+
     # 3.3.1 Ensure ip forwarding is disabled | Remediation
     - name: "3.3.1 Ensure ip forwarding is disabled | Remediation"
       ansible.posix.sysctl:
@@ -186,8 +187,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ip_forwaring_check.remediation_status 
-    
+      when: not audit_only and not is_ipv6_disabled and not ip_forwarding_check.remediation_status
+
     # 3.3.1 Ensure ip forwarding is disabled | Remediation
     - name: "3.3.1 Ensure ip forwarding is disabled | Remediation"
       ansible.posix.sysctl:
@@ -195,7 +196,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not ip_forwaring_check.remediation_status 
+      when: not audit_only and not ip_forwarding_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -223,7 +224,7 @@
         register: ipv4_all_icmp_redirect_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if ipv4_all_icmp_redirect_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -235,7 +236,7 @@
         register: ipv4_all_icmp_redirect_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if (icmp_redirect_remediation_status and ipv4_all_icmp_redirect_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirect_remediation_status
@@ -276,13 +277,13 @@
             fi;
         changed_when: false
         register: ipv4_all_icmp_redirect_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if (icmp_redirect_remediation_status and ipv4_all_icmp_redirect_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirect_remediation_status
-    
+
     # Audit net.ipv4.conf.default.send_redirects status
     - name: 3.3.2 Ensure packet redirect sending is disabled | Audit
       block:
@@ -296,7 +297,7 @@
         register: ipv4_default_icmp_redirect_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if (icmp_redirect_remediation_status and ipv4_default_icmp_redirect_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirect_remediation_status
@@ -309,7 +310,7 @@
         register: ipv4_default_icmp_redirect_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if (icmp_redirect_remediation_status and ipv4_default_icmp_redirect_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirect_remediation_status
@@ -318,12 +319,12 @@
       - name: 3.3.2 Ensure packet redirect sending is disabled | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.send_redirects\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.send_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.send_redirects\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.send_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv4_default_icmp_redirect_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -336,7 +337,7 @@
           label: "{{ item.stdout }}"
         loop: "{{ ipv4_default_icmp_redirect_conf_check.results | list }}"
         when: icmp_redirect_remediation_status
-      
+
       # Check if net.ipv4.conf.default.send_redirects is configured in one of the UFW sysctl configuration files
       - name: 3.3.2 Ensure packet redirect sending is disabled | Audit
         shell:
@@ -350,9 +351,9 @@
             fi;
         changed_when: false
         register: ipv4_default_icmp_redirect_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirect_remediation_status: "{{ true if (icmp_redirect_remediation_status and ipv4_default_icmp_redirect_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirect_remediation_status
@@ -379,8 +380,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirect_check.remediation_status 
-    
+      when: not audit_only and not icmp_redirect_check.remediation_status
+
     # 3.3.2 Ensure packet redirect sending is disabled | Remediation
     - name: "3.3.2 Ensure packet redirect sending is disabled | Remediation"
       ansible.posix.sysctl:
@@ -389,8 +390,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirect_check.remediation_status 
-    
+      when: not audit_only and not icmp_redirect_check.remediation_status
+
     # 3.3.2 Ensure packet redirect sending is disabled | Remediation
     - name: "3.3.2 Ensure packet redirect sending is disabled | Remediation"
       ansible.posix.sysctl:
@@ -398,7 +399,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not icmp_redirect_check.remediation_status 
+      when: not audit_only and not icmp_redirect_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -423,7 +424,7 @@
       register: bogus_icmp_responses_current_status_conf_check
 
     # Define remediation status
-    - set_fact: 
+    - set_fact:
         bogus_icmp_responses_remediation_status: "{{ true if bogus_icmp_responses_current_status_conf_check.stdout == 'configured' else false }}"
       changed_when: false
 
@@ -435,7 +436,7 @@
       register: bogus_icmp_responses_sysctl_conf_check
 
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         bogus_icmp_responses_remediation_status: "{{ true if (bogus_icmp_responses_remediation_status and bogus_icmp_responses_sysctl_conf_check.stdout == 'configured') else false }}"
       changed_when: false
       when: bogus_icmp_responses_remediation_status
@@ -476,13 +477,13 @@
           fi;
       changed_when: false
       register: bogus_icmp_responses_ufw_sysctl_conf_files_check
-      
+
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         bogus_icmp_responses_remediation_status: "{{ true if (bogus_icmp_responses_remediation_status and bogus_icmp_responses_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
       changed_when: false
       when: bogus_icmp_responses_remediation_status
-    
+
     # Extract audit result
     - set_fact:
         bogus_icmp_responses_check:
@@ -505,8 +506,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not bogus_icmp_responses_check.remediation_status 
-    
+      when: not audit_only and not bogus_icmp_responses_check.remediation_status
+
     # 3.3.3 Ensure bogus icmp responses are ignored | Remediation
     - name: "3.3.3 Ensure bogus icmp responses are ignored | Remediation"
       ansible.posix.sysctl:
@@ -514,7 +515,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not bogus_icmp_responses_check.remediation_status 
+      when: not audit_only and not bogus_icmp_responses_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -538,7 +539,7 @@
       register: icmp_broadcast_request_current_status_conf_check
 
     # Define remediation status
-    - set_fact: 
+    - set_fact:
         icmp_broadcast_request_remediation_status: "{{ true if icmp_broadcast_request_current_status_conf_check.stdout == 'configured' else false }}"
       changed_when: false
 
@@ -550,7 +551,7 @@
       register: icmp_broadcast_request_sysctl_conf_check
 
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         icmp_broadcast_request_remediation_status: "{{ true if (icmp_broadcast_request_remediation_status and icmp_broadcast_request_sysctl_conf_check.stdout == 'configured') else false }}"
       changed_when: false
       when: icmp_broadcast_request_remediation_status
@@ -591,13 +592,13 @@
           fi;
       changed_when: false
       register: icmp_broadcast_request_ufw_sysctl_conf_files_check
-      
+
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         icmp_broadcast_request_remediation_status: "{{ true if (icmp_broadcast_request_remediation_status and icmp_broadcast_request_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
       changed_when: false
       when: icmp_broadcast_request_remediation_status
-    
+
     # Extract audit result
     - set_fact:
         icmp_broadcast_request_check:
@@ -620,8 +621,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_broadcast_request_check.remediation_status 
-    
+      when: not audit_only and not icmp_broadcast_request_check.remediation_status
+
     # 3.3.4 Ensure broadcast icmp requests are ignored | Remediation
     - name: "3.3.4 Ensure broadcast icmp requests are ignored | Remediation"
       ansible.posix.sysctl:
@@ -629,7 +630,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not icmp_broadcast_request_check.remediation_status 
+      when: not audit_only and not icmp_broadcast_request_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -657,7 +658,7 @@
         register: ipv4_icmp_redirects_all_accept_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if ipv4_icmp_redirects_all_accept_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -669,7 +670,7 @@
         register: ipv4_icmp_redirects_all_accept_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv4_icmp_redirects_all_accept_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -688,9 +689,9 @@
         register: ipv4_icmp_redirects_all_accept_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -710,9 +711,9 @@
             fi;
         changed_when: false
         register: ipv4_icmp_redirects_all_accept_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv4_icmp_redirects_all_accept_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -730,7 +731,7 @@
         register: ipv4_icmp_redirects_default_accept_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if ipv4_icmp_redirects_default_accept_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -742,7 +743,7 @@
         register: ipv4_icmp_redirects_default_accept_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv4_icmp_redirects_default_accept_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -761,9 +762,9 @@
         register: ipv4_icmp_redirects_default_accept_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -783,13 +784,13 @@
             fi;
         changed_when: false
         register: ipv4_icmp_redirects_default_accept_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv4_icmp_redirects_default_accept_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
-    
+
     # Audit net.ipv6.conf.all.accept_redirects
     - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
       block:
@@ -803,7 +804,7 @@
         register: ipv6_icmp_redirects_all_accept_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_all_accept_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -816,7 +817,7 @@
         register: ipv6_icmp_redirects_all_accept_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_all_accept_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -825,12 +826,12 @@
       - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.accept_redirects\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.accept_redirects\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv6_icmp_redirects_all_accept_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -840,10 +841,10 @@
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_icmp_redirects_all_accept_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_icmp_redirects_all_accept_conf_check.results | default([]) | list }}"
         when: icmp_redirects_accept_remediation_status
-      
+
       # Check if net.ipv6.conf.all.accept_redirects is configured in one of the UFW sysctl configuration files
       - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
         shell:
@@ -859,10 +860,11 @@
         register: ipv6_icmp_redirects_all_accept_ufw_sysctl_conf_files_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_all_accept_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
+      when: not is_ipv6_disabled
 
     # Audit net.ipv6.conf.default.accept_redirects
     - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
@@ -877,7 +879,7 @@
         register: ipv6_icmp_redirects_default_accept_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_default_accept_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -890,7 +892,7 @@
         register: ipv6_icmp_redirects_default_accept_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_default_accept_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
@@ -899,12 +901,12 @@
       - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_redirects\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_redirects\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv6_icmp_redirects_default_accept_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -914,10 +916,10 @@
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_icmp_redirects_default_accept_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_icmp_redirects_default_accept_conf_check.results| default([]) | list }}"
         when: icmp_redirects_accept_remediation_status
-      
+
       # Check if net.ipv6.conf.default.accept_redirects is configured in one of the UFW sysctl configuration files
       - name: 3.3.5 Ensure icmp redirects are not accepted | Audit
         shell:
@@ -930,13 +932,14 @@
               echo configured
             fi;
         changed_when: false
-        register: ipv6_icmp_redirects_default_accept_ufw_sysctl_conf_files_check   
-      
+        register: ipv6_icmp_redirects_default_accept_ufw_sysctl_conf_files_check
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           icmp_redirects_accept_remediation_status: "{{ true if (icmp_redirects_accept_remediation_status and ipv6_icmp_redirects_default_accept_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: icmp_redirects_accept_remediation_status
+      when: not is_ipv6_disabled
 
     # Extract audit result
     - set_fact:
@@ -960,8 +963,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirects_accept_check.remediation_status 
-    
+      when: not audit_only and not icmp_redirects_accept_check.remediation_status
+
     # 3.3.5 Ensure icmp redirects are not accepted | Remediation
     - name: "3.3.5 Ensure icmp redirects are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -970,7 +973,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirects_accept_check.remediation_status 
+      when: not audit_only and not icmp_redirects_accept_check.remediation_status
 
     # 3.3.5 Ensure icmp redirects are not accepted | Remediation
     - name: "3.3.5 Ensure icmp redirects are not accepted | Remediation"
@@ -980,7 +983,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirects_accept_check.remediation_status 
+      when: not audit_only and not is_ipv6_disabled and not icmp_redirects_accept_check.remediation_status
 
     # 3.3.5 Ensure icmp redirects are not accepted | Remediation
     - name: "3.3.5 Ensure icmp redirects are not accepted | Remediation"
@@ -990,8 +993,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not icmp_redirects_accept_check.remediation_status 
-    
+      when: not audit_only and not is_ipv6_disabled and not icmp_redirects_accept_check.remediation_status
+
     # 3.3.5 Ensure icmp redirects are not accepted | Remediation
     - name: "3.3.5 Ensure icmp redirects are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -999,7 +1002,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not icmp_redirects_accept_check.remediation_status 
+      when: not audit_only and not icmp_redirects_accept_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -1027,7 +1030,7 @@
         register: secure_icmp_all_redirects_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if secure_icmp_all_redirects_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -1039,7 +1042,7 @@
         register: secure_icmp_all_redirects_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_all_redirects_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: secure_icmp_redirects_remediation_status
@@ -1058,9 +1061,9 @@
         register: secure_icmp_all_redirects_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -1080,13 +1083,13 @@
             fi;
         changed_when: false
         register: secure_icmp_all_redirects_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_all_redirects_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: secure_icmp_redirects_remediation_status
-    
+
     # Audit net.ipv4.conf.default.secure_redirects status
     - name: 3.3.6 Ensure secure icmp redirects are not accepted | Audit
       block:
@@ -1100,7 +1103,7 @@
         register: secure_icmp_default_redirects_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: secure_icmp_redirects_remediation_status
@@ -1113,7 +1116,7 @@
         register: secure_icmp_default_redirects_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: secure_icmp_redirects_remediation_status
@@ -1122,12 +1125,12 @@
       - name: 3.3.6 Ensure secure icmp redirects are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: secure_icmp_default_redirects_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -1140,7 +1143,7 @@
           label: "{{ item.stdout }}"
         loop: "{{ secure_icmp_default_redirects_conf_check.results | list }}"
         when: secure_icmp_redirects_remediation_status
-      
+
       # Check if net.ipv4.conf.default.secure_redirects is configured in one of the UFW sysctl configuration files
       - name: 3.3.6 Ensure secure icmp redirects are not accepted | Audit
         shell:
@@ -1154,16 +1157,16 @@
             fi;
         changed_when: false
         register: secure_icmp_default_redirects_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: secure_icmp_redirects_remediation_status
 
     # Extract audit result
     - set_fact:
-         secure_icmp_redirects_check:
+        secure_icmp_redirects_check:
           name: 3.3.6 Ensure secure icmp redirects are not accepted
           scored: true
           automated: true
@@ -1183,8 +1186,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not secure_icmp_redirects_check.remediation_status 
-    
+      when: not audit_only and not secure_icmp_redirects_check.remediation_status
+
     # 3.3.6 Ensure secure icmp redirects are not accepted | Remediation
     - name: "3.3.6 Ensure secure icmp redirects are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -1193,8 +1196,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not secure_icmp_redirects_check.remediation_status 
-    
+      when: not audit_only and not secure_icmp_redirects_check.remediation_status
+
     # 3.3.6 Ensure secure icmp redirects are not accepted | Remediation
     - name: "3.3.6 Ensure secure icmp redirects are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -1202,7 +1205,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not secure_icmp_redirects_check.remediation_status 
+      when: not audit_only and not secure_icmp_redirects_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -1232,7 +1235,7 @@
         register: ipv4_reverse_path_filter_all_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if ipv4_reverse_path_filter_all_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -1244,7 +1247,7 @@
         register: ipv4_reverse_path_filter_all_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_all_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_reverse_path_filter_remediation_status
@@ -1263,9 +1266,9 @@
         register: ipv4_reverse_path_filter_all_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -1285,13 +1288,13 @@
             fi;
         changed_when: false
         register: ipv4_reverse_path_filter_all_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_reverse_path_filter_remediation_status
-    
+
     # Audit net.ipv4.conf.default.rp_filter status
     - name: 3.3.7 Ensure reverse path filtering is enabled | Audit
       block:
@@ -1305,7 +1308,7 @@
         register: ipv4_reverse_path_filter_default_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_reverse_path_filter_remediation_status
@@ -1318,7 +1321,7 @@
         register: ipv4_reverse_path_filter_default_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_reverse_path_filter_remediation_status
@@ -1327,12 +1330,12 @@
       - name: 3.3.7 Ensure reverse path filtering is enabled | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv4_reverse_path_filter_default_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -1345,7 +1348,7 @@
           label: "{{ item.stdout }}"
         loop: "{{ ipv4_reverse_path_filter_default_conf_check.results | list }}"
         when: ipv4_reverse_path_filter_remediation_status
-      
+
       # Check if net.ipv4.conf.default.rp_filter is configured in one of the UFW sysctl configuration files
       - name: 3.3.7 Ensure reverse path filtering is enabled | Audit
         shell:
@@ -1359,9 +1362,9 @@
             fi;
         changed_when: false
         register: ipv4_reverse_path_filter_default_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_reverse_path_filter_remediation_status
@@ -1388,8 +1391,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not reverse_path_filter_check.remediation_status 
-    
+      when: not audit_only and not reverse_path_filter_check.remediation_status
+
     # 3.3.7 Ensure reverse path filtering is enabled | Remediation
     - name: "3.3.7 Ensure reverse path filtering is enabled | Remediation"
       ansible.posix.sysctl:
@@ -1398,8 +1401,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not reverse_path_filter_check.remediation_status 
-    
+      when: not audit_only and not reverse_path_filter_check.remediation_status
+
     # 3.3.7 Ensure reverse path filtering is enabled | Remediation
     - name: "3.3.7 Ensure reverse path filtering is enabled | Remediation"
       ansible.posix.sysctl:
@@ -1407,7 +1410,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not reverse_path_filter_check.remediation_status 
+      when: not audit_only and not reverse_path_filter_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -1437,7 +1440,7 @@
         register: ipv4_source_routed_packet_all_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if ipv4_source_routed_packet_all_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -1449,7 +1452,7 @@
         register: ipv4_source_routed_packet_all_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_all_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1468,9 +1471,9 @@
         register: ipv4_source_routed_packet_all_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -1490,9 +1493,9 @@
             fi;
         changed_when: false
         register: ipv4_source_routed_packet_all_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1510,7 +1513,7 @@
         register: ipv4_source_routed_packet_default_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if ipv4_source_routed_packet_default_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -1522,7 +1525,7 @@
         register: ipv4_source_routed_packet_default_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_default_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1541,13 +1544,13 @@
         register: ipv4_source_routed_packet_default_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv4_source_routed_packet_default_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv4_source_routed_packet_default_conf_check.results | default([]) | list }}"
         when: source_routed_packet_remediation_status
 
       # Check if net.ipv4.conf.default.accept_source_route is configured in one of the UFW sysctl configuration files
@@ -1563,13 +1566,13 @@
             fi;
         changed_when: false
         register: ipv4_source_routed_packet_default_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
-        when: source_routed_packet_remediation_status
-    
+      when: source_routed_packet_remediation_status
+
     # Audit net.ipv6.conf.all.accept_source_route
     - name: 3.3.8 Ensure source routed packets are not accepted | Audit
       block:
@@ -1583,7 +1586,7 @@
         register: ipv6_source_routed_packet_all_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1596,7 +1599,7 @@
         register: ipv6_source_routed_packet_all_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1605,12 +1608,12 @@
       - name: 3.3.8 Ensure source routed packets are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv6_source_routed_packet_all_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -1620,10 +1623,10 @@
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_source_routed_packet_all_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_source_routed_packet_all_conf_check.results | default([]) | list }}"
         when: source_routed_packet_remediation_status
-      
+
       # Check if net.ipv6.conf.all.accept_source_route is configured in one of the UFW sysctl configuration files
       - name: 3.3.8 Ensure source routed packets are not accepted | Audit
         shell:
@@ -1639,10 +1642,11 @@
         register: ipv6_source_routed_packet_all_ufw_sysctl_conf_files_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
+      when: not is_ipv6_disabled
 
     # Audit net.ipv6.conf.default.accept_source_route
     - name: 3.3.8 Ensure source routed packets are not accepted | Audit
@@ -1657,7 +1661,7 @@
         register: ipv6_source_routed_packet_default_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1670,7 +1674,7 @@
         register: ipv6_source_routed_packet_default_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
@@ -1679,12 +1683,12 @@
       - name: 3.3.8 Ensure source routed packets are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv6_source_routed_packet_default_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -1694,10 +1698,10 @@
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_source_routed_packet_default_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_source_routed_packet_default_conf_check.results | default([]) | list }}"
         when: source_routed_packet_remediation_status
-      
+
       # Check if net.ipv6.conf.default.accept_source_route is configured in one of the UFW sysctl configuration files
       - name: 3.3.8 Ensure source routed packets are not accepted | Audit
         shell:
@@ -1710,14 +1714,15 @@
               echo configured
             fi;
         changed_when: false
-        register: ipv6_source_routed_packet_default_ufw_sysctl_conf_files_check   
-      
+        register: ipv6_source_routed_packet_default_ufw_sysctl_conf_files_check
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: source_routed_packet_remediation_status
-
+      when: not is_ipv6_disabled
+    
     # Extract audit result
     - set_fact:
         source_routed_packet_check:
@@ -1740,8 +1745,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not source_routed_packet_check.remediation_status 
-    
+      when: not audit_only and not source_routed_packet_check.remediation_status
+
     # 3.3.8 Ensure source routed packets are not accepted | Remediation
     - name: "3.3.8 Ensure source routed packets are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -1750,7 +1755,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not source_routed_packet_check.remediation_status 
+      when: not audit_only and not source_routed_packet_check.remediation_status
 
     # 3.3.8 Ensure source routed packets are not accepted | Remediation
     - name: "3.3.8 Ensure source routed packets are not accepted | Remediation"
@@ -1760,7 +1765,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not source_routed_packet_check.remediation_status 
+      when: not audit_only and not is_ipv6_disabled and not source_routed_packet_check.remediation_status
 
     # 3.3.8 Ensure source routed packets are not accepted | Remediation
     - name: "3.3.8 Ensure source routed packets are not accepted | Remediation"
@@ -1770,8 +1775,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not source_routed_packet_check.remediation_status 
-    
+      when: not audit_only and not source_routed_packet_check.remediation_status
+
     # 3.3.8 Ensure source routed packets are not accepted | Remediation
     - name: "3.3.8 Ensure source routed packets are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -1779,7 +1784,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not source_routed_packet_check.remediation_status 
+      when: not audit_only and not is_ipv6_disabled and not source_routed_packet_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -1806,7 +1811,7 @@
         register: ipv4_suspicious_log_all_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if ipv4_suspicious_log_all_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -1818,7 +1823,7 @@
         register: ipv4_suspicious_log_all_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_all_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_suspicious_log_remediation_status
@@ -1837,9 +1842,9 @@
         register: ipv4_suspicious_log_all_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
           label: "{{ item.stdout }}"
@@ -1859,13 +1864,13 @@
             fi;
         changed_when: false
         register: ipv4_suspicious_log_all_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_suspicious_log_remediation_status
-    
+
     # Audit net.ipv4.conf.default.log_martians status
     - name: 3.3.9 Ensure suspicious packets are logged | Audit
       block:
@@ -1879,7 +1884,7 @@
         register: ipv4_suspicious_log_default_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_suspicious_log_remediation_status
@@ -1892,7 +1897,7 @@
         register: ipv4_suspicious_log_default_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_suspicious_log_remediation_status
@@ -1901,12 +1906,12 @@
       - name: 3.3.9 Ensure suspicious packets are logged | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv4_suspicious_log_default_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -1919,7 +1924,7 @@
           label: "{{ item.stdout }}"
         loop: "{{ ipv4_suspicious_log_default_conf_check.results | list }}"
         when: ipv4_suspicious_log_remediation_status
-      
+
       # Check if net.ipv4.conf.default.log_martians is configured in one of the UFW sysctl configuration files
       - name: 3.3.9 Ensure suspicious packets are logged | Audit
         shell:
@@ -1933,9 +1938,9 @@
             fi;
         changed_when: false
         register: ipv4_suspicious_log_default_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv4_suspicious_log_remediation_status
@@ -1962,8 +1967,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ipv4_suspicious_log_check.remediation_status 
-    
+      when: not audit_only and not ipv4_suspicious_log_check.remediation_status
+
     # 3.3.9 Ensure suspicious packets are logged | Remediation
     - name: "3.3.9 Ensure suspicious packets are logged | Remediation"
       ansible.posix.sysctl:
@@ -1972,8 +1977,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ipv4_suspicious_log_check.remediation_status 
-    
+      when: not audit_only and not ipv4_suspicious_log_check.remediation_status
+
     # 3.3.9 Ensure suspicious packets are logged | Remediation
     - name: "3.3.9 Ensure suspicious packets are logged | Remediation"
       ansible.posix.sysctl:
@@ -1981,7 +1986,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not ipv4_suspicious_log_check.remediation_status 
+      when: not audit_only and not ipv4_suspicious_log_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -2012,7 +2017,7 @@
       register: tcp_syn_cookies_current_status_conf_check
 
     # Define remediation status
-    - set_fact: 
+    - set_fact:
         tcp_syn_cookies_remediation_status: "{{ true if tcp_syn_cookies_current_status_conf_check.stdout == 'configured' else false }}"
       changed_when: false
 
@@ -2024,7 +2029,7 @@
       register: tcp_syn_cookies_sysctl_conf_check
 
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         tcp_syn_cookies_remediation_status: "{{ true if (tcp_syn_cookies_remediation_status and tcp_syn_cookies_sysctl_conf_check.stdout == 'configured') else false }}"
       changed_when: false
       when: tcp_syn_cookies_remediation_status
@@ -2065,13 +2070,13 @@
           fi;
       changed_when: false
       register: tcp_syn_cookies_ufw_sysctl_conf_files_check
-      
+
     # Update remediation status
-    - set_fact: 
+    - set_fact:
         tcp_syn_cookies_remediation_status: "{{ true if (tcp_syn_cookies_remediation_status and tcp_syn_cookies_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
       changed_when: false
       when: tcp_syn_cookies_remediation_status
-    
+
     # Extract audit result
     - set_fact:
         tcp_syn_cookies_check:
@@ -2094,8 +2099,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not tcp_syn_cookies_check.remediation_status 
-    
+      when: not audit_only and not tcp_syn_cookies_check.remediation_status
+
     # 3.3.10 Ensure tcp syn cookies is enabled | Remediation
     - name: "3.3.10 Ensure tcp syn cookies is enabled | Remediation"
       ansible.posix.sysctl:
@@ -2103,7 +2108,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not tcp_syn_cookies_check.remediation_status 
+      when: not audit_only and not tcp_syn_cookies_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -2129,7 +2134,7 @@
         register: ipv6_router_advertisements_all_current_status_conf_check
 
       # Define remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if ipv6_router_advertisements_all_current_status_conf_check.stdout == 'configured' else false }}"
         changed_when: false
 
@@ -2141,7 +2146,7 @@
         register: ipv6_router_advertisements_all_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status and ipv6_router_advertisements_all_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv6_router_advertisements_remediation_status
@@ -2160,13 +2165,13 @@
         register: ipv6_router_advertisements_all_conf_check
         loop: "{{ sysctl_conf_files }}"
 
-     # Update remediation status
       - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status or item.stdout == 'configured') else false }}"
+        # Update remediation status
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_router_advertisements_all_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_router_advertisements_all_conf_check.results | default([]) | list }}"
         when: ipv6_router_advertisements_remediation_status
 
       # Check if net.ipv6.conf.all.accept_ra is configured in one of the UFW sysctl configuration files
@@ -2182,13 +2187,14 @@
             fi;
         changed_when: false
         register: ipv6_router_advertisements_all_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status and ipv6_router_advertisements_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv6_router_advertisements_remediation_status
-    
+      when: not is_ipv6_disabled
+
     # Audit net.ipv6.conf.default.accept_ra status
     - name: 3.3.11 Ensure ipv6 router advertisements are not accepted | Audit
       block:
@@ -2202,7 +2208,7 @@
         register: ipv6_router_advertisements_default_current_status_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status and ipv6_router_advertisements_default_current_status_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv6_router_advertisements_remediation_status
@@ -2215,7 +2221,7 @@
         register: ipv6_router_advertisements_default_sysctl_conf_check
 
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status and ipv6_router_advertisements_default_sysctl_conf_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv6_router_advertisements_remediation_status
@@ -2224,12 +2230,12 @@
       - name: 3.3.11 Ensure ipv6 router advertisements are not accepted | Audit
         shell:
           cmd: |
-           'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_ra\s{0,}" {{ item }}';
-            if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
-              echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_ra\s{0,}=\s{0,}0" && echo configured || echo not_configured
-            else
-              echo configured
-            fi;
+            'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_ra\s{0,}" {{ item }}';
+             if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+               echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_ra\s{0,}=\s{0,}0" && echo configured || echo not_configured
+             else
+               echo configured
+             fi;
         changed_when: false
         register: ipv6_router_advertisements_default_conf_check
         loop: "{{ sysctl_conf_files }}"
@@ -2239,10 +2245,10 @@
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status or item.stdout == 'configured') else false }}"
         changed_when: false
         loop_control:
-          label: "{{ item.stdout }}"
-        loop: "{{ ipv6_router_advertisements_default_conf_check.results | list }}"
+          label: "{{ item.stdout | default() }}"
+        loop: "{{ ipv6_router_advertisements_default_conf_check.results | default([]) | list }}"
         when: ipv6_router_advertisements_remediation_status
-      
+
       # Check if net.ipv6.conf.default.accept_ra is configured in one of the UFW sysctl configuration files
       - name: 3.3.11 Ensure ipv6 router advertisements are not accepted | Audit
         shell:
@@ -2256,12 +2262,20 @@
             fi;
         changed_when: false
         register: ipv6_router_advertisements_default_ufw_sysctl_conf_files_check
-      
+
       # Update remediation status
-      - set_fact: 
+      - set_fact:
           ipv6_router_advertisements_remediation_status: "{{ true if (ipv6_router_advertisements_remediation_status and ipv6_router_advertisements_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
         changed_when: false
         when: ipv6_router_advertisements_remediation_status
+      when: not is_ipv6_disabled
+
+    # Define remediation status
+    - set_fact:
+        ipv6_router_advertisements_remediation:
+          remediation_status: "{{ true if ipv6_router_advertisements_remediation_status else false }}"
+      changed_when: false
+      when: not is_ipv6_disabled
 
     # Extract audit result
     - set_fact:
@@ -2269,8 +2283,13 @@
           name: 3.3.11 Ensure ipv6 router advertisements are not accepted
           scored: true
           automated: true
-          remediation_status: "{{ true if ipv6_router_advertisements_remediation_status else false }}"
       changed_when: false
+
+    # Append remediation
+    - set_fact:
+        ipv6_router_advertisements_check: "{{ ipv6_router_advertisements_check | combine(ipv6_router_advertisements_remediation) }}"
+      changed_when: false
+      when: not is_ipv6_disabled
 
     # Appending audit result
     - set_fact:
@@ -2285,8 +2304,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ipv6_router_advertisements_check.remediation_status 
-    
+      when: not audit_only and not is_ipv6_disabled and not ipv6_router_advertisements_check.remediation_status
+
     # 3.3.11 Ensure ipv6 router advertisements are not accepted | Remediation
     - name: "3.3.11 Ensure ipv6 router advertisements are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -2295,8 +2314,8 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and not ipv6_router_advertisements_check.remediation_status 
-    
+      when: not audit_only and not is_ipv6_disabled and not ipv6_router_advertisements_check.remediation_status
+
     # 3.3.11 Ensure ipv6 router advertisements are not accepted | Remediation
     - name: "3.3.11 Ensure ipv6 router advertisements are not accepted | Remediation"
       ansible.posix.sysctl:
@@ -2304,7 +2323,7 @@
         value: 1
         sysctl_set: false
         reload: true
-      when: not audit_only and not ipv6_router_advertisements_check.remediation_status 
+      when: not audit_only and not is_ipv6_disabled and not ipv6_router_advertisements_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
