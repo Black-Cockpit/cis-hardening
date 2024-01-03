@@ -50,8 +50,8 @@
         audit_result: "{{ (audit_result | default([])) + [authselect_modules_check] }}"
       changed_when: false
 
+    # 4.4.1.1 Ensure latest version of pam is installed | Remediation
     - name: 4.4.1.1 Ensure latest version of pam is installed | Remediation
-      # 4.4.1.1 Ensure latest version of pam is installed | Remediation
       shell:
         cmd: |
           authselect create-profile 00-cis-profile -b sssd
@@ -100,8 +100,8 @@
         audit_result: "{{ (audit_result | default([])) + [authselect_pam_faillock_module_check] }}"
       changed_when: false
 
+    # 4.4.2.2 Ensure pam_faillock module is enabled | Remediation
     - name: 4.4.2.2 Ensure pam_faillock module is enabled | Remediation
-      # 4.4.2.2 Ensure pam_faillock module is enabled | Remediation
       shell:
         cmd: |
           authselect enable-feature with-faillock
@@ -157,8 +157,8 @@
         audit_result: "{{ (audit_result | default([])) + [authselect_pam_pwquality_module_check] }}"
       changed_when: false
 
+    # 4.4.2.3 Ensure pam_pwquality module is enabled | Remediation
     - name: 4.4.2.3 Ensure pam_pwquality module is enabled | Remediation
-      # 4.4.2.3 Ensure pam_pwquality module is enabled | Remediation
       shell:
         cmd: |
           authselect enable-feature with-pwquality
@@ -205,8 +205,8 @@
         audit_result: "{{ (audit_result | default([])) + [authselect_pam_pwhistory_module_check] }}"
       changed_when: false
 
+    # 4.4.2.4 Ensure pam_pwhistory module is enabled | Remediation
     - name: 4.4.2.4 Ensure pam_pwhistory module is enabled | Remediation
-      # 4.4.2.4 Ensure pam_pwhistory module is enabled | Remediation
       shell:
         cmd: |
           authselect enable-feature with-pwhistory
