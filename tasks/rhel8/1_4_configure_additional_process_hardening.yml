@@ -64,7 +64,7 @@
       changed_when: false
       when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
-    # Append remidiation status
+    # Append remediation status
     - set_fact:
         aslr_configured_check: "{{ aslr_configured_check | combine(aslr_rule) }}"
       changed_when: false
@@ -156,7 +156,7 @@
       changed_when: false
       when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
-    # Append remidiation status
+    # Append remediation status
     - set_fact:
         ptrace_scope_configured_check: "{{ ptrace_scope_configured_check | combine(ptrace_scope_rule) }}"
       changed_when: false

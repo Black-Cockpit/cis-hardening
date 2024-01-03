@@ -347,15 +347,15 @@
           remediation_status: "{{ true if (ssh_allow_users_list_check.stdout != '0' and ssh_allow_users_conf_check.stdout != '0' ) else false }}"
       changed_when: false
 
-    # Set remidiation description
+    # Set remediation description
     - set_fact:
         remediation_description:
           remediation: "Consider to set allowed or denied users and groups on /etc/ssh/sshd_config"
       changed_when: false
 
+    # Append remediation description to audit result
     - set_fact:
         ssh_access_check: "{{ ssh_access_check | combine(remediation_description) }}"
-      # Append remediation description to audit result
       changed_when: false
       when: not audit_only and not ssh_access_check.remediation_status
 
@@ -581,9 +581,9 @@
       changed_when: false
       register: ssh_client_alive_count_max_conf_check
 
-    # Set ssh client alive count max remidiation status
+    # Set ssh client alive count max remediation status
     - set_fact:
-        ssh_client_alive_count_max_remidiation_status: "{{ true if (ssh_client_alive_count_max_check.stdout == 'configured' and ssh_client_alive_count_max_conf_check.stdout == 'configured') else false }}"
+        ssh_client_alive_count_max_remediation_status: "{{ true if (ssh_client_alive_count_max_check.stdout == 'configured' and ssh_client_alive_count_max_conf_check.stdout == 'configured') else false }}"
       changed_when: false
 
     # Extract audit result
@@ -592,7 +592,7 @@
           name: 4.2.7 Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured
           scored: true
           automated: true
-          remediation_status: "{{ true if (ssh_client_alive_interval_check.stdout == 'configured' and ssh_client_alive_count_max_remidiation_status) else false }}"
+          remediation_status: "{{ true if (ssh_client_alive_interval_check.stdout == 'configured' and ssh_client_alive_count_max_remediation_status) else false }}"
       changed_when: false
 
     # Appending audit result
@@ -623,7 +623,7 @@
         path: "/etc/ssh/sshd_config"
         regexp: "^(ClientAliveCountMax|#ClientAliveCountMax)"
         state: absent
-      when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remidiation_status
+      when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remediation_status
 
     # 4.2.7 Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | Remediation
     - name: "4.2.7 Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | Remediation"
@@ -632,7 +632,7 @@
         regexp: "^(ClientAliveCountMax)"
         line: 'ClientAliveCountMax {{ rhel8.sshd.client_alive_count_max | default(cis_defaults.sshd.client_alive_count_max) }}'
         state: present
-      when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remidiation_status
+      when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remediation_status
 
     # 4.2.7 Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | Remediation
     - name: "4.2.7 Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | Remediation"

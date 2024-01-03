@@ -71,10 +71,10 @@
           scored: true
           automated: true
       changed_when: false
-      
-    # Set remidiation status
+
+    # Set remediation status
     - set_fact:
-        at_authorization_remediation_status: 
+        at_authorization_remediation_status:
           remediation_status: "{{ true if  at_allow_check and at_deny_check else false }}"
       changed_when: false
       when: is_at_installed
