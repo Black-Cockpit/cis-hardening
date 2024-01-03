@@ -14,14 +14,14 @@
         cmd: rpm -qa | grep -E '^sudo[-][0-9]' && echo installed || not_installed
       changed_when: false
       register: sudo_status_check
-  
-   # Extract audit result
+
     - set_fact:
         sudo_check:
           name: 4.3.1 Ensure sudo is installed
           scored: true
           automated: true
           remediation_status: "{{ true if sudo_status_check.stdout == 'installed' else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -70,14 +70,14 @@
       loop_control:
         label: "{{ item.stdout }}"
       loop: "{{ pseudo_terminal_status_check.results | list }}"
-  
-   # Extract audit result
+
     - set_fact:
         pseudo_terminal_check:
           name: 4.3.2 Ensure sudo commands use pty
           scored: true
           automated: true
           remediation_status: "{{ true if pseudo_terminal_remediation_status else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -130,14 +130,14 @@
       loop_control:
         label: "{{ item.stdout }}"
       loop: "{{ sudo_log_file_status_check.results | list }}"
-  
-   # Extract audit result
+
     - set_fact:
         sudo_log_file_check:
           name: 4.3.3 Ensure sudo log file exists
           scored: true
           automated: true
           remediation_status: "{{ true if sudo_log_file_remediation_status else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -189,14 +189,14 @@
       loop_control:
         label: "{{ item.stdout }}"
       loop: "{{ sudo_no_password_status_check.results | list }}"
-  
-   # Extract audit result
+
     - set_fact:
         sudo_no_password_check:
           name: 4.3.4 Ensure users must provide password for escalation
           scored: true
           automated: true
           remediation_status: "{{ true if sudo_no_password_remediation_status else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -209,7 +209,7 @@
       replace:
         path: "{{ item }}"
         regexp: 'NOPASSWD:'
-        replace: ''      
+        replace: ''
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_no_password_check.remediation_status
     tags:
@@ -247,14 +247,14 @@
       loop_control:
         label: "{{ item.stdout }}"
       loop: "{{ sudo_re_authentication_status_check.results | list }}"
-  
-   # Extract audit result
+
     - set_fact:
         sudo_re_authentication_status_check:
           name: 4.3.5 Ensure re-authentication for privilege escalation is not disabled globally
           scored: true
           automated: true
           remediation_status: "{{ true if sudo_re_authentication_status else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -267,14 +267,14 @@
       replace:
         path: "{{ item }}"
         regexp: '^[^#].*\!authenticate:'
-        replace: ''      
+        replace: ''
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_re_authentication_status_check.remediation_status
     tags:
     - "server_level_1"
     - "workstation_level_1"
     when: "'server_level_1' in levels or 'workstation_level_1' in levels"
-    
+
 
 
   # 4.3.6 Ensure sudo authentication timeout is configured correctly
@@ -330,14 +330,14 @@
       loop_control:
         label: "{{ item.stdout }}"
       loop: "{{ sudoers_files_authentication_timeout_status_status_check.results | list }}"
-  
-   # Extract audit result
+
     - set_fact:
         sudo_authentication_timeout_check:
           name: 4.3.6 Ensure sudo authentication timeout is configured correctly
           scored: true
           automated: true
           remediation_status: "{{ true if sudo_authentication_timeout_status else false }}"
+      # Extract audit result
       changed_when: false
 
     # Appending audit result
@@ -345,8 +345,8 @@
         audit_result: "{{ (audit_result | default([])) + [sudo_authentication_timeout_check] }}"
       changed_when: false
 
-     # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
     - name: 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
+      # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
       lineinfile:
         path: "{{ item }}"
         regexp: '^Defaults[\s]{1,}.+timestamp_timeout'
@@ -354,8 +354,8 @@
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_authentication_timeout_check.remediation_status
 
-     # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
     - name: 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
+      # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
       lineinfile:
         path: "{{ item }}"
         regexp: '^Defaults[\s]{1,}env_reset'
@@ -363,8 +363,8 @@
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_authentication_timeout_check.remediation_status
 
-     # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
     - name: 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
+      # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
       lineinfile:
         path: "{{ item }}"
         regexp: '^Defaults timestamp_timeout=15'
@@ -373,8 +373,8 @@
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_authentication_timeout_check.remediation_status
 
-     # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
     - name: 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
+      # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
       lineinfile:
         path: "{{ item }}"
         regexp: '^Defaults env_reset'
@@ -382,7 +382,7 @@
         state: present
       loop: "{{ sudoers_files }}"
       when: not audit_only and not sudo_authentication_timeout_check.remediation_status
-    
+
     # 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
     - name: 4.3.6 Ensure sudo authentication timeout is configured correctly | Remediation
       lineinfile:
@@ -466,17 +466,17 @@
         name: "{{ su_group_name }}"
         state: present
       when: not audit_only and not sudo_access_restrection_check.remediation_status
-    
-     # 4.3.7 Ensure access to the su command is restricted | Remediation
+
     - name: 4.3.7 Ensure access to the su command is restricted | Remediation
+      # 4.3.7 Ensure access to the su command is restricted | Remediation
       lineinfile:
         path: "/etc/pam.d/su"
         regexp: '^auth[\s]{1,}required[\s]{1,}pam_wheel[.]so[\s]{1,}use_uid[\s]{1,}group='
         state: absent
       when: not audit_only and not sudo_access_restrection_check.remediation_status
-    
-     # 4.3.7 Ensure access to the su command is restricted | Remediation
+
     - name: 4.3.7 Ensure access to the su command is restricted | Remediation
+      # 4.3.7 Ensure access to the su command is restricted | Remediation
       lineinfile:
         path: "/etc/pam.d/su"
         regexp: '^auth[\s]{1,}required[\s]{1,}pam_wheel[.]so[\s]{1,}use_uid[\s]{1,}group='

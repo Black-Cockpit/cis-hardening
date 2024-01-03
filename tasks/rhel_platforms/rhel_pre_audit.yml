@@ -1,3 +1,8 @@
+# Gather system packages
+- name: Pre Audit | Gathering system info
+  package_facts:
+    manager: auto
+
 # Check target RHEL platforms 
 - name: "Pre Audit | Check OS version and family"
   assert:

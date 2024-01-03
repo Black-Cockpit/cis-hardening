@@ -1,0 +1,92 @@
+# 4.4.1 Configure PAM software packages
+- name: 4.4.1 Configure PAM software packages
+  block:
+  # 4.4.1.1 Ensure latest version of pam is installed
+  #
+  # To ensure the system has full functionality and access to the options covered by this
+  # Benchmark, pam-1.3.1-25 or latter is required
+  - name: "4.4.1.1 Ensure latest version of pam is installed"
+    block:
+    # 4.4.1.1 Ensure latest version of pam is installed | Audit
+    # Extract pam version
+    - name: 4.4.1.1 Ensure latest version of pam is installed | Audit
+      set_fact:
+        pam_version: "{{ ansible_facts.packages['pam'][0].version | regex_search('[0-9.]*') }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        pam_version_check:
+          name: 4.4.1.1 Ensure latest version of pam is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if pam_version is version('1.3.1', '>=') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [pam_version_check] }}"
+      changed_when: false
+
+    - name: 4.4.1.1 Ensure latest version of pam is installed | Remediation
+      # 4.4.1.1 Ensure latest version of pam is installed | Remediation
+      yum:
+        name: pam
+        bugfix: true
+        security: true
+        state: latest
+      when: not audit_only and not pam_version_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.4.1.2 Ensure latest version of authselect is installed
+  #
+  # Authselect is a utility that simplifies the configuration of user authentication. Authselect
+  # offers ready-made profiles that can be universally used with all modern identity
+  # management systems
+  #
+  # You can create and deploy a custom profile by customizing one of the default profiles,
+  # the sssd, winbind, or the nis profile. This is particularly useful if Modifying a ready-made
+  # authselect profile is not enough for your needs. When you deploy a custom profile, the
+  # profile is applied to every user logging into the given host. This would be the
+  # recommended method, so that the existing profiles can remain unmodified.
+  # Updated versions of authselect include additional functionality
+  - name: "4.4.1.2 Ensure latest version of authselect is installed"
+    block:
+    # 4.4.1.2 Ensure latest version of authselect is installed | Audit
+    # Extract authselect version
+    - name: 4.4.1.2 Ensure latest version of authselect is installed | Audit
+      set_fact:
+        authselect_version: "{{ ansible_facts.packages['authselect'][0].version | regex_search('[0-9.]*') }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        authselect_version_check:
+          name: 4.4.1.2 Ensure latest version of authselect is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_version is version('1.2.6', '>=') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_version_check] }}"
+      changed_when: false
+
+    - name: 4.4.1.2 Ensure latest version of authselect is installed | Remediation
+      # 4.4.1.2 Ensure latest version of authselect is installed | Remediation
+      yum:
+        name: authselect
+        bugfix: true
+        security: true
+        state: latest
+      when: not audit_only and not authselect_version_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
