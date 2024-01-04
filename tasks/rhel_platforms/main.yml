@@ -73,6 +73,8 @@
 # - include_tasks:
 #     file: "./rhel8/4_4_2_configure_authselect.yml"
 
-- include_tasks:
-    file: "./rhel8/4_4_3_1_configure_pam_faillock_module.yml"
+# - include_tasks:
+#     file: "./rhel8/4_4_3_1_configure_pam_faillock_module.yml"
 
+- include_tasks:
+    file: "./rhel8/4_4_3_2_configure_pam_pwquality_module.yml"

@@ -47,7 +47,7 @@
     - name: 4.4.3.1.1 Ensure password failed attempts lockout is configured | Remediation
       replace:
         path: /etc/security/faillock.conf
-        regexp: '^(#deny|deny)[\s]{1,}='
+        regexp: '^(#deny|deny)[\s]{0,}=.+'
         replace: ''
       when: not audit_only and not faillock_deny_check.remediation_status
 
@@ -138,7 +138,7 @@
     - name: 4.4.3.1.1 Ensure password failed attempts lockout is configured | Remediation
       replace:
         path: /etc/security/faillock.conf
-        regexp: '^(#unlock_time|unlock_time)[\s]{1,}=[\s]{1,}[\d]{1,}'
+        regexp: '^(#unlock_time|unlock_time)[\s]{0,}=[\s]{0,}[\d]{0,}.+'
         replace: ''
       when: not audit_only and not unlock_time_check.remediation_status
 
@@ -223,7 +223,7 @@
     - name: 4.4.3.1.3 Ensure password failed attempts lockout includes root account | Remediation
       replace:
         path: /etc/security/faillock.conf
-        regexp: '^(#root_unlock_time|root_unlock_time)[\s]{1,}=[\s]{1,}[\d]{1,}'
+        regexp: '^(#root_unlock_time|root_unlock_time)[\s]{0,}=[\s]{0,}[\d]{0,}.+'
         replace: ''
       when: not audit_only and not root_unlock_check.remediation_status
 
@@ -240,7 +240,7 @@
     - name: 4.4.3.1.3 Ensure password failed attempts lockout includes root account | Remediation
       replace:
         path: /etc/security/faillock.conf
-        regexp: '^(#even_deny_root|even_deny_root)'
+        regexp: '^(#even_deny_root|even_deny_root).+'
         replace: ''
       when: not audit_only and not root_unlock_check.remediation_status
 

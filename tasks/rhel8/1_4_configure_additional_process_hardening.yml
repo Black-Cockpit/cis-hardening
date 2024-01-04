@@ -236,7 +236,7 @@
     - name: "1.4.3 Ensure core dump backtraces are disabled | Remediation"
       replace:
         name: "/etc/systemd/coredump.conf"
-        regexp: "^[#]{0,}(ProcessSizeMax=)"
+        regexp: '^[#]{0,}(ProcessSizeMax=)[\s]{0,}[\d]{0,}.+'
         replace: "ProcessSizeMax=0"
       when: not audit_only and not process_size_max_configured_check.remediation_status
 
@@ -312,7 +312,7 @@
     - name: "1.4.4 Ensure core dump storage is disabled | Remediation"
       replace:
         name: "/etc/systemd/coredump.conf"
-        regexp: "^[#]{0,}(Storage=)"
+        regexp: "^[#]{0,}(Storage=).+"
         replace: "Storage=none"
       when: not audit_only and not core_dump_storage_configured_check.remediation_status
 

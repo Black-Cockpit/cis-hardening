@@ -240,7 +240,7 @@
       changed_when: false
       register: authselect_pam_unix_module_status_check
 
-     # Extract audit result
+    # Extract audit result
     - set_fact:
         authselect_pam_unix_module_check:
           name: 4.4.2.5 Ensure pam_unix module is enabled
