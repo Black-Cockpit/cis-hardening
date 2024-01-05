@@ -79,5 +79,8 @@
 # - include_tasks:
 #     file: "./rhel8/4_4_3_2_configure_pam_pwquality_module.yml"
 
+# - include_tasks:
+#     file: "./rhel8/4_4_3_3_configure_pam_pwhistory_module.yml"
+
 - include_tasks:
-    file: "./rhel8/4_4_3_3_configure_pam_pwhistory_module.yml"
+    file: "./rhel8/4_4_3_4_configure_pam_unix module.yml"
