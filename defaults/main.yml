@@ -5,6 +5,9 @@ reboot_required: false
 # Warning Banner Content (issue, issue.net, motd)
 warning_banner: "Authorized uses only. All activity may be monitored and reported."
 
+# Define site policy
+site_policy:
+
 cis_defaults:
   # Time synchronization ntp servers
   time_synchronization_servers:

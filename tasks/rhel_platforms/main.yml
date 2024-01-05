@@ -85,5 +85,8 @@
 # - include_tasks:
 #     file: "./rhel8/4_4_3_4_configure_pam_unix_module.yml"
 
+# - include_tasks:
+#     file: "./rhel8/4_5_1_configure_shadow_password_suite_parameters.yml"
+
 - include_tasks:
-    file: "./rhel8/4_5_1_configure_shadow_password_suite_parameters.yml"
+    file: "./rhel8/4_5_2_configure_root_and_system_accounts_and_environment.yml"

@@ -1,5 +1,6 @@
 # Remediation will not be applied unless the audit_only is set to false
 audit_only: true
+
 # Benchmark level
 # Allowed values are `server_level_1`, `server_level_2`, `workstation_level_1` or `workstation_level_2`
 levels:
@@ -15,6 +16,11 @@ time_synchronization_servers:
 
 # Chrony server options
 chrony_server_options: "minpoll 8"
+
+# Define site policy
+site_policy:
+  # Set root account password
+  root_password: ''
 
 # SELinux policy
 rhel8:
