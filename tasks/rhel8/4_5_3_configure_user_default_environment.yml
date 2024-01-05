@@ -296,6 +296,6 @@
         state: present
       when: not audit_only and not default_user_umask_check.remediation_status
     tags:
-    - "server_level_2"
-    - "workstation_level_2"
-    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

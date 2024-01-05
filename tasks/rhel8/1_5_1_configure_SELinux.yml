@@ -289,7 +289,7 @@
 
     # Append remediation
     - set_fact:
-        unconfined_service_check: "{{ unconfined_service_check | combine(unconfined_service_check) }}"
+        unconfined_service_check: "{{ unconfined_service_check | combine(unconfined_service_recommendation) }}"
       changed_when: false
       when: not unconfined_service_check.remediation_status
 
