@@ -282,7 +282,7 @@
 
     # Define remediation message
     - set_fact:
-        unconfined_service_recommandation:
+        unconfined_service_recommendation:
           remediation: "Consider to investigate any unconfined processes list bellow : \n {% for item in (unconfined_service_list.stdout_lines | list) %}{{ item + '\n'}}{% endfor %}"
       changed_when: false
       when: not unconfined_service_check.remediation_status

@@ -13,7 +13,7 @@
         cmd: |
           # Extract pam_unix configuration
           pam_unix=$(grep -P -- '^\h*(auth|account|password|session)\h+(requisite|required|sufficient)\h+pam_unix\.so\b' /etc/pam.d/{password,system}-auth)
-          
+
           # Check if pam_unix configuration has nullok and return audit result
           echo "$pam_unix" | grep -Pq -- '\bnullok\b' && echo 'not_configured' || echo 'configured'
       changed_when: false
@@ -81,7 +81,7 @@
         cmd: |
           # Extract remember configuration
           remember=$(grep -P -- '^\h*password\h+([^#\n\r]+\h+)?pam_unix\.so\b' /etc/pam.d/{password,system}-auth)
-          
+
           # Check if remember configuration has nullok and return audit result
           echo "$remember" | grep -Pq -- '\bremember=\d\b' && echo 'not_configured' || echo 'configured'
       changed_when: false
