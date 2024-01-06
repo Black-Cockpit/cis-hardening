@@ -94,6 +94,8 @@
 # - include_tasks:
 #     file: "./rhel8/4_5_3_configure_user_default_environment.yml"
 
-- include_tasks:
-    file: "./rhel8/5_1_1_configure_rsyslog_sh.yml"
+# - include_tasks:
+#     file: "./rhel8/5_1_1_configure_rsyslog_sh.yml"
 
+- include_tasks:
+    file: "./rhel8/5_1_2_configure_journald.yml"
