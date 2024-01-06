@@ -1,0 +1,168 @@
+# 5.2.1 Ensure auditing is enabled
+- name: 5.2.1 Ensure auditing is enabled
+  block:
+  # 5.2.1.1 Ensure audit is installed
+  #
+  # auditd is the userspace component to the Linux Auditing System. It's responsible for
+  # writing audit records to the disk.
+  - name: "5.2.1.1 Ensure audit is installed"
+    block:
+    # 5.2.1.1 Ensure audit is installed | Audit
+    - name: 5.2.1.1 Ensure audit is installed | Audit
+      shell:
+        cmd: rpm -q audit | grep -Eq 'audit[\-][0-9]' && echo 'installed' || echo 'not_installed'
+      changed_when: false
+      register: auditd_status_check
+
+    # Extract audit result
+    - set_fact:
+        auditd_check:
+          name: 5.2.1.1 Ensure audit is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if auditd_status_check.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [auditd_check] }}"
+      changed_when: false
+
+    # 5.2.1.1 Ensure audit is installed | Remediation
+    - name: 5.2.1.1 Ensure audit is installed | Remediation
+      package:
+        name: audit
+        state: present
+      when: not audit_only and not auditd_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled
+  #
+  # Configure grub2 so that processes that are capable of being audited can be audited
+  # even if they start up prior to auditd startup.
+  - name: "5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled"
+    block:
+    # 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled | Audit
+    - name: 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled | Audit
+      shell:
+        cmd: grubby --info=ALL | grep -Poq '\baudit=1\b' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: auditd_grub_processes_status_check
+
+    # Extract audit result
+    - set_fact:
+        auditd_grub_processes_check:
+          name: 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if auditd_grub_processes_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [auditd_grub_processes_check] }}"
+      changed_when: false
+
+    # 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled | Remediation
+    - name: 5.2.1.2 Ensure auditing for processes that start prior to auditd is enabled | Remediation
+      shell:
+        cmd: grubby --update-kernel ALL --args 'audit=1'
+      when: not audit_only and not auditd_grub_processes_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.1.3 Ensure audit_backlog_limit is sufficient
+  #
+  # The backlog limit has a default setting of 64
+  - name: "5.2.1.3 Ensure audit_backlog_limit is sufficient"
+    block:
+    # 5.2.1.3 Ensure audit_backlog_limit is sufficient | Audit
+    - name: 5.2.1.3 Ensure audit_backlog_limit is sufficient | Audit
+      shell:
+        cmd: |
+          audit='configured'
+
+          while read -r value; do
+              if [[ "$value" -lt 8191 ]]; then
+                  audit='not_configured'
+                  break
+              fi
+          done <<<$(awk -F '=' '{print $2}' <<<$(grubby --info=ALL | grep -Po "\baudit_backlog_limit=\d+\b" || echo 'audit_backlog_limit=0'))
+
+          echo "$audit"
+      changed_when: false
+      register: audit_backlog_limit_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_backlog_limit_check:
+          name: 5.2.1.3 Ensure audit_backlog_limit is sufficient
+          scored: true
+          automated: true
+          remediation_status: "{{ true if audit_backlog_limit_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_backlog_limit_check] }}"
+      changed_when: false
+
+    # 5.2.1.3 Ensure audit_backlog_limit is sufficient | Remediation
+    - name: 5.2.1.3 Ensure audit_backlog_limit is sufficient | Remediation
+      shell:
+        cmd: grubby --update-kernel ALL --args 'audit_backlog_limit=8192'
+      when: not audit_only and not audit_backlog_limit_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.1.4 Ensure auditd service is enabled
+  #
+  # Turn on the auditd daemon to record system events.
+  - name: "5.2.1.4 Ensure auditd service is enabled"
+    block:
+    # 5.2.1.4 Ensure auditd service is enabled | Audit
+    - name: 5.2.1.4 Ensure auditd service is enabled | Audit
+      systemd:
+        name: auditd
+      changed_when: false
+      register: auditd_service_status_check
+
+    # Extract audit result
+    - set_fact:
+        auditd_service_check:
+          name: 5.2.1.4 Ensure auditd service is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (auditd_service_status_check.status.ActiveState == 'active' and auditd_service_status_check.status.UnitFileState == 'enabled') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [auditd_service_check] }}"
+      changed_when: false
+
+    # 5.2.1.4 Ensure auditd service is enabled | Remediation
+    - name: 5.2.1.4 Ensure auditd service is enabled | Remediation
+      systemd:
+        name: auditd
+        state: started
+        enabled: true
+        masked: false
+      when: not audit_only and not auditd_service_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
