@@ -100,5 +100,8 @@
 # - include_tasks:
 #     file: "./rhel8/5_1_2_configure_journald.yml"
 
+# - include_tasks:
+#     file: "./rhel8/5_2_1_ensure_auditing_is_enabled.yml"
+
 - include_tasks:
-    file: "./rhel8/5_2_1_ensure_auditing_is_enabled.yml"
+    file: "./rhel8/5_2_2_configure_data_retention.yml"
