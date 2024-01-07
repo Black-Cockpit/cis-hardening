@@ -1347,7 +1347,6 @@
     - "workstation_level_2"
     when: "'server_level_2' in levels or 'workstation_level_2' in levels"
 
-  
 
 
   # 5.2.3.11 Ensure session initiation information is collected
@@ -1732,8 +1731,8 @@
           &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
       changed_when: false
       loop:
-      - "/etc/selinux/"
-      - "/usr/share/selinux/"
+      - "/etc/selinux"
+      - "/usr/share/selinux"
       register: audit_mac_rule_status_check
 
     # 5.2.3.14 Ensure events that modify the system's Mandatory Access Controls are collected | Audit
@@ -1748,8 +1747,8 @@
           &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
       changed_when: false
       loop:
-      - "/etc/selinux/"
-      - "/usr/share/selinux/"
+      - "/etc/selinux"
+      - "/usr/share/selinux"
       register: audit_mac_running_rule_status_check
 
     # Define remediation status
@@ -1809,15 +1808,15 @@
 
           [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k MAC-policy' >> /etc/audit/rules.d/00-cis-MAC-policy.rules
       loop:
-      - "/var/log/lastlog"
-      - "/var/run/faillock"
+      - "/etc/selinux"
+      - "/usr/share/selinux"
       when: not audit_only and not audit_mac_rule_check.remediation_status
 
      # 5.2.3.14 Ensure events that modify the system's Mandatory Access Controls are collected | Remediation
     - name: 5.2.3.14 Ensure events that modify the system's Mandatory Access Controls are collected | Remediation
       shell:
         cmd: augenrules --load
-      when: not audit_only and not audit_login_rule_check.remediation_status
+      when: not audit_only and not audit_mac_rule_check.remediation_status
     tags:
     - "server_level_2"
     - "workstation_level_2"
@@ -1825,112 +1824,592 @@
 
 
 
-
   # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded
   #
   # The operating system must generate audit records for successful/unsuccessful uses of
   # the chcon command.
-  # - name: "5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded"
-  #   block:    
-  #   # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
-  #   - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
-  #     shell:
-  #       cmd: |
-  #         MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+  - name: "5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded"
+    block:    
+    # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
+    - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
+      shell:
+        cmd: |
+          awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chcon/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      register: audit_chcon_rule_status_check
 
-  #         awk "/^ *-w/ \
-  #         &&/"${MAC_FILE_ESCAPED}"/ \
-  #         &&/ +-p *wa/ \
-  #         &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
-  #     changed_when: false
-  #     loop:
-  #     - "/etc/selinux/"
-  #     - "/usr/share/selinux/"
-  #     register: audit_mac_rule_status_check
+    # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
+    - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chcon/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+      changed_when: false
+      register: audit_chcon_running_rule_status_check
 
-  #   # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
-  #   - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Audit
-  #     shell:
-  #       cmd: |
-  #         MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+    # Extract audit result
+    - set_fact:
+        audit_chcon_rule_check:
+          name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( system_min_uid.stdout != '' and (audit_chcon_rule_status_check.stdout | int) > 0 and (audit_chcon_running_rule_status_check.stdout | int) > 0) else false }}"
+      changed_when: false
 
-  #         auditctl -l | awk "/^ *-w/ \
-  #         &&/"${MAC_FILE_ESCAPED}"/ \
-  #         &&/ +-p *wa/ \
-  #         &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
-  #     changed_when: false
-  #     loop:
-  #     - "/etc/selinux/"
-  #     - "/usr/share/selinux/"
-  #     register: audit_mac_running_rule_status_check
-
-  #   # Define remediation status
-  #   - set_fact:
-  #       remediation_status: true
-  #     changed_when: false
-
-  #   # Check if all system's Mandatory Access modification rules are configured
-  #   - set_fact:
-  #       remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
-  #     loop: "{{ audit_mac_rule_status_check.results | default([]) | list }}"
-  #     loop_control:
-  #       label: "{{ item.stdout | default() }}"
-  #     changed_when: false
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_chcon_rule_check] }}"
+      changed_when: false
     
-  #   # Check if all system's Mandatory Access modification rules are loaded
-  #   - set_fact:
-  #       remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
-  #     loop: "{{ audit_mac_running_rule_status_check.results | default([]) | list }}"
-  #     loop_control:
-  #       label: "{{ item.stdout | default() }}"
-  #     changed_when: false
-
-  #   # Extract audit result
-  #   - set_fact:
-  #       audit_mac_rule_check:
-  #         name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded
-  #         scored: true
-  #         automated: true
-  #         remediation_status: "{{ true if remediation_status else false }}"
-  #     changed_when: false
-
-  #   # Appending audit result
-  #   - set_fact:
-  #       audit_result: "{{ (audit_result | default([])) + [audit_mac_rule_check] }}"
-  #     changed_when: false
+    # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+    - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+      copy:
+        dest: /etc/audit/rules.d/00-cis-chcon-perm-chng.rules
+        content: ''
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_chcon_rule_check.remediation_status
     
-  #   # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #   - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #     copy:
-  #       dest: /etc/audit/rules.d/00-cis-MAC-policy.rules
-  #       content: ''
-  #       mode: "0600"
-  #       owner: root
-  #     when: not audit_only and not audit_mac_rule_check.remediation_status
+    # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+    - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chcon/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -S all -F path=/usr/bin/chcon -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=-1 -F key=perm_chng' >> /etc/audit/rules.d/00-cis-chcon-perm-chng.rules
+      when: not audit_only and not audit_chcon_rule_check.remediation_status
+
+     # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+    - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_chcon_rule_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded
+  #
+  # The operating system must generate audit records for successful/unsuccessful uses of
+  # the setfacl command
+  - name: "5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded"
+    block:    
+    # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Audit
+    - name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Audit
+      shell:
+        cmd: |
+          awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/setfacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      register: audit_setfacl_rule_status_check
+
+    # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Audit
+    - name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/setfacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+      changed_when: false
+      register: audit_setfacl_running_rule_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_setfacl_rule_check:
+          name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( system_min_uid.stdout != '' and (audit_setfacl_rule_status_check.stdout | int) > 0 and (audit_setfacl_running_rule_status_check.stdout | int) > 0) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_setfacl_rule_check] }}"
+      changed_when: false
     
-  #   # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #   - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #     shell:
-  #       cmd: |
-  #         MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+    # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+    - name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+      copy:
+        dest: /etc/audit/rules.d/00-cis-setfacl-perm-chng.rules
+        content: ''
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_setfacl_rule_check.remediation_status
+    
+    # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+    - name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/setfacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
 
-  #         rule_count=$(awk "/^ *-w/ \
-  #         &&/"${MAC_FILE_ESCAPED}"/ \
-  #         &&/ +-p *wa/ \
-  #         &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -S all -F path=/usr/bin/setfacl -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=-1 -F key=perm_chng' >> /etc/audit/rules.d/00-cis-setfacl-perm-chng.rules
+      when: not audit_only and not audit_setfacl_rule_check.remediation_status
 
-  #         [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k MAC-policy' >> /etc/audit/rules.d/00-cis-MAC-policy.rules
-  #     loop:
-  #     - "/var/log/lastlog"
-  #     - "/var/run/faillock"
-  #     when: not audit_only and not audit_mac_rule_check.remediation_status
+     # 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+    - name: 5.2.3.16 Ensure successful and unsuccessful attempts to use the setfacl command are recorded | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_setfacl_rule_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
 
-  #    # 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #   - name: 5.2.3.15 Ensure successful and unsuccessful attempts to use the chcon command are recorded | Remediation
-  #     shell:
-  #       cmd: augenrules --load
-  #     when: not audit_only and not audit_login_rule_check.remediation_status
-  #   tags:
-  #   - "server_level_2"
-  #   - "workstation_level_2"
-  #   when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+  # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded
+  #
+  # The operating system must generate audit records for successful/unsuccessful uses of
+  # the chacl command
+  - name: "5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded"
+    block:    
+    # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Audit
+    - name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Audit
+      shell:
+        cmd: |
+          awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      register: audit_chacl_rule_status_check
+
+    # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Audit
+    - name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+      changed_when: false
+      register: audit_chacl_running_rule_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_chacl_rule_check:
+          name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( system_min_uid.stdout != '' and (audit_chacl_rule_status_check.stdout | int) > 0 and (audit_chacl_running_rule_status_check.stdout | int) > 0) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_chacl_rule_check] }}"
+      changed_when: false
+    
+    # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+    - name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+      copy:
+        dest: /etc/audit/rules.d/00-cis-chacl-perm-chng.rules
+        content: ''
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_chacl_rule_check.remediation_status
+    
+    # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+    - name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/chacl/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k perm_chng' >> /etc/audit/rules.d/00-cis-chacl-perm-chng.rules
+      when: not audit_only and not audit_chacl_rule_check.remediation_status
+
+     # 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+    - name: 5.2.3.17 Ensure successful and unsuccessful attempts to use the chacl command are recorded | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_chacl_rule_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded
+  #
+  # The operating system must generate audit records for successful/unsuccessful uses of
+  # the usermod command.
+  - name: "5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded"
+    block:    
+    # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Audit
+    - name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Audit
+      shell:
+        cmd: |
+          awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/sbin\/usermod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      register: audit_usermod_rule_status_check
+
+    # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Audit
+    - name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/sbin\/usermod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+      changed_when: false
+      register: audit_usermod_running_rule_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_usermod_rule_check:
+          name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( system_min_uid.stdout != '' and (audit_usermod_rule_status_check.stdout | int) > 0 and (audit_usermod_running_rule_status_check.stdout | int) > 0) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_usermod_rule_check] }}"
+      changed_when: false
+    
+    # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+    - name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+      copy:
+        dest: /etc/audit/rules.d/00-cis-usermod.rules
+        content: ''
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_usermod_rule_check.remediation_status
+    
+    # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+    - name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/sbin\/usermod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k usermod' >> /etc/audit/rules.d/00-cis-usermod.rules
+      when: not audit_only and not audit_usermod_rule_check.remediation_status
+
+     # 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+    - name: 5.2.3.18 Ensure successful and unsuccessful attempts to use the usermod command are recorded | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_usermod_rule_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.3.19 Ensure kernel module loading unloading and modification is collected
+  #
+  # Monitor the loading and unloading of kernel modules. All the loading / listing /
+  # dependency checking of modules is done by kmod via symbolic links.
+  # 
+  # The following system calls control loading and unloading of modules:
+  #
+  #
+  # - init_module   : load a module
+  # - finit_module  : load a module (used when the overhead of using cryptographically signed modules to determine the authenticity of a module can be avoided)
+  # - delete_module : delete a module
+  # - create_module : create a loadable module entry
+  # - query_module  : query the kernel for various bits pertaining to modules
+  #
+  # Any execution of the loading and unloading module programs and system calls will
+  # trigger an audit record with an identifier of modules .
+  - name: "5.2.3.19 Ensure kernel module loading unloading and modification is collected"
+    block:    
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+      shell:
+        cmd: |
+          awk '/^ *-a *always,exit/ \
+          &&/ -F *arch=b{{ item }}/ \
+          &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -S/ \
+          &&(/init_module,finit_module,delete_module,create_module,query_module/) \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      loop:
+      - "32"
+      - "64"
+      register: audit_kernel_module_syscall_rule_status_check
+
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk '/^ *-a *always,exit/ \
+          &&/ -F *arch=b{{ item }}/ \
+          &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -S/ \
+          &&(/create_module,init_module,delete_module,query_module,finit_module/) \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+      changed_when: false
+      loop:
+      - "32"
+      - "64"
+      register: audit_kernel_module_syscall_running_rule_status_check
+
+    # Set kernel module syscall rules audit result
+    - set_fact:
+        audit_kernel_module_syscall_status: "{{ true if system_min_uid.stdout != '' else false }}"
+      changed_when: false
+
+    # Check if all kernel module syscall rules rules are configured
+    - set_fact:
+        audit_kernel_module_syscall_status: "{{ true if (audit_kernel_module_syscall_status and (item.stdout | int) > 0) else false}}"
+      loop: "{{ audit_kernel_module_syscall_rule_status_check.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+    
+    # Check if all kernel module syscall rules are loaded
+    - set_fact:
+        audit_kernel_module_syscall_status: "{{ true if (audit_kernel_module_syscall_status and (item.stdout | int) > 0) else false}}"
+      loop: "{{ audit_kernel_module_syscall_running_rule_status_check.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+      shell:
+        cmd: |
+          awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/kmod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+      changed_when: false
+      register: audit_kernel_module_rule_status_check
+
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Audit
+      shell:
+        cmd: |
+          auditctl -l | awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/kmod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+      changed_when: false
+      register: audit_kernel_module_running_rule_status_check
+
+    # Set kernel module rules audit result
+    - set_fact:
+        audit_kernel_module_status: "{{ true if (system_min_uid.stdout != '' and (audit_kernel_module_rule_status_check.stdout | int) > 0 and (audit_kernel_module_running_rule_status_check.stdout | int) > 0) else false }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_kernel_module_rule_check:
+          name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (audit_kernel_module_syscall_status and audit_kernel_module_status) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_kernel_module_rule_check] }}"
+      changed_when: false
+    
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+      copy:
+        dest: /etc/audit/rules.d/00-cis-kernel-modules.rules
+        content: ''
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+    
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk '/^ *-a *always,exit/ \
+          &&/ -F *arch=b{{ item }}/ \
+          &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -S/ \
+          &&(/init_module,finit_module,delete_module,create_module,query_module/) \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F arch=b{{ item }} -S init_module,finit_module,delete_module,create_module,query_module -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k kernel_modules' >> /etc/audit/rules.d/00-cis-kernel-modules.rules
+      loop:
+      - "32"
+      - "64"
+      when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+    # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+      shell:
+        cmd: |
+          rule_count=$(awk "/^ *-a *always,exit/ \
+          &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+          &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+          &&/ -F *perm=x/ \
+          &&/ -F *path=\/usr\/bin\/kmod/ \
+          &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+          [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F path=/usr/bin/kmod -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k kernel_modules' >> /etc/audit/rules.d/00-cis-kernel-modules.rules
+      when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+     # 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+    - name: 5.2.3.19 Ensure kernel module loading unloading and modification is collected | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.3.20 Ensure the audit configuration is immutable
+  #
+  # Set system audit so that audit rules cannot be modified with auditctl . Setting the flag
+  # "-e 2" forces audit to be put in immutable mode. Audit changes can only be made on
+  # system reboot.
+  # 
+  # Note: This setting will require the system to be rebooted to update the active auditd
+  # configuration settings.
+  - name: "5.2.3.20 Ensure the audit configuration is immutable"
+    block:    
+    # 5.2.3.20 Ensure the audit configuration is immutable | Audit
+    - name: 5.2.3.20 Ensure the audit configuration is immutable | Audit
+      shell:
+        cmd: grep -Phq -- '^\h*-e\h+2\b' /etc/audit/rules.d/*.rules && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_immutable_conf_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_immutable_conf_check:
+          name: 5.2.3.20 Ensure the audit configuration is immutable
+          scored: true
+          automated: true
+          remediation_status: "{{ true if audit_immutable_conf_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_immutable_conf_check] }}"
+      changed_when: false
+    
+    # 5.2.3.20 Ensure the audit configuration is immutable | Remediation
+    - name: 5.2.3.20 Ensure the audit configuration is immutable | Remediation
+      copy:
+        dest: /etc/audit/rules.d/99-cis-finalize.rules
+        # Break line is required
+        content: |
+          -e 2
+
+        mode: "0600"
+        owner: root
+      when: not audit_only and not audit_immutable_conf_check.remediation_status
+
+     # 5.2.3.20 Ensure the audit configuration is immutable | Remediation
+    - name: 5.2.3.20 Ensure the audit configuration is immutable | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_immutable_conf_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.3.21 Ensure the running and on disk configuration is the same
+  #
+  # The Audit system have both on disk and running configuration. It is possible for these
+  # configuration settings to differ.
+  # Note: Due to the limitations of augenrules and auditctl , it is not absolutely guaranteed
+  # that loading the rule sets via augenrules --load will result in all rules being loaded or
+  # even that the user will be informed if there was a problem loading the rules.
+  - name: "5.2.3.21 Ensure the running and on disk configuration is the same"
+    block:    
+    # 5.2.3.21 Ensure the running and on disk configuration is the same | Audit
+    - name: 5.2.3.21 Ensure the running and on disk configuration is the same | Audit
+      shell:
+        cmd: augenrules --check | grep -qi 'no change' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_all_rules_loaded_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_all_rules_loaded_check:
+          name: 5.2.3.21 Ensure the running and on disk configuration is the same
+          scored: true
+          automated: false
+          remediation_status: "{{ true if audit_all_rules_loaded_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_all_rules_loaded_check] }}"
+      changed_when: false
+
+     # 5.2.3.21 Ensure the running and on disk configuration is the same | Remediation
+    - name: 5.2.3.21 Ensure the running and on disk configuration is the same | Remediation
+      shell:
+        cmd: augenrules --load
+      when: not audit_only and not audit_all_rules_loaded_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
