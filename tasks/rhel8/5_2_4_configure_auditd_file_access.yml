@@ -1,60 +1,63 @@
-# Pre Audit | Get audit log directory
-- name: Pre Audit | Get audit log directory
-  shell:
-    cmd: dirname $( awk -F"=" '/^\s*log_file\s*=\s*/ {print $2}' /etc/audit/auditd.conf)
-  changed_when: false
-  register: audit_log_dir
-
-# Pre Audit | List audit log files
-- name: Pre Audit | List audit log files
-  find:
-    paths:
-      - "{{ audit_log_dir.stdout }}"
-    file_type: file
-  changed_when: false
-  register: audit_log_files_list
-
-# Pre Audit | stat audit log files
-- name: Pre Audit | stat audit log files
-  stat:
-    path: "{{ item.path }}"
-  changed_when: false
-  loop: "{{ audit_log_files_list.files | default([]) | list }}"
-  loop_control:
-    label: "{{ item.path | default() }}"
-  register: audit_log_files_status
-
-# Pre Audit | List audit configuration files
-- name: Pre Audit | List audit configuration files
-  find:
-    paths:
-      - /etc/audit/
-      - /etc/audit/rules.d/
-      - /etc/audit/plugins.d/
-    patterns:
-      - "*.conf"
-      - "*.rules"
-    file_type: file
-  changed_when: false
-  register: audit_conf_files_list
-
-# Pre Audit | stat audit configuration files
-- name: Pre Audit | stat audit configuration files
-  stat:
-    path: "{{ item.path }}"
-  changed_when: false
-  loop: "{{ audit_conf_files_list.files | default([]) | list }}"
-  loop_control:
-    label: "{{ item.path | default() }}"
-  register: audit_conf_files_status
-
-# Pre Audit | stat audit tools files
-- name: Pre Audit | stat audit tools files
-  stat:
-    path: "{{ item }}"
-  changed_when: false
-  loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
-  register: audit_tools_status
+# Pre Audit | 5.2.4 Configure auditd file access
+- name: Pre Audit | 5.2.4 Configure auditd file access
+  block:
+  # Pre Audit | Get audit log directory
+  - name: Pre Audit | Get audit log directory
+    shell:
+      cmd: dirname $( awk -F"=" '/^\s*log_file\s*=\s*/ {print $2}' /etc/audit/auditd.conf)
+    changed_when: false
+    register: audit_log_dir
+  
+  # Pre Audit | List audit log files
+  - name: Pre Audit | List audit log files
+    find:
+      paths:
+        - "{{ audit_log_dir.stdout }}"
+      file_type: file
+    changed_when: false
+    register: audit_log_files_list
+  
+  # Pre Audit | stat audit log files
+  - name: Pre Audit | stat audit log files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_log_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_log_files_status
+  
+  # Pre Audit | List audit configuration files
+  - name: Pre Audit | List audit configuration files
+    find:
+      paths:
+        - /etc/audit/
+        - /etc/audit/rules.d/
+        - /etc/audit/plugins.d/
+      patterns:
+        - "*.conf"
+        - "*.rules"
+      file_type: file
+    changed_when: false
+    register: audit_conf_files_list
+  
+  # Pre Audit | stat audit configuration files
+  - name: Pre Audit | stat audit configuration files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_conf_files_status
+  
+  # Pre Audit | stat audit tools files
+  - name: Pre Audit | stat audit tools files
+    stat:
+      path: "{{ item }}"
+    changed_when: false
+    loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+    register: audit_tools_status
 
 # 5.2.4 Configure auditd file access
 - name: 5.2.4 Configure auditd file access
