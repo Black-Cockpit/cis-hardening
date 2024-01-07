@@ -30,5 +30,11 @@ cis_defaults:
       rate: 30
       full: 60
 
-
+  audit_tools:
+  - "/sbin/auditctl"
+  - "/sbin/aureport"
+  - "/sbin/ausearch"
+  - "/sbin/autrace"
+  - "/sbin/auditd"
+  - "/sbin/augenrules"
 

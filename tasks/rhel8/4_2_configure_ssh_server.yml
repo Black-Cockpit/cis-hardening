@@ -135,7 +135,24 @@
     # 4.2.2 Ensure permissions on SSH private host key files are configured | Audit
     - name: 4.2.2 Ensure permissions on SSH private host key files are configured | Audit
       shell:
-        cmd: "if [ -d /etc/ssh ]; then\n  # Extract file mode\n  mode=$(stat -Lc '%#a' \"{{ item }}\")\n        #magic___^_^___line\n  # Extract file owner\n  owner=$(stat -Lc '%U' \"{{ item }}\")\n        #magic___^_^___line\n  # Extract file group\n  group=$(stat -Lc '%G' \"{{ item }}\")\n        #magic___^_^___line\n  if [ $(($mode & {{ expected_file_mask }})) -gt 0 ] || [ \"$owner\" != \"root\" ] || [[ ! \"$group\" =~ \"{{ ssh_keys_group }}\" ]]; then \n    echo not_configured\n  else\n    echo configured\n  fi\nelse\n  echo configured\nfi\n"
+        cmd: |
+          if [ -d /etc/ssh ]; then
+              # Extract file mode
+              mode=$(stat -Lc '%#a' {{ item }})
+
+              # Extract file owner
+              owner=$(stat -Lc '%U' {{ item }})
+
+              # Extract file group
+              group=$(stat -Lc '%G' {{ item }})
+
+              if [ $(("$mode" & {{ expected_file_mask }})) -gt 0 ] || [ "$owner" != "root" ] || [[ ! "$group" =~ "{{ ssh_keys_group }}" ]]; then
+                  echo 'not_configured'
+              fi
+
+          else
+              echo 'configured'
+          fi
       changed_when: false
       loop: "{{ ssh_keys_files }}"
       register: ssh_keys_files_stat_check

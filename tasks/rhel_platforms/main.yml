@@ -106,7 +106,8 @@
 # - include_tasks:
 #     file: "./rhel8/5_2_2_configure_data_retention.yml"
 
+# - include_tasks:
+#     file: "./rhel8/5_2_3_configure_auditd_rules.yml"
+
 - include_tasks:
-    file: "./rhel8/5_2_3_configure_auditd_rules.yml"
-
-
+    file: "./rhel8/5_2_4_configure_auditd_file_access.yml"

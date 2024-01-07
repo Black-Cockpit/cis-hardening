@@ -1,0 +1,596 @@
+# Pre Audit | Get audit log directory
+- name: Pre Audit | Get audit log directory
+  shell:
+    cmd: dirname $( awk -F"=" '/^\s*log_file\s*=\s*/ {print $2}' /etc/audit/auditd.conf)
+  changed_when: false
+  register: audit_log_dir
+
+# Pre Audit | List audit log files
+- name: Pre Audit | List audit log files
+  find:
+    paths:
+      - "{{ audit_log_dir.stdout }}"
+    file_type: file
+  changed_when: false
+  register: audit_log_files_list
+
+# Pre Audit | stat audit log files
+- name: Pre Audit | stat audit log files
+  stat:
+    path: "{{ item.path }}"
+  changed_when: false
+  loop: "{{ audit_log_files_list.files | default([]) | list }}"
+  loop_control:
+    label: "{{ item.path | default() }}"
+  register: audit_log_files_status
+
+# Pre Audit | List audit configuration files
+- name: Pre Audit | List audit configuration files
+  find:
+    paths:
+      - /etc/audit/
+      - /etc/audit/rules.d/
+      - /etc/audit/plugins.d/
+    patterns:
+      - "*.conf"
+      - "*.rules"
+    file_type: file
+  changed_when: false
+  register: audit_conf_files_list
+
+# Pre Audit | stat audit configuration files
+- name: Pre Audit | stat audit configuration files
+  stat:
+    path: "{{ item.path }}"
+  changed_when: false
+  loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+  loop_control:
+    label: "{{ item.path | default() }}"
+  register: audit_conf_files_status
+
+# Pre Audit | stat audit tools files
+- name: Pre Audit | stat audit tools files
+  stat:
+    path: "{{ item }}"
+  changed_when: false
+  loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+  register: audit_tools_status
+
+# 5.2.4 Configure auditd file access
+- name: 5.2.4 Configure auditd file access
+  block:
+  # 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive
+  #
+  # The audit log directory contains audit log files.
+  - name: "5.2.4.1 Ensure the audit log directory is 0750 or more restrictive"
+    block:    
+    # 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Audit
+    - name: 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Audit
+      stat:
+        path: "{{ audit_log_dir.stdout }}"
+      changed_when: false
+      register: audit_log_dir_status
+
+    # 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Audit
+    - name: 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Audit
+      shell:
+        cmd: |
+          [ $(({{ audit_log_dir_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: audit_log_dir_permission_status
+      vars:
+        expected_file_mask: "0027"
+
+    # Extract audit result
+    - set_fact:
+        audit_log_dir_permission_check:
+          name: 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive
+          scored: true
+          automated: false
+          remediation_status: "{{ true if ( audit_log_dir.stdout != '' and audit_log_dir_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_log_dir_permission_check] }}"
+      changed_when: false
+
+    # 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Remediation
+    - name: 5.2.4.1 Ensure the audit log directory is 0750 or more restrictive | Remediation
+      file:
+        path: "{{ audit_log_dir.stdout }}"
+        mode: "0750"
+        state: directory
+      when: not audit_only and not audit_log_dir_permission_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.2 Ensure audit log files are mode 0640 or less permissive
+  #
+  # Audit log files contain information about the system and system activity.
+  - name: "5.2.4.2 Ensure audit log files are mode 0640 or less permissive"
+    block:
+    # 5.2.4.2 Ensure audit log files are mode 0640 or less permissive | Audit
+    - name: 5.2.4.2 Ensure audit log files are mode 0640 or less permissive | Audit
+      shell:
+        cmd: |
+          [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: audit_log_files_permission_status
+      loop: "{{ audit_log_files_status.results | default([]) | list }}"
+      no_log: yes
+      vars:
+        expected_file_mask: "0137"
+
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # Chack if all audit log files are configured
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stdout == 'configured')) }}"
+      loop: "{{ audit_log_files_permission_status.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_log_files_permission_check:
+          name: 5.2.4.2 Ensure audit log files are mode 0640 or less permissive
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_log_files_permission_check] }}"
+      changed_when: false
+
+    # 5.2.4.2 Ensure audit log files are mode 0640 or less permissive | Remediation
+    - name: 5.2.4.2 Ensure audit log files are mode 0640 or less permissive | Remediation
+      file:
+        path: "{{ item.path }}"
+        mode: "0640"
+      loop: "{{ audit_log_files_list.files | default([]) | list }}"
+      loop_control:
+        label: "{{ item.path | default() }}"
+      when: not audit_only and not audit_log_files_permission_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.3 Ensure only authorized users own audit log files
+  #
+  # Audit log files contain information about the system and system activity.
+  - name: "5.2.4.3 Ensure only authorized users own audit log files"
+    block:
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # 5.2.4.3 Ensure only authorized users own audit log files | Audit
+    - name: 5.2.4.3 Ensure only authorized users own audit log files | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.pw_name == 'root')) }}"
+      loop: "{{ audit_log_files_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_log_files_owner_check:
+          name: 5.2.4.3 Ensure only authorized users own audit log files
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_log_files_owner_check] }}"
+      changed_when: false
+
+    # 5.2.4.3 Ensure only authorized users own audit log files | Remediation
+    - name: 5.2.4.3 Ensure only authorized users own audit log files | Remediation
+      file:
+        path: "{{ item.path }}"
+        owner: root
+      loop: "{{ audit_log_files_list.files | default([]) | list }}"
+      loop_control:
+        label: "{{ item.path | default() }}"
+      when: not audit_only and not audit_log_files_owner_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files
+  #
+  # Audit log files contain information about the system and system activity.
+  - name: "5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files"
+    block:
+    # 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+    - name: 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+      stat:
+        path: "{{ audit_log_dir.stdout }}"
+      changed_when: false
+      register: audit_log_dir_status
+
+    # 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+    - name: 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+      shell:
+        cmd: |
+          audit_log_group=$(grep -Piw -- '^\h*log_group\h*=\h*(adm|root)\b' /etc/audit/auditd.conf | awk -F '=' '{print $2}' | sed -e 's/ //g')
+          [[ "$audit_log_group" == "root" ]] || [[ "$audit_log_group" == "adm" ]] &&
+          echo 'configured' || echo 'not_configured'
+      register: audit_log_group_status
+      changed_when: false
+
+    # Define remediation status
+    - set_fact:
+        remediation_status: "{{ true if ((audit_log_dir_status.stat.gr_name == 'root' or audit_log_dir_status.stat.gr_name == 'adm') and audit_log_group_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+    - name: 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.gr_name == 'root' or item.stat.gr_name == 'adm')) }}"
+      loop: "{{ audit_log_files_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_log_group_check:
+          name: 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_log_group_check] }}"
+      changed_when: false
+
+    # 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Remediation
+    - name: 5.2.4.4 Ensure only authorized groups are assigned ownership of audit log files | Remediation
+      file:
+        path: "{{ audit_log_dir.stdout }}"
+        group: root
+        recurse: true
+      when: not audit_only and not audit_log_group_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.5 Ensure audit configuration files are 640 or more restrictive
+  #
+  # Audit configuration files control auditd and what events are audited.
+  - name: "5.2.4.5 Ensure audit configuration files are 640 or more restrictive"
+    block:
+    # 5.2.4.5 Ensure audit configuration files are 640 or more restrictive | Audit
+    - name: 5.2.4.5 Ensure audit configuration files are 640 or more restrictive | Audit
+      shell:
+        cmd: |
+          [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: audit_conf_files_permission_status
+      loop: "{{ audit_conf_files_status.results | default([]) | list }}"
+      no_log: yes
+      vars:
+        expected_file_mask: "0137"
+
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # Chack if all audit log files are configured
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stdout == 'configured')) }}"
+      loop: "{{ audit_conf_files_permission_status.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_conf_files_permission_check:
+          name: 5.2.4.5 Ensure audit configuration files are 640 or more restrictive
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_conf_files_permission_check] }}"
+      changed_when: false
+
+    # 5.2.4.5 Ensure audit configuration files are 640 or more restrictive | Remediation
+    - name: 5.2.4.5 Ensure audit configuration files are 640 or more restrictive | Remediation
+      file:
+        path: "{{ item.path }}"
+        mode: "0640"
+      loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+      loop_control:
+        label: "{{ item.path | default() }}"
+      when: not audit_only and not audit_conf_files_permission_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.6 Ensure audit configuration files are owned by root
+  #
+  # Audit configuration files control auditd and what events are audited.
+  - name: "5.2.4.6 Ensure audit configuration files are owned by root"
+    block:
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # 5.2.4.6 Ensure audit configuration files are owned by root | Audit
+    - name: 5.2.4.6 Ensure audit configuration files are owned by root | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.pw_name == 'root')) }}"
+      loop: "{{ audit_conf_files_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_conf_files_owner_check:
+          name: 5.2.4.6 Ensure audit configuration files are owned by root
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_conf_files_owner_check] }}"
+      changed_when: false
+
+    # 5.2.4.6 Ensure audit configuration files are owned by root | Remediation
+    - name: 5.2.4.6 Ensure audit configuration files are owned by root | Remediation
+      file:
+        path: "{{ item.path }}"
+        owner: root
+      loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+      loop_control:
+        label: "{{ item.path | default() }}"
+      when: not audit_only and not audit_conf_files_owner_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.7 Ensure audit configuration files belong to group root
+  #
+  # Audit configuration files control auditd and what events are audited.
+  - name: "5.2.4.7 Ensure audit configuration files belong to group root"
+    block:
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # 5.2.4.7 Ensure audit configuration files belong to group root | Audit
+    - name: 5.2.4.7 Ensure audit configuration files belong to group root | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.gr_name == 'root')) }}"
+      loop: "{{ audit_conf_files_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_conf_files_group_check:
+          name: 5.2.4.7 Ensure audit configuration files belong to group root
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_conf_files_group_check] }}"
+      changed_when: false
+
+    # 5.2.4.7 Ensure audit configuration files belong to group root | Remediation
+    - name: 5.2.4.7 Ensure audit configuration files belong to group root | Remediation
+      file:
+        path: "{{ item.path }}"
+        group: root
+      loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+      loop_control:
+        label: "{{ item.path | default() }}"
+      when: not audit_only and not audit_conf_files_group_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+
+  # 5.2.4.8 Ensure audit tools are 755 or more restrictive
+  #
+  # Audit tools include, but are not limited to, vendor-provided and open source audit tools
+  # needed to successfully view and manipulate audit information system activity and
+  # records. Audit tools include custom queries and report generators.
+  - name: "5.2.4.8 Ensure audit tools are 755 or more restrictive"
+    block:
+    # 5.2.4.8 Ensure audit tools are 755 or more restrictive | Audit
+    - name: 5.2.4.8 Ensure audit tools are 755 or more restrictive | Audit
+      shell:
+        cmd: |
+          [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: audit_tools_permission_status
+      loop: "{{ audit_tools_status.results | default([]) | list }}"
+      no_log: yes
+      vars:
+        expected_file_mask: "0022"
+
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # Chack if all audit log files are configured
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stdout == 'configured')) }}"
+      loop: "{{ audit_tools_permission_status.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_tools_permission_check:
+          name: 5.2.4.8 Ensure audit tools are 755 or more restrictive
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_tools_permission_check] }}"
+      changed_when: false
+
+    # 5.2.4.8 Ensure audit tools are 755 or more restrictive | Remediation
+    - name: 5.2.4.8 Ensure audit tools are 755 or more restrictive | Remediation
+      file:
+        path: "{{ item }}"
+        mode: "0755"
+      loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+      when: not audit_only and not audit_tools_permission_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.9 Ensure audit tools are owned by root
+  #
+  # Audit tools include, but are not limited to, vendor-provided and open source audit tools
+  # needed to successfully view and manipulate audit information system activity and
+  # records. Audit tools include custom queries and report generators.
+  - name: "5.2.4.9 Ensure audit tools are owned by root"
+    block:
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # 5.2.4.9 Ensure audit tools are owned by root | Audit
+    - name: 5.2.4.9 Ensure audit tools are owned by root | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.pw_name == 'root')) }}"
+      loop: "{{ audit_tools_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_tools_owner_check:
+          name: 5.2.4.9 Ensure audit tools are owned by root
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_tools_owner_check] }}"
+      changed_when: false
+
+    # 5.2.4.9 Ensure audit tools are owned by root | Remediation
+    - name: 5.2.4.9 Ensure audit tools are owned by root | Remediation
+      file:
+        path: "{{ item }}"
+        owner: root
+      loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+      when: not audit_only and not audit_tools_owner_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.4.10 Ensure audit tools belong to group root
+  #
+  # Audit tools include, but are not limited to, vendor-provided and open source audit tools
+  # needed to successfully view and manipulate audit information system activity and
+  # records. Audit tools include custom queries and report generators.
+  - name: "5.2.4.10 Ensure audit tools belong to group root"
+    block:
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # 5.2.4.10 Ensure audit tools belong to group root | Audit
+    - name: 5.2.4.10 Ensure audit tools belong to group root | Audit
+      set_fact:
+        remediation_status: "{{ true if (remediation_status and (item.stat.gr_name == 'root')) }}"
+      loop: "{{ audit_tools_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        audit_tools_group_check:
+          name: 5.2.4.10 Ensure audit tools belong to group root
+          scored: true
+          automated: false
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_tools_group_check] }}"
+      changed_when: false
+
+    # 5.2.4.10 Ensure audit tools belong to group root | Remediation
+    - name: 5.2.4.10 Ensure audit tools belong to group root | Remediation
+      file:
+        path: "{{ item }}"
+        group: root
+      loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+      when: not audit_only and not audit_tools_group_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
