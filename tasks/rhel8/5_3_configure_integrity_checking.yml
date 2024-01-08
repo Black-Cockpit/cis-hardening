@@ -67,7 +67,7 @@
 
     # Define remediation status
     - set_fact:
-        remediation_status: "{{ true if aidecheck_service_check.status.UnitFileState == 'enabled' else false}}"
+        remediation_status: "{{ true if (aidecheck_service_check.status.UnitFileState is defined and aidecheck_service_check.status.UnitFileState == 'enabled') else false}}"
       changed_when: false
 
     # 5.3.2 Ensure filesystem integrity is regularly checked | Audit
