@@ -59,6 +59,8 @@
     loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
     register: audit_tools_status
 
+
+
 # 5.2.4 Configure auditd file access
 - name: 5.2.4 Configure auditd file access
   block:

@@ -112,5 +112,8 @@
 # - include_tasks:
 #     file: "./rhel8/5_2_4_configure_auditd_file_access.yml"
 
+# - include_tasks:
+#     file: "./rhel8/5_3_configure_integrity_checking.yml"
+
 - include_tasks:
-    file: "./rhel8/5_3_configure_integrity_checking.yml"
+    file: "./rhel8/6_1_system_file_permissions.yml"
