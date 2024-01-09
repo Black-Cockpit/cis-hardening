@@ -15,9 +15,10 @@ tags:
 - linux_benchmark
 - cis_benchmark
 dependencies: {}
-repository: https://github.com/Black-Cockpit/ansible-secure-nginx
-documentation: https://github.com/Black-Cockpit/ansible-secure-nginx/blob/master/doc
-homepage: https://github.com/Black-Cockpit/ansible-secure-nginx
-issues: https://github.com/Black-Cockpit/ansible-secure-nginx/issues
+repository: https://github.com/Black-Cockpit/cis-hardening
+documentation: https://github.com/Black-Cockpit/cis-hardening/blob/master/doc
+homepage: https://github.com/Black-Cockpit/cis-hardening
+issues: https://github.com/Black-Cockpit/cis-hardening/issues
 build_ignore:
 - .venv
+- .git
