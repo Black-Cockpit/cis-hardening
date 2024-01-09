@@ -8,7 +8,7 @@ This collection provides roles for cis benchmark.
 Requirements: `python 3`, `ansible-8.6.1` or higher version
 
 ```bash
-ansible-galaxy collection install keepass.reader
+ansible-galaxy collection install hasnimehdi91.cis_hardening
 ```
 
 
