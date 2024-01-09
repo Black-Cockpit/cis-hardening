@@ -113,7 +113,7 @@
           name: 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client
           scored: true
           automated: true
-          remediation_status: "{{ true if (systemd_journal_remote_socket_service_status_check.status.ActiveState != 'active' and systemd_journal_remote_socket_service_status_check.status.UnitFileState == 'masked') else false }}"
+          remediation_status: "{{ true if (systemd_journal_remote_socket_service_status_check.status.ActiveState != 'active' and (systemd_journal_remote_socket_service_status_check.status.UnitFileState | default('masked')) == 'masked') else false }}"
       changed_when: false
 
     # Appending audit result
