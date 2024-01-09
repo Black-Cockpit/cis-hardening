@@ -72,13 +72,13 @@
         empty_user_password_description:
           remediation: "Consider to review the locked accounts bellow: \n {% for item in empty_user_password_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not empty_user_password_check.remediation_status
+      when: not empty_user_password_check.remediation_status
 
     # Append locked users list to audit result
     - set_fact:
         empty_user_password_check: "{{ empty_user_password_check | combine(empty_user_password_description) }}"
       changed_when: false
-      when: not audit_only and not empty_user_password_check.remediation_status
+      when: not empty_user_password_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -133,13 +133,13 @@
         not_matched_groups_description:
           remediation: "Consider to review the groups bellow: \n {% for item in groups_list_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not groups_list_check.remediation_status
+      when: not groups_list_check.remediation_status
 
     # Append not matched group list to audit result
     - set_fact:
         groups_list_check: "{{ groups_list_check | combine(not_matched_groups_description) }}"
       changed_when: false
-      when: not audit_only and not groups_list_check.remediation_status
+      when: not groups_list_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -188,13 +188,13 @@
         duplicated_id_description:
           remediation: "Consider to review the UIDs bellow: \n {% for item in users_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not users_id_check.remediation_status
+      when: not users_id_check.remediation_status
 
     # Append duplicated user id list to audit result
     - set_fact:
         users_id_check: "{{ users_id_check | combine(duplicated_id_description) }}"
       changed_when: false
-      when: not audit_only and not users_id_check.remediation_status
+      when: not users_id_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -243,13 +243,13 @@
         duplicated_id_description:
           remediation: "Consider to review the GIDs bellow: \n {% for item in groups_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not groups_id_check.remediation_status
+      when: not groups_id_check.remediation_status
 
     # Append duplicated group id list to audit result
     - set_fact:
         groups_id_check: "{{ groups_id_check | combine(duplicated_id_description) }}"
       changed_when: false
-      when: not audit_only and not groups_id_check.remediation_status
+      when: not groups_id_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -297,13 +297,13 @@
         duplicated_user_description:
           remediation: "Consider to review the user names bellow: \n {% for item in users_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not users_name_check.remediation_status
+      when: not users_name_check.remediation_status
 
     # Append duplicated users list to audit result
     - set_fact:
         users_name_check: "{{ users_name_check | combine(duplicated_user_description) }}"
       changed_when: false
-      when: not audit_only and not users_name_check.remediation_status
+      when: not users_name_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -351,13 +351,13 @@
         duplicated_group_description:
           remediation: "Consider to review the group names bellow: \n {% for item in groups_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not groups_name_check.remediation_status
+      when: not groups_name_check.remediation_status
 
     # Append duplicated groups list to audit result
     - set_fact:
         groups_name_check: "{{ groups_name_check | combine(duplicated_group_description) }}"
       changed_when: false
-      when: not audit_only and not groups_name_check.remediation_status
+      when: not groups_name_check.remediation_status
 
     # Appending audit result
     - set_fact:
@@ -429,13 +429,13 @@
         root_paths_description:
           remediation: "Consider to review the paths bellow: \n {% for item in root_path_integrity_status.stdout_lines %}{{ item + '\n'}}{% endfor %}"
       changed_when: false
-      when: not audit_only and not root_path_integrity_check.remediation_status
+      when: not root_path_integrity_check.remediation_status
 
     # Append duplicated groups list to audit result
     - set_fact:
         root_path_integrity_check: "{{ root_path_integrity_check | combine(root_paths_description) }}"
       changed_when: false
-      when: not audit_only and not root_path_integrity_check.remediation_status
+      when: not root_path_integrity_check.remediation_status
 
     # Appending audit result
     - set_fact:

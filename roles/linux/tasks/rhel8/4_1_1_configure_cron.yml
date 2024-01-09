@@ -420,7 +420,7 @@
 
     # Audit /etc/cron.allow
     - set_fact:
-        cron_allow_check: "{{ true if (cron_allow_stat.stat.exists and cron_allow_stat.stat.mode == '0640' and cron_allow_stat.stat.pw_name == 'root' and cron_allow_stat.stat.gr_name == 'root') else false}}"
+        cron_allow_check: "{{ true if (not cron_allow_stat.stat.exists or (cron_allow_stat.stat.mode == '0640' and cron_allow_stat.stat.pw_name == 'root' and cron_allow_stat.stat.gr_name == 'root')) else false}}"
 
     # 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
     - name: 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
@@ -431,7 +431,7 @@
 
     # Audit /etc/cron.deny
     - set_fact:
-        cron_deny_check: "{{ true if ((cron_allow_stat.stat.exists and not cron_deny_stat.stat.exists) or (cron_deny_stat.stat.exists and cron_deny_stat.stat.mode == '0640' and cron_deny_stat.stat.pw_name == 'root' and cron_deny_stat.stat.gr_name == 'root')) else false}}"
+        cron_deny_check: "{{ true if ((cron_allow_check and not cron_deny_stat.stat.exists) or (cron_deny_stat.stat.exists and cron_deny_stat.stat.mode == '0640' and cron_deny_stat.stat.pw_name == 'root' and cron_deny_stat.stat.gr_name == 'root')) else false}}"
       changed_when: false
       
     # Extract audit result

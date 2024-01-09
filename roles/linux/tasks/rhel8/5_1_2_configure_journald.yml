@@ -143,8 +143,8 @@
     block:
     # 5.1.2.2 Ensure journald service is enabled | Audit
     - name: 5.1.2.2 Ensure journald service is enabled | Audit
-      systemd:
-        name: systemd-journald
+      shell:
+        cmd: systemctl is-enabled systemd-journald.service | grep -q static && echo 'enabled' || echo 'not_enabled'
       changed_when: false
       register: systemd_journal_remote_service_status_check
 
@@ -154,7 +154,7 @@
           name: 5.1.2.2 Ensure journald service is enabled
           scored: true
           automated: true
-          remediation_status: "{{ true if (systemd_journal_remote_service_status_check.status.ActiveState == 'active' and systemd_journal_remote_service_status_check.status.UnitFileState == 'enabled') else false }}"
+          remediation_status: "{{ true if systemd_journal_remote_service_status_check.stdout == 'enabled' else false }}"
       changed_when: false
 
     # Appending audit result

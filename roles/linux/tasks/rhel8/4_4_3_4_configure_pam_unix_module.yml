@@ -203,7 +203,7 @@
     - name: 4.4.3.4.4 Ensure pam_unix includes use_authtok | Audit
       shell:
         cmd: |
-          pam_unix_with_use_authtok_lines=$(grep -P -- '^\h*password\h+([^#\n\r]+)\h+pam_unix\.so\h+([^#\n\r]+\h+)?use_authtok\b' /etc/pam.d/{password,system}-auth | wc -l)
+          pam_unix_with_use_authtok_lines=$(grep -P -- '^\h*password\h+([^#\n\r]+)\h+pam_unix\.so\h+([^#\n\r]+\h+).*[\s](use_authtok).*\b' /etc/pam.d/{password,system}-auth | wc -l)
           pam_unix_lines=$(grep -P -- '^\h*password\h+([^#\n\r]+)\h+pam_unix\.so\h+([^#\n\r]+\h+)?\b' /etc/pam.d/{password,system}-auth | wc -l)
 
           [[ "$pam_unix_lines" -eq "$pam_unix_with_use_authtok_lines" ]] && echo 'configured' || echo 'not_configured'
@@ -238,7 +238,7 @@
               fi
 
               for authselect_file in "$pam_profile_path"/password-auth "$pam_profile_path"/system-auth; do
-                  if ! grep -Pq '^\h*password\h+([^#\n\r]+)\h+pam_unix\.so\h+([^#\n\r]+\h+)?use_authtok\b' "$l_authselect_file"; then
+                  if ! grep -Pq '^\h*password\h+([^#\n\r]+)\h+pam_unix\.so\h+([^#\n\r]+\h+).*[\s](use_authtok).*\b' "$l_authselect_file"; then
                       sed -ri 's/(^\s*password\s+(requisite|required|sufficient)\s+pam_unix\.so\s+.*)$/&use_authtok/g' "$l_authselect_file"
                   fi
               done
