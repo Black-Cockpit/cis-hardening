@@ -1,0 +1,151 @@
+# 3.1 Configure Network Devices
+- name: 3.1 Configure Network Devices
+  block:
+  # 3.1.1 Ensure IPv6 status is identified
+  #
+  # Internet Protocol Version 6 (IPv6) is the most recent version of Internet Protocol (IP). It's
+  # designed to supply IP addressing and additional security to support the predicted
+  # growth of connected devices. IPv6 is based on 128-bit addressing and can support 340
+  # undecillion, which is 340 trillion3 addresses.
+  # Features of IPv6
+  #   - Hierarchical addressing and routing infrastructure
+  #   - Stateful and Stateless configuration
+  #   - Support for quality of service (QoS)
+  #   - An ideal protocol for neighboring node interaction
+  - name: "3.1.1 Ensure IPv6 status is identified"
+    block:
+    # 3.1.1 Ensure IPv6 status is identified | Audit
+    - name: 3.1.1 Ensure IPv6 status is identified | Audit
+      shell:
+        cmd: |
+          grep -Pqs '^\h*0\b' /sys/module/ipv6/parameters/disable && echo "IPv6 is enabled" || echo "IPv6 is not enabled"
+      changed_when: false
+      register: ipv6_status_check
+
+    # Extract audit result
+    - set_fact:
+        ipv6_check:
+          name: 3.1.1 Ensure IPv6 status is identified
+          scored: false
+          automated: false
+          logs: "{{ ipv6_status_check.stdout }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ipv6_check] }}"
+      changed_when: false
+
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 3.1.2 Ensure wireless interfaces are disabled
+  #
+  # Wireless networking is used when wired networks are unavailable.
+  - name: "3.1.2 Ensure wireless interfaces are disabled"
+    block:
+    # 3.1.2 Ensure wireless interfaces are disabled | Audit
+    # Extract wireless modules
+    - name: "3.1.2 Ensure wireless interfaces are disabled | Audit"
+      shell:
+        cmd: |
+          if [ -n "$(find /sys/class/net/*/ -type d -name wireless)" ]; then
+            l_dname=$(for driverdir in $(find /sys/class/net/*/ -type d -name wireless | xargs -0 dirname); do basename "$(readlink -f "$driverdir"/device/driver/module)"; done | sort -u)
+            for l_mname in $l_dname; do
+              echo $l_dname
+            done
+          fi
+      changed_when: false
+      register: wireless_modules_result
+
+    # Define remediation status
+    - set_fact:
+        wireless_remediation_status: true
+
+    - name: "3.1.2 Ensure wireless interfaces are disabled | Audit"
+      include_tasks:
+        file: "rhel8/utils/wirless_modules_check.yml"
+      with_items: "{{ wireless_modules_result.stdout_lines | list }}"
+
+    # Extract audit result
+    - set_fact:
+        wireless_modules_check:
+          name: 3.1.2 Ensure wireless interfaces are disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if wireless_remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [wireless_modules_check] }}"
+      changed_when: false
+
+    # 3.1.2 Ensure wireless interfaces are disabled | Remediation
+    - name: "3.1.2 Ensure wireless interfaces are disabled | Remediation"
+      include_tasks:
+        file: "rhel8/utils/wirless_modules_remediation.yml"
+      with_items: "{{ wireless_modules_result.stdout_lines | list }}"
+      when: not audit_only and not wireless_modules_check.remediation_status
+    tags:
+    - "server_level_1"
+    when: "'server_level_1' in levels"
+
+
+
+  # 3.1.3 Ensure bluetooth services are not in use
+  #
+  # Bluetooth is a short-range wireless technology standard that is used for exchanging
+  # data between devices over short distances. It employs UHF radio waves in the ISM
+  # bands, from 2.402 GHz to 2.48 GHz. It is mainly used as an alternative to wire
+  # connections.
+  - name: "3.1.3 Ensure bluetooth services are not in use"
+    block:
+    # 3.1.3 Ensure bluetooth services are not in use | Audit
+    - name: 3.1.3 Ensure bluetooth services are not in use | Audit
+      shell:
+        cmd: rpm -qa | grep -q bluez && echo installed || echo not_installed
+      changed_when: false
+      register: bluez_status_check
+
+    # 3.1.3 Ensure bluetooth services are not in use | Audit
+    - name: 3.1.3 Ensure bluetooth services are not in use | Audit
+      systemd:
+        name: bluetooth
+      ignore_errors: yes
+      changed_when: false
+      register: bluetooth_service_status_check
+      when: bluez_status_check.stdout == 'installed'
+
+    # Extract audit result
+    - set_fact:
+        bluetooth_check:
+          name: 3.1.3 Ensure bluetooth services are not in use
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (bluez_status_check.stdout == 'not_installed' or (bluetooth_service_status_check.status.ActiveState == 'inactive' and (bluetooth_service_status_check.status.UnitFileState is not defined or bluetooth_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [bluetooth_check] }}"
+      changed_when: false
+
+    # 3.1.3 Ensure bluetooth services are not in use | Remediation
+    - name: 3.1.3 Ensure bluetooth services are not in use | Remediation
+      systemd:
+        name: bluetooth
+        state: stopped
+        enabled: false
+        masked: true
+        force: true
+      when: not audit_only and not bluetooth_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_2"
+    when: "'server_level_1' in levels or 'workstation_level_2' in levels"
+

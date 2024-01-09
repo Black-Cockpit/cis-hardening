@@ -1,0 +1,301 @@
+# 5.2.2 Configure Data Retention
+- name: 5.2.2 Configure Data Retention
+  block:
+  # 5.2.2.1 Ensure audit log storage size is configured
+  #
+  # Configure the maximum size of the audit log file. Once the log reaches the maximum
+  # size, it will be rotated and a new log file will be started.
+  - name: "5.2.2.1 Ensure audit log storage size is configured"
+    block:
+    # 5.2.2.1 Ensure audit log storage size is configured | Audit
+    - name: 5.2.2.1 Ensure audit log storage size is configured | Audit
+      shell:
+        cmd: |
+          [[ $(awk -F '=' '{print $2}' <<<$(grubby --info=ALL | grep -w "^\s*max_log_file\s*=" /etc/audit/auditd.conf || echo 'max_log_file = 0')) -gt 0 ]] && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: max_log_file_status_check
+
+    # Extract audit result
+    - set_fact:
+        max_log_file_check:
+          name: 5.2.2.1 Ensure audit log storage size is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if max_log_file_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [max_log_file_check] }}"
+      changed_when: false
+
+    # 5.2.2.1 Ensure audit log storage size is configured | Remediation
+    - name: 5.2.2.1 Ensure audit log storage size is configured | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: '^\s*max_log_file\s*='
+        state: absent
+      when: not audit_only and not max_log_file_check.remediation_status
+    
+    # 5.2.2.1 Ensure audit log storage size is configured | Remediation
+    - name: 5.2.2.1 Ensure audit log storage size is configured | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: '^(max_log_file = 8)'
+        line: max_log_file = 8
+        state: present
+      when: not audit_only and not max_log_file_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.2.2 Ensure audit logs are not automatically deleted
+  #
+  # The max_log_file_action setting determines how to handle the audit log file reaching
+  # the max file size. A value of keep_logs will rotate the logs but never delete old logs.
+  - name: "5.2.2.2 Ensure audit logs are not automatically deleted"
+    block:
+    # 5.2.2.2 Ensure audit logs are not automatically deleted | Audit
+    - name: 5.2.2.2 Ensure audit logs are not automatically deleted | Audit
+      shell:
+        cmd: |
+          [[ $(awk -F '=' '{print $2}' <<< $(grep -E "^\s*max_log_file_action" /etc/audit/auditd.conf || echo "max_log_file_action = ")) == *"keep_logs"* ]] && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: max_log_file_action_status_check
+
+    # Extract audit result
+    - set_fact:
+        max_log_file_action_check:
+          name: 5.2.2.2 Ensure audit logs are not automatically deleted
+          scored: true
+          automated: true
+          remediation_status: "{{ true if max_log_file_action_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [max_log_file_action_check] }}"
+      changed_when: false
+
+    # 5.2.2.2 Ensure audit logs are not automatically deleted | Remediation
+    - name: 5.2.2.2 Ensure audit logs are not automatically deleted | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: '^\s*max_log_file_action\s*='
+        state: absent
+      when: not audit_only and not max_log_file_action_check.remediation_status
+    
+    # 5.2.2.2 Ensure audit logs are not automatically deleted | Remediation
+    - name: 5.2.2.2 Ensure audit logs are not automatically deleted | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: '^(max_log_file_action = keep_logs)'
+        line: max_log_file_action = keep_logs
+        state: present
+      when: not audit_only and not max_log_file_action_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.2.3 Ensure system is disabled when audit logs are full
+  #
+  # The auditd daemon can be configured to halt the system or put the system in single
+  # user mode, if no free space is available or an error is detected on the partition that holds
+  # the audit log files.
+  #
+  # The disk_full_action parameter tells the system what action to take when no free
+  # space is available on the partition that holds the audit log files. Valid values are ignore ,
+  # syslog , rotate , exec , suspend , single , and halt .
+  # 
+  # - ignore  : the audit daemon will issue a syslog message but no other action is taken
+  # - syslog  : the audit daemon will issue a warning to syslog
+  # - rotate  : the audit daemon will rotate logs, losing the oldest to free up space
+  # - exec    : /path-to-script will execute the script. You cannot pass parameters to the
+  #             script. The script is also responsible for telling the auditd daemon to resume
+  #             logging once its completed its action
+  # - suspend : the audit daemon will stop writing records to the disk
+  # - single  : the audit daemon will put the computer system in single user mode
+  # - halt    : the audit daemon will shut down the system
+  #
+  # The disk_error_action parameter tells the system what action to take when an error is
+  # detected on the partition that holds the audit log files. Valid values are ignore , syslog ,
+  # exec , suspend , single , and halt .
+  #
+  # - ignore  : the audit daemon will not take any action
+  # - syslog  : the audit daemon will issue no more than 5 consecutive warnings to syslog
+  # - exec    : /path-to-script will execute the script. You cannot pass parameters to the script.
+  # - suspend : the audit daemon will stop writing records to the disk
+  # - single  : the audit daemon will put the computer system in single user mode
+  # - halt    : the audit daemon will shut down the system
+  - name: "5.2.2.3 Ensure system is disabled when audit logs are full"
+    block:
+    # 5.2.2.3 Ensure system is disabled when audit logs are full | Audit
+    - name: 5.2.2.3 Ensure system is disabled when audit logs are full | Audit
+      shell:
+        cmd: |
+          grep -Pq -- '^\h*disk_full_action\h*=\h*(halt|single)\b' /etc/audit/auditd.conf && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_disk_full_action_status_check
+    
+    # 5.2.2.3 Ensure system is disabled when audit logs are full | Audit
+    - name: 5.2.2.3 Ensure system is disabled when audit logs are full | Audit
+      shell:
+        cmd: |
+          grep -Pq -- '^\h*disk_error_action\h*=\h*(syslog|single|halt)\b' /etc/audit/auditd.conf && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_disk_error_action_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_disk_action_check:
+          name: 5.2.2.3 Ensure system is disabled when audit logs are full
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (audit_disk_full_action_status_check.stdout == 'configured' and audit_disk_error_action_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_disk_action_check] }}"
+      changed_when: false
+
+    # 5.2.2.3 Ensure system is disabled when audit logs are full | Remediation
+    - name: 5.2.2.3 Ensure system is disabled when audit logs are full | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: "{{ item }}"
+        state: absent
+      loop:
+      - '^\s*disk_full_action\s*='
+      - '^\s*disk_error_action\s*='
+      when: not audit_only and not audit_disk_action_check.remediation_status
+    
+    # 5.2.2.3 Ensure system is disabled when audit logs are full | Remediation
+    - name: 5.2.2.3 Ensure system is disabled when audit logs are full | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+      - line: "disk_full_action = halt"
+        regex: '^(disk_full_action = halt)'
+      - line: "disk_error_action = halt"
+        regex: '^(disk_error_action = halt)'
+      when: not audit_only and not audit_disk_action_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 5.2.2.4 Ensure system warns when audit logs are low on space
+  #
+  # The auditd daemon can be configured to halt the system, put the system in single user
+  # mode or send a warning message, if the partition that holds the audit log files is low on
+  # space.
+  #
+  # The space_left_action parameter tells the system what action to take when the system
+  # has detected that it is starting to get low on disk space. Valid values are ignore , syslog ,
+  # rotate , email , exec , suspend , single , and halt .
+  # 
+  # - ignore  : the audit daemon does nothing
+  # - syslog  : the audit daemon will issue a warning to syslog
+  # - rotate  : the audit daemon will rotate logs, losing the oldest to free up space
+  # - email   : the audit daemon will send a warning to the email account specified in
+  #             action_mail_acct as well as sending the message to syslog
+  # - exec    : /path-to-script will execute the script. You cannot pass parameters to the
+  #             script. The script is also responsible for telling the auditd daemon to resume
+  #             logging once its completed its action
+  # - suspend : the audit daemon will stop writing records to the disk
+  # - single  : the audit daemon will put the computer system in single user mode
+  # - halt    : the audit daemon will shut down the system
+  #
+  # The admin_space_left_action parameter tells the system what action to take when the
+  # system has detected that it is low on disk space. Valid values are ignore , syslog ,
+  # rotate , email , exec , suspend , single , and halt .
+  #
+  # - ignore  : the audit daemon does nothing
+  # - syslog  : the audit daemon will issue a warning to syslog
+  # - rotate  : the audit daemon will rotate logs, losing the oldest to free up space
+  # - email   : the audit daemon will send a warning to the email account specified in
+  #             action_mail_acct as well as sending the message to syslog
+  # - exec    : /path-to-script will execute the script. You cannot pass parameters to the
+  #             script. The script is also responsible for telling the auditd daemon to resume
+  #             logging once its completed its action
+  # - suspend : the audit daemon will stop writing records to the disk
+  # - single  : the audit daemon will put the computer system in single user mode
+  # - halt    : the audit daemon will shut down the system
+  - name: "5.2.2.4 Ensure system warns when audit logs are low on space"
+    block:
+    # 5.2.2.4 Ensure system warns when audit logs are low on space | Audit
+    - name: 5.2.2.4 Ensure system warns when audit logs are low on space | Audit
+      shell:
+        cmd: |
+          grep -Pq -- '^\h*space_left_action\h*=\h*(email|exec|single|halt)\b' /etc/audit/auditd.conf && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_space_left_action_status_check
+    
+    # 5.2.2.4 Ensure system warns when audit logs are low on space | Audit
+    - name: 5.2.2.4 Ensure system warns when audit logs are low on space | Audit
+      shell:
+        cmd: |
+          grep -Pq -- '^\h*admin_space_left_action\h*=\h*(single|halt)\b' /etc/audit/auditd.conf && \
+          echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: audit_admin_space_left_action_action_status_check
+
+    # Extract audit result
+    - set_fact:
+        audit_disk_warning_action_check:
+          name: 5.2.2.4 Ensure system warns when audit logs are low on space
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (audit_space_left_action_status_check.stdout == 'configured' and audit_admin_space_left_action_action_status_check.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [audit_disk_warning_action_check] }}"
+      changed_when: false
+
+    # 5.2.2.4 Ensure system warns when audit logs are low on space | Remediation
+    - name: 5.2.2.4 Ensure system warns when audit logs are low on space | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: "{{ item }}"
+        state: absent
+      loop:
+      - '^\s*space_left_action\s*='
+      - '^\s*admin_space_left_action\s*='
+      when: not audit_only and not audit_disk_warning_action_check.remediation_status
+    
+    # 5.2.2.4 Ensure system warns when audit logs are low on space | Remediation
+    - name: 5.2.2.4 Ensure system warns when audit logs are low on space | Remediation
+      lineinfile: 
+        path: /etc/audit/auditd.conf
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+      - line: "space_left_action = single"
+        regex: '^(space_left_action = single)'
+      - line: "admin_space_left_action = single"
+        regex: '^(admin_space_left_action = single)'
+      when: not audit_only and not audit_disk_warning_action_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"

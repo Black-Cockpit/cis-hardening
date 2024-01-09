@@ -1,0 +1,251 @@
+- name: 1.2 Configure Software and Patch Management
+  block:
+  # 1.2.1 Ensure GPG keys are configured
+  #
+  # The RPM Package Manager implements GPG key signing to verify package integrity
+  # during and after installation.
+  - name: "1.2.1 Ensure GPG keys are configured"
+    block:
+    # 1.2.1 Ensure GPG keys are configured | Audit
+    - name: "1.2.1 Ensure GPG keys are configured | Audit"
+      shell:
+        cmd: "PKG=`rpm -qf {{ rpm_gpg_key }}` && rpm -q --queryformat \"%{PACKAGER} %{SIGPGP:pgpsig}\\n\" \"${PKG}\" | grep \"^{{ rpm_packager }}.*Key.ID.{{ rpm_key }}\""
+      changed_when: false
+      ignore_errors: true
+      register: gpg_key_check_status
+
+    # Extract audit result
+    - set_fact:
+        gpg_key_check:
+          name: 1.2.1 Ensure GPG keys are configured
+          scored: true
+          automated: false
+          remediation_status: "{{ true if gpg_key_check_status.rc == 0 else false }}"
+          remediation: "Consider to verify that GPG keys are configured correctly for your system"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gpg_key_check] }}"
+      changed_when: false
+
+    # 1.2.1 Ensure GPG keys are configured | Remediation
+    - name: 1.2.1 Ensure GPG keys are configured | Remediation
+      debug:
+        msg: "Consider to verify that GPG keys are configured correctly for your system"
+      when: not audit_only and not gpg_key_check.remediation_status
+      changed_when: false
+
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.2.2 Ensure gpgcheck is globally activated
+  #
+  # The gpgcheck option, found in the main section of the /etc/dnf/dnf.conf and individual
+  # /etc/yum.repos.d/* files, determines if an RPM package's signature is checked prior to
+  # its installation.
+  - name: "1.2.2 Ensure gpgcheck is globally activated"
+    block:
+    # 1.2.2 Ensure gpgcheck is globally activated | Audit
+    - name: "1.2.2 Ensure gpgcheck is globally activated | Audit"
+      shell:
+        cmd: grep -q ^gpgcheck /etc/dnf/dnf.conf && echo compliant || echo not_compliant
+      changed_when: false
+      register: yum_repos_check_status
+
+    # Extract audit result
+    - set_fact:
+        yum_repos_check:
+          name: 1.2.2 Ensure gpgcheck is globally activated
+          scored: true
+          automated: true
+          remediation_status: "{{ true if yum_repos_check_status.stdout == 'compliant' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [yum_repos_check] }}"
+      changed_when: false
+
+    # 1.2.2 Ensure gpgcheck is globally activated | Remediation
+    - name: "1.2.2 Ensure gpgcheck is globally activated | Remediation"
+      find:
+        paths: /etc/yum.repos.d
+        patterns: "*.repo"
+      ignore_errors: true
+      register: yum_repos_list
+
+    # 1.2.2 Ensure gpgcheck is globally activated | Remediation
+    - name: "1.2.2 Ensure gpgcheck is globally activated | Remediation"
+      replace:
+        name: "{{ item.path }}"
+        regexp: "^gpgcheck=0"
+        replace: "gpgcheck=1"
+      with_items:
+      - "{{ yum_repos_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not yum_repos_check.remediation_status
+
+    # 1.2.2 Ensure gpgcheck is globally activated | Remediation
+    - name: "1.2.2 Ensure gpgcheck is globally activated | Remediation"
+      lineinfile:
+        path: "{{ item.path }}"
+        regexp: "^gpgcheck=0"
+        line: "gpgcheck=1"
+        state: present
+      with_items:
+      - "{{ yum_repos_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not yum_repos_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 1.2.3 Ensure repo_gpgcheck is globally activated
+  #
+  # The repo_gpgcheck option, found in the main section of the /etc/dnf/dnf.conf and
+  # individual /etc/yum.repos.d/* files, will perform a GPG signature check on the
+  # repodata.
+  - name: "1.2.3 Ensure repo_gpgcheck is globally activated"
+    block:
+    # 1.2.3 Ensure repo_gpgcheck is globally activated | Audit
+    - name: "1.2.3 Ensure repo_gpgcheck is globally activated | Audit"
+      shell:
+        cmd: grep -q ^repo_gpgcheck /etc/dnf/dnf.conf && echo compliant || echo not_compliant
+      changed_when: false
+      register: yum_repos_gpgcheck_check_status
+
+    # Extract audit result
+    - set_fact:
+        yum_repos_gpgcheck_check:
+          name: 1.2.3 Ensure repo_gpgcheck is globally activated
+          scored: true
+          automated: true
+          remediation_status: "{{ true if yum_repos_gpgcheck_check_status.stdout == 'compliant' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [yum_repos_gpgcheck_check] }}"
+      changed_when: false
+
+    # 1.2.3 Ensure repo_gpgcheck is globally activated | Remediation
+    - name: "1.2.3 Ensure repo_gpgcheck is globally activated | Remediation"
+      find:
+        paths: /etc/yum.repos.d
+        patterns: "*.repo"
+      ignore_errors: true
+      register: yum_repos_list
+
+    # 1.2.3 Ensure repo_gpgcheck is globally activated | Remediation
+    - name: "1.2.3 Ensure repo_gpgcheck is globally activated | Remediation"
+      replace:
+        name: "{{ item.path }}"
+        regexp: "^repo_gpgcheck=0"
+        replace: "repo_gpgcheck=1"
+      with_items:
+      - "{{ yum_repos_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not yum_repos_gpgcheck_check.remediation_status
+
+    # Ensure that repo_gpgcheck is added to all the repo
+    - name: "1.2.3 Ensure repo_gpgcheck is globally activated | Remediation"
+      lineinfile:
+        path: "{{ item.path }}"
+        regexp: "^repo_gpgcheck=0"
+        line: "repo_gpgcheck=1"
+        state: present
+      with_items:
+      - "{{ yum_repos_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 1.2.4 Ensure package manager repositories are configured
+  #
+  # Systems need to have the respective package manager repositories configured to
+  # ensure that the system is able to receive the latest patches and updates.
+  - name: "1.2.4 Ensure package manager repositories are configured"
+    block:
+    # 1.2.4 Ensure package manager repositories are configured | Audit
+    - name: "1.2.4 Ensure package manager repositories are configured | Audit"
+      shell:
+        cmd: dnf repolist | awk '(NR>1)'
+      changed_when: false
+      register: dnf_repolist_check_status
+
+    # Extract audit result
+    - set_fact:
+        dnf_repolist_check:
+          name: 1.2.4 Ensure package manager repositories are configured
+          scored: false
+          automated: false
+          remediation: "Consider to verify the repositories bellow: \n {% for item in dnf_repolist_check_status.stdout_lines %}{{ item + '\n'}}{% endfor %}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [dnf_repolist_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 1.2.5 Ensure updates, patches, and additional security software are installed
+  #
+  # Periodically patches are released for included software either due to security flaws or to
+  # include additional functiona
+  - name: "1.2.5 Ensure updates, patches, and additional security software are installed"
+    block:
+    # 1.2.5 Ensure updates, patches, and additional security software are installed | Audit
+    - name: "1.2.5 Ensure updates, patches, and additional security software are installed | Audit"
+      shell:
+        cmd: dnf updateinfo list security -y | grep -E "(Moderate|Important|Low)\/Sec" | wc -l
+      changed_when: false
+      register: system_update_check_status
+
+    - set_fact:
+        system_update_check:
+          name: 1.2.5 Ensure updates, patches, and additional security software are installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (system_update_check_status.stdout | int ) <= 1 else false }}"
+      # Extract audit result
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [system_update_check] }}"
+      changed_when: false
+
+    # 1.2.5 Ensure updates, patches, and additional security software are installed | Remediation
+    - name: "1.2.5 Ensure updates, patches, and additional security software are installed | Remediation"
+      yum:
+        name: "*"
+        security: true
+        update_cache: true
+        state: latest
+      when: not audit_only and not system_update_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+

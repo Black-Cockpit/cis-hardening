@@ -1,0 +1,249 @@
+# 4.5.2 Configure root and system accounts and environment
+- name: 4.5.2 Configure root and system accounts and environment
+  block:
+  # 4.5.2.1 Ensure default group for the root account is GID 0
+  #
+  # The usermod command can be used to specify which group the root account belongs to.
+  # This affects permissions of files that are created by the root account.
+  - name: "4.5.2.1 Ensure default group for the root account is GID 0"
+    block:
+    # 4.5.2.1 Ensure default group for the root account is GID 0 | Audit
+    - name: 4.5.2.1 Ensure default group for the root account is GID 0 | Audit
+      user:
+        name: root
+      changed_when: false
+      register: root_id_status_check
+
+    # Extract audit result
+    - set_fact:
+        root_id_check:
+          name: 4.5.2.1 Ensure default group for the root account is GID 0
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (root_id_status_check.uid is defined and root_id_status_check.uid == 0) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [root_id_check] }}"
+      changed_when: false
+
+    # 4.5.2.1 Ensure default group for the root account is GID 0 | Remediation
+    - name: 4.5.2.1 Ensure default group for the root account is GID 0 | Remediation
+      user:
+        name: root
+        uid: 0
+        state: present
+      when: not audit_only and not root_id_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.5.2.2 Ensure root user umask is configured
+  #
+  # The user file-creation mode mask ( umask ) is used to determine the file permission for
+  # newly created directories and files. In Linux, the default permissions for any newly
+  # created directory is 0777 ( rwxrwxrwx ), and for any newly created file it is 0666 ( rw-rw-
+  # rw- ). The umask modifies the default Linux permissions by restricting (masking) these
+  # permissions. The umask is not simply subtracted, but is processed bitwise. Bits set in the
+  # umask are cleared in the resulting file mode.
+  #
+  # umask can be set with either Octal or Symbolic values:
+  # - Octal (Numeric) Value - Represented by either three or four digits. ie umask 0027
+  #   or umask 027 . If a four digit umask is used, the first digit is ignored. The remaining
+  #   three digits effect the resulting permissions for user, group, and world/other
+  #   respectively.
+  #
+  # - Symbolic Value - Represented by a comma separated list for User u , group g ,
+  #   and world/other o . The permissions listed are not masked by umask . ie a umask
+  #   set by umask u=rwx,g=rx,o= is the Symbolic equivalent of the Octal umask 027 .
+  #   This umask would set a newly created directory with file mode drwxr-x--- and a
+  #   newly created file with file mode rw-r----- .
+  #
+  # root user Shell Configuration Files:
+  # - /root/.bash_profile : Is executed to configure the root users' shell before the
+  #                         initial command prompt. Is only read by login shells.
+  #
+  # - /root/.bashrc!      : Is executed for interactive shells. only read by a shell that's
+  #                         both interactive and non-login
+  #
+  # umask is set by order of precedence. If umask is set in multiple locations, this order of
+  # precedence will determine the system's default umask.
+  # Order of precedence:
+  #   1. /root/.bash_profile
+  #   2. /root/.bashrc
+  #   3. The system default umask
+  - name: "4.5.2.2 Ensure root user umask is configured"
+    block:
+    # 4.5.2.2 Ensure root user umask is configured | Audit
+    - name: 4.5.2.2 Ensure root user umask is configured | Audit
+      shell:
+        cmd: |
+          grep -Psiq -- '^\h*umask\h+(([0-7][0-7][01][0-7]\b|[0-7][0-7][0-7][0-6]\b)|([0-7][01][0-7]\b|[0-7][0-7][0-6]\b)|(u=[rwx]{1,3},)?(((g=[rx]?[rx]?w[rx]?[rx]?\b)(,o=[rwx]{1,3})?)|((g=[wrx]{1,3},)?o=[wrx]{1,3}\b)))' /root/.bash_profile /root/.bashrc &&
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: root_umask_status_check
+
+    # Extract audit result
+    - set_fact:
+        root_umask_check:
+          name: 4.5.2.2 Ensure root user umask is configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if root_umask_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [root_umask_check] }}"
+      changed_when: false
+
+    # 4.5.2.2 Ensure root user umask is configured | Remediation
+    - name: 4.5.2.2 Ensure root user umask is configured | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: '^(umask)[\s]{1,}[\d]{1,}.+'
+        replace: ''
+      loop:
+      - "/root/.bash_profile"
+      - "/root/.bashrc"
+      when: not audit_only and not root_umask_check.remediation_status
+
+     # 4.5.2.2 Ensure root user umask is configured | Remediation
+    - name: 4.5.2.2 Ensure root user umask is configured | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '^(umask)[\s]{1,}0027'
+        line: 'umask 0027'
+        state: present
+      loop:
+      - "/root/.bash_profile"
+      - "/root/.bashrc"
+      when: not audit_only and not root_umask_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.5.2.3 Ensure system accounts are secured
+  #
+  # There are a number of accounts provided with most distributions that are used to
+  # manage applications and are not intended to provide an interactive shell. Furthermore,
+  # a user may add special accounts that are not intended to provide an interactive shell.
+  - name: "4.5.2.3 Ensure system accounts are secured"
+    block:
+    # 4.5.2.3 Ensure system accounts are secured | Audit
+    - name: 4.5.2.3 Ensure system accounts are secured | Audit
+      shell:
+        cmd: |
+          awk -F: '($1!~/^(root|halt|sync|shutdown|nfsnobody)$/ && ($3<'"$(awk '/^\s*UID_MIN/{print $2}' /etc/login.defs)"' || $3 == 65534) && $7!~/^(\/usr)?\/sbin\/nologin$/) { print $1 }' /etc/passwd
+      changed_when: false
+      register: nologin_critical_accounts_list
+
+    # 4.5.2.3 Ensure system accounts are secured | Audit
+    - name: 4.5.2.3 Ensure system accounts are secured | Audit
+      shell:
+        cmd: |
+          awk -F: '/nologin/ {print $1}' /etc/passwd | xargs -I '{}' passwd -S '{}' | awk '($2!="L" && $2!="LK") {print $1}'
+      changed_when: false
+      register: nologin_with_password_accounts_list
+
+    # Extract audit result
+    - set_fact:
+        nologin_accounts_check:
+          name: 4.5.2.3 Ensure system accounts are secured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (nologin_critical_accounts_list.stdout == '' and nologin_with_password_accounts_list.stdout == '') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nologin_accounts_check] }}"
+      changed_when: false
+
+    # Define nologin users list
+    - set_fact:
+        nologin_account_list: "{{ nologin_critical_accounts_list.stdout_lines | default([]) | list }}"
+      changed_when: false
+      when: not audit_only and not nologin_accounts_check.remediation_status
+
+    # Appending nologin users that have password to nologin users list
+    - set_fact:
+        nologin_account_list: "{{ (nologin_account_list | default([])) + (nologin_with_password_accounts_list.stdout_lines | default()) }}"
+      changed_when: false
+      when: not audit_only and nologin_with_password_accounts_list.stdout != '' and not nologin_accounts_check.remediation_status
+
+    # 4.5.2.3 Ensure system accounts are secured | Remediation
+    - name: 4.5.2.3 Ensure system accounts are secured | Remediation
+      shell:
+        cmd: |
+          usermod -s $(command -v nologin) {{ item }}> /dev/null 2>& 1 || echo 'failed'
+          usermod -L {{ item }}> /dev/null 2>& 1 || echo 'failed'
+      loop: "{{ nologin_account_list | default([]) | unique }}"
+      ignore_errors: yes
+      when: not audit_only and not nologin_accounts_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.5.2.4 Ensure root password is set
+  #
+  # There are a number of methods to access the root account directly. Without a password
+  # set any user would be able to gain access and thus control over the entire system.
+  - name: "4.5.2.4 Ensure root password is set"
+    block:
+    # 4.5.2.4 Ensure root password is set | Audit
+    - name: 4.5.2.4 Ensure root password is set | Audit
+      shell:
+        cmd: |
+          passwd -S root | grep -iq "password set" && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: root_password_set_status_check
+      
+    # Extract audit result
+    - set_fact:
+        root_password_set_check:
+          name: 4.5.2.4 Ensure root password is set
+          scored: true
+          automated: true
+          remediation_status: "{{ true if root_password_set_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Adding remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "Consider to create a password for the root user"
+      changed_when: false
+      when: not audit_only and ((site_policy.root_password | default('')) == '') and not root_password_set_check.remediation_status
+
+    # Append remediation
+    - set_fact:
+        root_password_set_check: "{{ root_password_set_check | combine(remediation_description) }}"
+      changed_when: false
+      when: not audit_only and ((site_policy.root_password | default('')) == '') and not root_password_set_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [root_password_set_check] }}"
+      changed_when: false
+    
+    # 4.5.2.4 Ensure root password is set | Remediation
+    - name: 4.5.2.4 Ensure root password is set | Remediation
+      user:
+        name: root
+        password: "{{ site_policy.root_password }}"
+        state: present
+      when: not audit_only and ((site_policy.root_password | default('')) != '') and not root_password_set_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

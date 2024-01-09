@@ -1,0 +1,723 @@
+# 5.1.2 Configure journald
+- name: 5.1.2 Configure journald
+  block:
+  # 5.1.2.1.1 Ensure systemd-journal-remote is installed
+  #
+  # Journald (via systemd-journal-remote ) supports the ability to send log events it gathers
+  # to a remote log host or to receive messages from remote hosts, thus enabling
+  # centralized log management.
+  - name: "5.1.2.1.1 Ensure systemd-journal-remote is installed"
+    block:
+    # 5.1.2.1.1 Ensure systemd-journal-remote is installed | Audit
+    - name: 5.1.2.1.1 Ensure systemd-journal-remote is installed | Audit
+      shell:
+        cmd: rpm -q systemd-journal-remote | grep -Eq 'systemd[\-]journal[\-]remote[\-][0-9]' && echo 'installed' || echo 'not_installed'
+      changed_when: false
+      register: systemd_journal_remote_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_check:
+          name: 5.1.2.1.1 Ensure systemd-journal-remote is installed
+          scored: true
+          automated: false
+          remediation_status: "{{ true if systemd_journal_remote_status_check.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_check] }}"
+      changed_when: false
+
+    # 5.1.2.1.1 Ensure systemd-journal-remote is installed | Remediation
+    - name: 5.1.2.1.1 Ensure systemd-journal-remote is installed | Remediation
+      package:
+        name: systemd-journal-remote
+        state: present
+      when: not audit_only and not systemd_journal_remote_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 5.1.2.1.2 Ensure systemd-journal-remote is configured
+  #
+  # Journald (via systemd-journal-remote ) supports the ability to send log events it gathers
+  # to a remote log host or to receive messages from remote hosts, thus enabling
+  # centralized log management.
+  - name: "5.1.2.1.2 Ensure systemd-journal-remote is configured"
+    block:
+    # 5.1.2.1.2 Ensure systemd-journal-remote is configured | Audit
+    - name: 5.1.2.1.2 Ensure systemd-journal-remote is configured | Audit
+      shell:
+        cmd: |
+          grep -P "^ *URL=|^ *ServerKeyFile=|^ *ServerCertificateFile=|^ *TrustedCertificateFile=" /etc/systemd/journal-upload.conf || echo ''
+      changed_when: false
+      register: systemd_journal_remote_conf_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_conf_check:
+          name: 5.1.2.1.2 Ensure systemd-journal-remote is configured
+          scored: true
+          automated: false
+      changed_when: false
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: 'Consider to add the appropriate configuration of systemd-journal-remote'
+      changed_when: false
+      when: systemd_journal_remote_conf_status_check.stdout == ''
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "Consider to review systemd-journal-remote configuration bellow: \n{{ systemd_journal_remote_conf_status_check.stdout }}"
+      changed_when: false
+      when: systemd_journal_remote_conf_status_check.stdout != ''
+
+    # Append remediation
+    - set_fact:
+        systemd_journal_remote_conf_check: "{{ systemd_journal_remote_conf_check | combine(remediation_description) }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_conf_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client
+  #
+  # Journald supports the ability to receive messages from remote hosts, thus acting as a
+  # log server. Clients should not receive data from other hosts.
+  - name: "5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client"
+    block:
+    # 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client | Audit
+    - name: 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client | Audit
+      systemd:
+        name: systemd-journal-remote.socket
+      changed_when: false
+      register: systemd_journal_remote_socket_service_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_socket_service_check:
+          name: 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (systemd_journal_remote_socket_service_status_check.status.ActiveState != 'active' and (systemd_journal_remote_socket_service_status_check.status.UnitFileState | default('masked')) == 'masked') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_socket_service_check] }}"
+      changed_when: false
+
+    # 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client | Remediation
+    - name: 5.1.2.1.4 Ensure journald is not configured to receive logs from a remote client | Remediation
+      systemd:
+        name: systemd-journal-remote.socket
+        state: stopped
+        enabled: false
+        masked: true
+      when: not audit_only and not systemd_journal_remote_socket_service_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 5.1.2.2 Ensure journald service is enabled
+  #
+  # Ensure that the systemd-journald service is enabled to allow capturing of logging
+  # events.
+  - name: "5.1.2.2 Ensure journald service is enabled"
+    block:
+    # 5.1.2.2 Ensure journald service is enabled | Audit
+    - name: 5.1.2.2 Ensure journald service is enabled | Audit
+      shell:
+        cmd: systemctl is-enabled systemd-journald.service | grep -q static && echo 'enabled' || echo 'not_enabled'
+      changed_when: false
+      register: systemd_journal_remote_service_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_service_check:
+          name: 5.1.2.2 Ensure journald service is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if systemd_journal_remote_service_status_check.stdout == 'enabled' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_service_check] }}"
+      changed_when: false
+
+    # 5.1.2.2 Ensure journald service is enabled | Remediation
+    - name: 5.1.2.2 Ensure journald service is enabled | Remediation
+      systemd:
+        name: systemd-journald
+        state: started
+        enabled: true
+        masked: false
+      when: not audit_only and not systemd_journal_remote_service_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.2.3 Ensure journald is configured to compress large log files
+  #
+  # The journald system includes the capability of compressing overly large files to avoid
+  # filling up the system with logs or making the logs unmanageably large.
+  - name: "5.1.2.3 Ensure journald is configured to compress large log files"
+    block:
+    # 5.1.2.3 Ensure journald is configured to compress large log files | Audit
+    - name: 5.1.2.3 Ensure journald is configured to compress large log files | Audit
+      shell:
+        cmd: grep -q ^\s*Compress /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: systemd_journal_remote_log_compress_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_log_compress_check:
+          name: 5.1.2.3 Ensure journald is configured to compress large log files
+          scored: true
+          automated: true
+          remediation_status: "{{ true if systemd_journal_remote_log_compress_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_log_compress_check] }}"
+      changed_when: false
+
+    # 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+    - name: 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[#]{0,}[\s]{0,}Compress.*'
+        state: absent
+      when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+
+    # 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+    - name: 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[\s]{0,}Compress=yes'
+        line: "Compress=yes"
+        state: present
+      when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+
+    # 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+    - name: 5.1.2.3 Ensure journald is configured to compress large log files | Remediation
+      systemd:
+        name: systemd-journald
+        state: restarted
+      when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk
+  #
+  # Data from journald may be stored in volatile memory or persisted locally on the server.
+  # Logs in memory will be lost upon a system reboot. By persisting logs to local disk on the
+  # server they are protected from loss due to a reboot.
+  - name: "5.1.2.4 Ensure journald is configured to write logfiles to persistent disk"
+    block:
+    # 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Audit
+    - name: 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Audit
+      shell:
+        cmd: grep -q ^\s*Storage /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: systemd_journal_remote_log_stotage_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_log_stotage_check:
+          name: 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk
+          scored: true
+          automated: true
+          remediation_status: "{{ true if systemd_journal_remote_log_stotage_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_log_stotage_check] }}"
+      changed_when: false
+
+    # 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+    - name: 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[#]{0,}[\s]{0,}Storage.*'
+        state: absent
+      when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+
+    # 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+    - name: 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[\s]{0,}Storage=persistent'
+        line: "Storage=persistent"
+        state: present
+      when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+
+    # 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+    - name: 5.1.2.4 Ensure journald is configured to write logfiles to persistent disk | Remediation
+      systemd:
+        name: systemd-journald
+        state: restarted
+      when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog
+  #
+  # Data from journald should be kept in the confines of the service and not forwarded on
+  # to other services.
+  - name: "5.1.2.5 Ensure journald is not configured to send logs to rsyslog"
+    block:
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Audit
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Audit
+      shell:
+        cmd: grep -q ^\s*ForwardToSyslog /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: systemd_journal_remote_log_forward_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_log_forward_check:
+          name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog
+          scored: true
+          automated: true
+          remediation_status: "{{ true if systemd_journal_remote_log_forward_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_log_forward_check] }}"
+      changed_when: false
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[#]{0,}[\s]{0,}ForwardToSyslog.*'
+        state: absent
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[\s]{0,}ForwardToSyslog=yes'
+        line: "ForwardToSyslog=yes"
+        state: present
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      systemd:
+        name: systemd-journald
+        state: restarted
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.3 Ensure logrotate is configured
+  #
+  # The system includes the capability of rotating log files regularly to avoid filling up the
+  # system with logs or making the logs unmanageably large. The file
+  # /etc/logrotate.d/syslog is the configuration file used to rotate log files created by
+  # syslog or rsyslog .
+  - name: "5.1.2.5 Ensure journald is not configured to send logs to rsyslog"
+    block:
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Audit
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Audit
+      shell:
+        cmd: grep -q ^\s*ForwardToSyslog /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: systemd_journal_remote_log_forward_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_log_forward_check:
+          name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog
+          scored: false
+          automated: false
+          remediation_status: "{{ true if systemd_journal_remote_log_forward_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_log_forward_check] }}"
+      changed_when: false
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[#]{0,}[\s]{0,}ForwardToSyslog.*'
+        state: absent
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: '^[\s]{0,}ForwardToSyslog=yes'
+        line: "ForwardToSyslog=yes"
+        state: present
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+    # 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+    - name: 5.1.2.5 Ensure journald is not configured to send logs to rsyslog | Remediation
+      systemd:
+        name: systemd-journald
+        state: restarted
+      when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.2.6 Ensure journald log rotation is configured per site policy
+  #
+  # Journald includes the capability of rotating log files regularly to avoid filling up the
+  # system with logs or making the logs unmanageably large. The file
+  # /etc/systemd/journald.conf is the configuration file used to specify how logs
+  # generated by Journald should be rotated.
+  - name: "5.1.2.6 Ensure journald log rotation is configured per site policy"
+    block:
+    # 5.1.2.6 Ensure journald log rotation is configured per site policy | Audit
+    - name: 5.1.2.6 Ensure journald log rotation is configured per site policy | Audit
+      shell:
+        cmd: |
+          max_use=$(grep -q ^\s*SystemMaxUse /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured')
+          keep_free=$(grep -q ^\s*SystemKeepFree /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured')
+          runtime_max_use=$(grep -q ^\s*RuntimeMaxUse /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured')
+          runtime_keep_free=$(grep -q ^\s*RuntimeKeepFree /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured')
+          max_file_sec=$(grep -q ^\s*MaxFileSec /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured')
+
+          [[ "$max_use" == 'configured' && "$keep_free" == 'configured' && "$runtime_max_use" == 'configured' && "$runtime_keep_free" == 'configured' && "$max_file_sec" == 'configured' ]] && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: systemd_journal_remote_log_rotate_status_check
+
+    # Extract audit result
+    - set_fact:
+        systemd_journal_remote_log_rotate_check:
+          name: 5.1.2.6 Ensure journald log rotation is configured per site policy
+          scored: false
+          automated: false
+          remediation_status: "{{ true if systemd_journal_remote_log_rotate_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: |
+            Consider to add the items bellow in /etc/systemd/journald.conf according to site policy:
+              SystemMaxUse=
+              SystemKeepFree=
+              RuntimeMaxUse=
+              RuntimeKeepFree=
+              MaxFileSec=
+      changed_when: false
+      when: not systemd_journal_remote_log_rotate_check.remediation_status
+
+    # Append remediation
+    - set_fact:
+        systemd_journal_remote_log_rotate_check: "{{ systemd_journal_remote_log_rotate_check | combine(remediation_description) }}"
+      changed_when: false
+      when: not systemd_journal_remote_log_rotate_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [systemd_journal_remote_log_rotate_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 5.1.3 Ensure logrotate is configured
+  #
+  # The system includes the capability of rotating log files regularly to avoid filling up the
+  # system with logs or making the logs unmanageably large. The file
+  # /etc/logrotate.d/syslog is the configuration file used to rotate log files created by
+  # syslog or rsyslog .
+  - name: "5.1.3 Ensure logrotate is configured"
+    block:
+    # Extract audit result
+    - set_fact:
+        logrotate_check:
+          name: 5.1.3 Ensure logrotate is configured
+          scored: false
+          automated: false
+          remediation: |
+            Consider to review /etc/logrotate.conf and /etc/logrotate.d/* and verify logs are rotated
+            according to site policy.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [logrotate_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 5.1.4 Ensure all logfiles have appropriate access configured
+  #
+  # Log files stored in /var/log/ contain logged information from many services on the
+  # system and potentially from other logged hosts as well.
+  - name: "5.1.4 Ensure all logfiles have appropriate access configured"
+    block:
+    # 5.1.4 Ensure all logfiles have appropriate access configured | Audit
+    - name: 5.1.4 Ensure all logfiles have appropriate access configured | Audit
+      shell:
+        cmd: |
+          l_op2="" l_output2=""
+          l_uidmin="$(awk '/^\s*UID_MIN/{print $2}' /etc/login.defs)"
+
+          file_test_chk() {
+              l_op2=""
+              if [ $(($l_mode & $perm_mask)) -gt 0 ]; then
+                  l_op2="$l_op2\n - Mode: \"$l_mode\" should be \"$maxperm\" or more restrictive"
+              fi
+              if [[ ! "$l_user" =~ $l_auser ]]; then
+                  l_op2="$l_op2\n - Owned by: \"$l_user\" and should be owned by \"${l_auser//|/ or }\""
+              fi
+              if [[ ! "$l_group" =~ $l_agroup ]]; then
+                  l_op2="$l_op2\n - Group owned by: \"$l_group\" and should be group owned by \"${l_agroup//|/ or }\""
+              fi
+              [ -n "$l_op2" ] && l_output2="$l_output2\n - File: \"$l_fname\" is:$l_op2\n"
+          }
+
+          unset a_file && a_file=() # clear and initialize array
+
+          # Loop to create array with stat of files that could possibly fail one of the audits
+          while IFS= read -r -d $'\0' l_file; do
+              [ -e "$l_file" ] && a_file+=("$(stat -Lc '%n^%#a^%U^%u^%G^%g' "$l_file")")
+          done < <(find -L /var/log -type f \( -perm /0137 -o ! -user root -o ! -group root \) -print0)
+
+          while IFS="^" read -r l_fname l_mode l_user l_uid l_group l_gid; do
+              l_bname="$(basename "$l_fname")"
+              case "$l_bname" in
+              lastlog | lastlog.* | wtmp | wtmp.* | wtmp-* | btmp | btmp.* | btmp-* | README)
+                  perm_mask='0113'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="root"
+                  l_agroup="(root|utmp)"
+                  file_test_chk
+                  ;;
+              secure | auth.log | syslog | messages)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="(root|syslog)"
+                  l_agroup="(root|adm)"
+                  file_test_chk
+                  ;;
+              SSSD | sssd)
+                  perm_mask='0117'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="(root|SSSD)"
+                  l_agroup="(root|SSSD)"
+                  file_test_chk
+                  ;;
+              gdm | gdm3)
+                  perm_mask='0117'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="root"
+                  l_agroup="(root|gdm|gdm3)"
+                  file_test_chk
+                  ;;
+              *.journal | *.journal~)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="root"
+                  l_agroup="(root|systemd-journal)"
+                  file_test_chk
+                  ;;
+              *)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="(root|syslog)"
+                  l_agroup="(root|adm)"
+                  if [ "$l_uid" -lt "$l_uidmin" ] && [ -z "$(awk -v grp="$l_group" -F: '$1==grp {print $4}' /etc/group)" ]; then
+                      if [[ ! "$l_user" =~ $l_auser ]]; then
+                          l_auser="(root|syslog|$l_user)"
+                      fi
+                      if [[ ! "$l_group" =~ $l_agroup ]]; then
+                          l_tst=""
+                          while l_out3="" read -r l_duid; do
+                              [ "$l_duid" -ge "$l_uidmin" ] && l_tst=failed
+                          done <<<"$(awk -F: '$4=='"$l_gid"' {print $3}' /etc/passwd)"
+                          [ "$l_tst" != "failed" ] && l_agroup="(root|adm|$l_group)"
+                      fi
+                  fi
+                  file_test_chk
+                  ;;
+              esac
+          done <<<"$(printf '%s\n' "${a_file[@]}")"
+
+          unset a_file # Clear array
+
+          if [ -z "$l_output2" ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: log_files_permission_status_check
+
+    # Extract audit result
+    - set_fact:
+        log_files_permission_check:
+          name: 5.1.4 Ensure all logfiles have appropriate access configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if log_files_permission_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [log_files_permission_check] }}"
+      changed_when: false
+    
+    # 5.1.4 Ensure all logfiles have appropriate access configured | Remediation
+    - name: 5.1.4 Ensure all logfiles have appropriate access configured | Remediation
+      shell:
+        cmd: |
+          l_op2="" l_output2=""
+          l_uidmin="$(awk '/^\s*UID_MIN/{print $2}' /etc/login.defs)"
+
+          file_test_fix() {
+              l_op2=""
+              l_fuser="root"
+              l_fgroup="root"
+              if [ $(($l_mode & $perm_mask)) -gt 0 ]; then
+                  l_op2="$l_op2\n - Mode: \"$l_mode\" should be \"$maxperm\" or more restrictive\n-Removing excess permissions"
+                  chmod "$l_rperms" "$l_fname"
+              fi
+              if [[ ! "$l_user" =~ $l_auser ]]; then
+                  l_op2="$l_op2\n - Owned by: \"$l_user\" and should be owned by \"${l_auser//|/ or }\"\n- Changing ownership to: \"$l_fuser\""
+                  chown "$l_fuser" "$l_fname"
+              fi
+              if [[ ! "$l_group" =~ $l_agroup ]]; then
+                  l_op2="$l_op2\n - Group owned by: \"$l_group\" and should be group owned by \"${l_agroup//|/ or }\"\n - Changing group ownership to: \"$l_fgroup\""
+                  chgrp "$l_fgroup" "$l_fname"
+              fi
+              [ -n "$l_op2" ] && l_output2="$l_output2\n - File: \"$l_fname\" is:$l_op2\n"
+          }
+
+          unset a_file && a_file=() # clear and initialize array
+          # Loop to create array with stat of files that could possibly fail one of the audits
+
+          while IFS= read -r -d $'\0' l_file; do
+              [ -e "$l_file" ] && a_file+=("$(stat -Lc '%n^%#a^%U^%u^%G^%g' "$l_file")")
+          done < <(find -L /var/log -type f \( -perm /0137 -o ! -user root -o ! -group root \) -print0)
+
+          while IFS="^" read -r l_fname l_mode l_user l_uid l_group l_gid; do
+              l_bname="$(basename "$l_fname")"
+              case "$l_bname" in
+              lastlog | lastlog.* | wtmp | wtmp.* | wtmp-* | btmp | btmp.* | btmp-* | README)
+                  perm_mask='0113'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_rperms="ug-x,o-wx"
+                  l_auser="root"
+                  l_agroup="(root|utmp)"
+                  file_test_fix
+                  ;;
+              secure | auth.log | syslog | messages)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_rperms="u-x,g-wx,o-rwx"
+                  l_auser="(root|syslog)"
+                  l_agroup="(root|adm)"
+                  file_test_fix
+                  ;;
+              SSSD | sssd)
+                  perm_mask='0117'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_rperms="ug-x,o-rwx"
+                  l_auser="(root|SSSD)"
+                  l_agroup="(root|SSSD)"
+                  file_test_fix
+                  ;;
+              gdm | gdm3)
+                  perm_mask='0117'
+                  l_rperms="ug-x,o-rwx"
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_auser="root"
+                  l_agroup="(root|gdm|gdm3)"
+                  file_test_fix
+                  ;;
+              *.journal | *.journal~)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_rperms="u-x,g-wx,o-rwx"
+                  l_auser="root"
+                  l_agroup="(root|systemd-journal)"
+                  file_test_fix
+                  ;;
+              *)
+                  perm_mask='0137'
+                  maxperm="$(printf '%o' $((0777 & ~$perm_mask)))"
+                  l_rperms="u-x,g-wx,o-rwx"
+                  l_auser="(root|syslog)"
+                  l_agroup="(root|adm)"
+
+                  if [ "$l_uid" -lt "$l_uidmin" ] && [ -z "$(awk -v grp="$l_group" -F: '$1==grp {print $4}' /etc/group)" ]; then
+                      if [[ ! "$l_user" =~ $l_auser ]]; then
+                          l_auser="(root|syslog|$l_user)"
+                      fi
+                      if [[ ! "$l_group" =~ $l_agroup ]]; then
+                          l_tst=""
+                          while l_out3="" read -r l_duid; do
+                              [ "$l_duid" -ge "$l_uidmin" ] && l_tst=failed
+                          done <<<"$(awk -F: '$4=='"$l_gid"' {print $3}' /etc/passwd)"
+                          [ "$l_tst" != "failed" ] && l_agroup="(root|adm|$l_group)"
+                      fi
+                  fi
+                  file_test_fix
+                  ;;
+              esac
+          done <<<"$(printf '%s\n' "${a_file[@]}")"
+          unset a_file # Clear array
+      when: not audit_only and not log_files_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

@@ -1,0 +1,939 @@
+# 6.1 System File Permissions
+- name: 6.1 System File Permissions
+  block:
+  # 6.1.1 Ensure permissions on /etc/passwd are configured
+  #
+  # The /etc/passwd file contains user account information that is used by many system
+  # utilities and therefore must be readable for these utilities to operate.
+  - name: "6.1.1 Ensure permissions on /etc/passwd are configured"
+    block:    
+    # 6.1.1 Ensure permissions on /etc/passwd are configured | Audit
+    - name: 6.1.1 Ensure permissions on /etc/passwd are configured | Audit
+      stat:
+        path: /etc/passwd
+      changed_when: false
+      register: passwd_file_status
+
+    # 6.1.1 Ensure permissions on /etc/passwd are configured | Audit
+    - name: 6.1.1 Ensure permissions on /etc/passwd are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ passwd_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: passwd_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        passwd_permission_check:
+          name: 6.1.1 Ensure permissions on /etc/passwd are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( passwd_file_status.stat.pw_name == 'root' and passwd_file_status.stat.gr_name == 'root' and passwd_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [passwd_permission_check] }}"
+      changed_when: false
+
+    # 6.1.1 Ensure permissions on /etc/passwd are configured | Remediation
+    - name: 6.1.1 Ensure permissions on /etc/passwd are configured | Remediation
+      file:
+        path: /etc/passwd
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not passwd_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.2 Ensure permissions on /etc/passwd- are configured
+  #
+  # The /etc/passwd- file contains backup user account information.
+  - name: "6.1.2 Ensure permissions on /etc/passwd- are configured"
+    block:    
+    # 6.1.2 Ensure permissions on /etc/passwd- are configured | Audit
+    - name: 6.1.2 Ensure permissions on /etc/passwd- are configured | Audit
+      stat:
+        path: "/etc/passwd-"
+      changed_when: false
+      register: passwd_backup_file_status
+
+    # 6.1.2 Ensure permissions on /etc/passwd- are configured | Audit
+    - name: 6.1.2 Ensure permissions on /etc/passwd- are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ passwd_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: passwd_backup_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        passwd_backup_permission_check:
+          name: 6.1.2 Ensure permissions on /etc/passwd- are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( passwd_backup_file_status.stat.pw_name == 'root' and passwd_backup_file_status.stat.gr_name == 'root' and passwd_backup_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [passwd_backup_permission_check] }}"
+      changed_when: false
+
+    # 6.1.2 Ensure permissions on /etc/passwd- are configured | Remediation
+    - name: 6.1.2 Ensure permissions on /etc/passwd- are configured | Remediation
+      file:
+        path: "/etc/passwd-"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not passwd_backup_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.3 Ensure permissions on /etc/opasswd are configured
+  #
+  # /etc/security/opasswd and it's /etc/security/opasswd.old hold user's
+  # previous passwords if pam_unix or pam_pwhistory is in use on the system
+  - name: "6.1.3 Ensure permissions on /etc/opasswd are configured"
+    block:    
+    # 6.1.3 Ensure permissions on /etc/opasswd are configured | Audit
+    - name: 6.1.3 Ensure permissions on /etc/opasswd are configured | Audit
+      stat:
+        path: "{{ item }}"
+      changed_when: false
+      loop:
+      - "/etc/security/opasswd"
+      - "/etc/security/opasswd.old"
+      register: passwd_pam_file_status
+
+    # 6.1.3 Ensure permissions on /etc/opasswd are configured | Audit
+    - name: 6.1.3 Ensure permissions on /etc/opasswd are configured | Audit
+      shell:
+        cmd: |
+          if [[ "{{ item.stat.exists }}" == "True" ]]; then
+              [ $(({{ item.stat.mode | default () }} & {{ expected_file_mask }})) -gt 0 ] && 
+              echo 'not_configured' || echo 'configured'
+          else
+              echo 'configured'
+          fi
+      changed_when: false
+      loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+      no_log: yes
+      register: passwd_pam_permission_status
+      vars:
+        expected_file_mask: "0177"
+
+    # Define remediation status
+    - set_fact:
+        remediation_status: true
+      changed_when: false
+
+    # Update remediation status
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and item.stdout == 'configured') else false}}"
+      loop: "{{ passwd_pam_permission_status.results | default([]) | list }}"
+      loop_control:
+        label: "{{ item.stdout | default() }}"
+      changed_when: false
+
+    # Update remediation status
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and (not item.stat.exists or ((item.stat.pw_name | default()) == 'root' and (item.stat.gr_name | default())))) else false}}"
+      loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+      no_log: yes
+      changed_when: false
+
+    # Extract audit result
+    - set_fact:
+        passwd_backup_permission_check:
+          name: 6.1.3 Ensure permissions on /etc/opasswd are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if remediation_status else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [passwd_backup_permission_check] }}"
+      changed_when: false
+
+    # 6.1.3 Ensure permissions on /etc/opasswd are configured | Remediation
+    - name: 6.1.3 Ensure permissions on /etc/opasswd are configured | Remediation
+      shell:
+        cmd: |
+          if [[ "{{ item.stat.exists }}" == "True" ]]; then
+              chmod 600 "{{ item.stat.path | default() }}"
+              chown root:root "{{ item.stat.path | default() }}"
+          fi
+      loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+      no_log: yes
+      when: not audit_only and not passwd_backup_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.4 Ensure permissions on /etc/group are configured
+  #
+  # The /etc/group file contains a list of all the valid groups defined in the system. The
+  # command below allows read/write access for root and read access for everyone else.
+  - name: "6.1.4 Ensure permissions on /etc/group are configured"
+    block:    
+    # 6.1.4 Ensure permissions on /etc/group are configured | Audit
+    - name: 6.1.4 Ensure permissions on /etc/group are configured | Audit
+      stat:
+        path: /etc/group
+      changed_when: false
+      register: group_file_status
+
+    # 6.1.4 Ensure permissions on /etc/group are configured | Audit
+    - name: 6.1.4 Ensure permissions on /etc/group are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ group_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: group_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        group_permission_check:
+          name: 6.1.4 Ensure permissions on /etc/group are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( group_file_status.stat.pw_name == 'root' and group_file_status.stat.gr_name == 'root' and group_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [group_permission_check] }}"
+      changed_when: false
+
+    # 6.1.4 Ensure permissions on /etc/group are configured | Remediation
+    - name: 6.1.4 Ensure permissions on /etc/group are configured | Remediation
+      file:
+        path: /etc/group
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not group_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.5 Ensure permissions on /etc/group- are configured
+  #
+  # The /etc/group- file contains a backup list of all the valid groups defined in the system.
+  - name: "6.1.5 Ensure permissions on /etc/group- are configured"
+    block:    
+    # 6.1.5 Ensure permissions on /etc/group- are configured | Audit
+    - name: 6.1.5 Ensure permissions on /etc/group- are configured | Audit
+      stat:
+        path: "/etc/group-"
+      changed_when: false
+      register: group_backup_file_status
+
+    # 6.1.5 Ensure permissions on /etc/group- are configured | Audit
+    - name: 6.1.5 Ensure permissions on /etc/group- are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ group_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: group_backup_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        group_backup_permission_check:
+          name: 6.1.5 Ensure permissions on /etc/group- are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( group_backup_file_status.stat.pw_name == 'root' and group_backup_file_status.stat.gr_name == 'root' and group_backup_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [group_backup_permission_check] }}"
+      changed_when: false
+
+    # 6.1.5 Ensure permissions on /etc/group- are configured | Remediation
+    - name: 6.1.5 Ensure permissions on /etc/group- are configured | Remediation
+      file:
+        path: "/etc/group-"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not group_backup_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.6 Ensure permissions on /etc/shadow are configured
+  #
+  # The /etc/shadow file is used to store the information about user accounts that is critical
+  # to the security of those accounts, such as the hashed password and other security
+  # information.
+  - name: "6.1.6 Ensure permissions on /etc/shadow are configured"
+    block:    
+    # 6.1.6 Ensure permissions on /etc/shadow are configured | Audit
+    - name: 6.1.6 Ensure permissions on /etc/shadow are configured | Audit
+      stat:
+        path: "/etc/shadow"
+      changed_when: false
+      register: shadow_file_status
+
+    # 6.1.6 Ensure permissions on /etc/shadow are configured | Audit
+    - name: 6.1.6 Ensure permissions on /etc/shadow are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ shadow_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: shadow_permission_status
+      vars:
+        expected_file_mask: "0777"
+
+    # Extract audit result
+    - set_fact:
+        shadow_permission_check:
+          name: 6.1.6 Ensure permissions on /etc/shadow are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( shadow_file_status.stat.pw_name == 'root' and shadow_file_status.stat.gr_name == 'root' and shadow_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [shadow_permission_check] }}"
+      changed_when: false
+
+    # 6.1.6 Ensure permissions on /etc/shadow are configured | Remediation
+    - name: 6.1.6 Ensure permissions on /etc/shadow are configured | Remediation
+      file:
+        path: "/etc/shadow"
+        mode: "0000"
+        owner: root
+        group: root
+      when: not audit_only and not shadow_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.7 Ensure permissions on /etc/shadow- are configured
+  #
+  # The /etc/shadow- file is used to store backup information about user accounts that is
+  # critical to the security of those accounts, such as the hashed password and other
+  # security information.
+  - name: "6.1.7 Ensure permissions on /etc/shadow- are configured"
+    block:    
+    # 6.1.7 Ensure permissions on /etc/shadow- are configured | Audit
+    - name: 6.1.7 Ensure permissions on /etc/shadow- are configured | Audit
+      stat:
+        path: "/etc/shadow-"
+      changed_when: false
+      register: shadow_backup_file_status
+
+    # 6.1.7 Ensure permissions on /etc/shadow- are configured | Audit
+    - name: 6.1.7 Ensure permissions on /etc/shadow- are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ shadow_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: shadow_backup_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        shadow_backup_permission_check:
+          name: 6.1.7 Ensure permissions on /etc/shadow- are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( shadow_backup_file_status.stat.pw_name == 'root' and shadow_backup_file_status.stat.gr_name == 'root' and shadow_backup_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [shadow_backup_permission_check] }}"
+      changed_when: false
+
+    # 6.1.7 Ensure permissions on /etc/shadow- are configured | Remediation
+    - name: 6.1.7 Ensure permissions on /etc/shadow- are configured | Remediation
+      file:
+        path: "/etc/shadow-"
+        mode: "0000"
+        owner: root
+        group: root
+      when: not audit_only and not shadow_backup_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.8 Ensure permissions on /etc/gshadow are configured
+  #
+  # The /etc/gshadow file is used to store the information about groups that is critical to the
+  # security of those accounts, such as the hashed password and other security
+  # information.
+  - name: "6.1.8 Ensure permissions on /etc/gshadow are configured"
+    block:    
+    # 6.1.8 Ensure permissions on /etc/gshadow are configured | Audit
+    - name: 6.1.8 Ensure permissions on /etc/gshadow are configured | Audit
+      stat:
+        path: "/etc/gshadow"
+      changed_when: false
+      register: gshadow_file_status
+
+    # 6.1.8 Ensure permissions on /etc/gshadow are configured | Audit
+    - name: 6.1.8 Ensure permissions on /etc/gshadow are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ gshadow_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: gshadow_permission_status
+      vars:
+        expected_file_mask: "0777"
+
+    # Extract audit result
+    - set_fact:
+        gshadow_permission_check:
+          name: 6.1.8 Ensure permissions on /etc/gshadow are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( gshadow_file_status.stat.pw_name == 'root' and gshadow_file_status.stat.gr_name == 'root' and gshadow_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gshadow_permission_check] }}"
+      changed_when: false
+
+    # 6.1.8 Ensure permissions on /etc/gshadow are configured | Remediation
+    - name: 6.1.8 Ensure permissions on /etc/gshadow are configured | Remediation
+      file:
+        path: "/etc/gshadow"
+        mode: "0000"
+        owner: root
+        group: root
+      when: not audit_only and not gshadow_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.9 Ensure permissions on /etc/gshadow- are configured
+  #
+  # The /etc/gshadow- file is used to store backup information about groups that is critical
+  # to the security of those accounts, such as the hashed password and other security
+  # information.
+  - name: "6.1.9 Ensure permissions on /etc/gshadow- are configured"
+    block:    
+    # 6.1.9 Ensure permissions on /etc/gshadow- are configured | Audit
+    - name: 6.1.9 Ensure permissions on /etc/gshadow- are configured | Audit
+      stat:
+        path: "/etc/gshadow-"
+      changed_when: false
+      register: gshadow_backup_file_status
+
+    # 6.1.9 Ensure permissions on /etc/gshadow- are configured | Audit
+    - name: 6.1.9 Ensure permissions on /etc/gshadow- are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ gshadow_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: gshadow_backup_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        gshadow_backup_permission_check:
+          name: 6.1.9 Ensure permissions on /etc/gshadow- are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( gshadow_backup_file_status.stat.pw_name == 'root' and gshadow_backup_file_status.stat.gr_name == 'root' and gshadow_backup_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gshadow_backup_permission_check] }}"
+      changed_when: false
+
+    # 6.1.9 Ensure permissions on /etc/gshadow- are configured | Remediation
+    - name: 6.1.9 Ensure permissions on /etc/gshadow- are configured | Remediation
+      file:
+        path: "/etc/gshadow-"
+        mode: "0000"
+        owner: root
+        group: root
+      when: not audit_only and not gshadow_backup_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.10 Ensure permissions on /etc/shells are configured
+  #
+  # /etc/shells is a text file which contains the full pathnames of valid login shells. This file
+  # is consulted by chsh and available to be queried by other programs.
+  - name: "6.1.10 Ensure permissions on /etc/shells are configured"
+    block:    
+    # 6.1.10 Ensure permissions on /etc/shells are configured | Audit
+    - name: 6.1.10 Ensure permissions on /etc/shells are configured | Audit
+      stat:
+        path: "/etc/shells"
+      changed_when: false
+      register: shells_file_status
+
+    # 6.1.10 Ensure permissions on /etc/shells are configured | Audit
+    - name: 6.1.10 Ensure permissions on /etc/shells are configured | Audit
+      shell:
+        cmd: |
+          [ $(({{ shells_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: shells_permission_status
+      vars:
+        expected_file_mask: "0133"
+
+    # Extract audit result
+    - set_fact:
+        shells_permission_check:
+          name: 6.1.10 Ensure permissions on /etc/shells are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ( shells_file_status.stat.pw_name == 'root' and shells_file_status.stat.gr_name == 'root' and shells_permission_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [shells_permission_check] }}"
+      changed_when: false
+
+    # 6.1.10 Ensure permissions on /etc/shells are configured | Remediation
+    - name: 6.1.10 Ensure permissions on /etc/shells are configured | Remediation
+      file:
+        path: "/etc/shells"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not shells_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.11 Ensure world writable files and directories are secured
+  #
+  # World writable files are the least secure. Data in world-writable files can be modified and
+  # compromised by any user on the system. World writable files may also indicate an
+  # incorrectly written script or program that could potentially be the cause of a larger
+  # compromise to the system's integrity. See the chmod(2) man page for more information.
+  # Setting the sticky bit on world writable directories prevents users from deleting or
+  # renaming files in that directory that are not owned by them.
+  - name: "6.1.11 Ensure world writable files and directories are secured"
+    block:    
+    # 6.1.11 Ensure world writable files and directories are secured | Audit
+    - name: 6.1.11 Ensure world writable files and directories are secured | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          l_output="" l_output2=""
+          l_smask='01000'
+          a_path=()
+          a_arr=()
+          a_file=()
+          a_dir=() # Initialize arrays
+
+          # List all system paths
+          a_path=(! -path "/run/user/*" -a ! -path "/proc/*" -a ! -path "*/containerd/*" -a ! -path
+              "*/kubelet/pods/*" -a ! -path "/sys/kernel/security/apparmor/*" -a ! -path "/snap/*" -a ! -path
+              "/sys/fs/cgroup/memory/*" -a ! -path "/sys/fs/selinux/*")
+
+          while read -r l_bfs; do
+              a_path+=(-a ! -path ""$l_bfs"/*")
+          done < <(findmnt -Dkerno fstype,target | awk '$1 ~ /^\s*(nfs|proc|smb)/ {print $2}')
+
+          # Populate array with files that will possibly fail one of the audits
+          while IFS= read -r -d $'\0' l_file; do
+              [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+          done < <(find / \( "${a_path[@]}" \) \( -type f -o -type d \) -perm -0002 -print0 2>/dev/null)
+
+          while IFS="^" read -r l_fname l_mode; do
+              # Test files in the array
+              [ -f "$l_fname" ] && a_file+=("$l_fname")
+
+              if [ -d "$l_fname" ]; then
+                  [ ! $(($l_mode & $l_smask)) -gt 0 ] && a_dir+=("$l_fname")
+              fi
+          done < <(printf '%s\n' "${a_arr[@]}")
+
+          # Check files
+          if ! ((${#a_file[@]} > 0)); then
+              l_output="SUCCESS"
+          else
+              l_output2="FAIL"
+          fi
+
+          # Check directories
+          if ! ((${#a_dir[@]} > 0)); then
+              l_output="SUCCESS"
+          else
+              l_output2="FAIL"
+          fi
+
+          unset a_path
+          unset a_arr
+          unset a_file
+          unset a_dir # Remove arrays
+
+          # If l_output2 is empty, we pass
+          if [ -z "$l_output2" ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+          {% endraw %}
+      changed_when: false
+      register: world_writable_files_status
+
+    # Extract audit result
+    - set_fact:
+        world_writable_files_check:
+          name: 6.1.11 Ensure world writable files and directories are secured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if world_writable_files_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [world_writable_files_check] }}"
+      changed_when: false
+
+    # 6.1.11 Ensure world writable files and directories are secured | Remediation
+    - name: 6.1.11 Ensure world writable files and directories are secured | Remediation
+      shell:
+        cmd: |
+          {% raw %}
+          l_smask='01000'
+          a_path=()
+          a_arr=() # Initialize array
+          a_path=(! -path "/run/user/*" -a ! -path "/proc/*" -a ! -path
+              "*/containerd/*" -a ! -path "*/kubelet/pods/*" -a ! -path
+              "/sys/kernel/security/apparmor/*" -a ! -path "/snap/*" -a ! -path
+              "/sys/fs/cgroup/memory/*" -a ! -path "/sys/fs/selinux/*")
+          while read -r l_bfs; do
+              a_path+=(-a ! -path ""$l_bfs"/*")
+          done < <(findmnt -Dkerno fstype,target | awk '$1 ~ /^\s*(nfs|proc|smb)/ {print $2}')
+          
+          # Populate array with files
+          while IFS= read -r -d $'\0' l_file; do
+              [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+          done < <(
+              find / \( "${a_path[@]}" \) \( -type f -o -type d \) -perm -0002
+              -print0 2>/dev/null
+          )
+          
+          # Update files permissions
+          while IFS="^" read -r l_fname l_mode; do # Test files in the array
+              if [ -f "$l_fname" ]; then           # Remove excess permissions from WW files
+                  # Update file access
+                  chmod o-w "$l_fname"
+              fi
+              if [ -d "$l_fname" ]; then
+                  if [ ! $(($l_mode & $l_smask)) -gt 0 ]; then # Add sticky bit
+                      # Update directory access
+                      chmod a+t "$l_fname"
+                  fi
+              fi
+          done < <(printf '%s\n' "${a_arr[@]}")
+          unset a_path
+          unset a_arr # Remove array
+          {% endraw %}
+      when: not audit_only and not world_writable_files_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 6.1.12 Ensure no unowned or ungrouped files or directories exist
+  #
+  # Administrators may delete users or groups from the system and neglect to remove all
+  # files and/or directories owned by those users or groups.
+  - name: "6.1.12 Ensure no unowned or ungrouped files or directories exist"
+    block:    
+    # 6.1.12 Ensure no unowned or ungrouped files or directories exist | Audit
+    - name: 6.1.12 Ensure no unowned or ungrouped files or directories exist | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          l_output="" l_output2=""
+          l_smask='01000'
+          a_path=()
+          a_arr=()
+          a_file=()
+          a_dir=() # Initialize arrays
+
+          # List all system paths
+          a_path=(! -path "/run/user/*" -a ! -path "/proc/*" -a ! -path "*/containerd/*" -a ! -path
+              "*/kubelet/pods/*" -a ! -path "/sys/kernel/security/apparmor/*" -a ! -path "/snap/*" -a ! -path
+              "/sys/fs/cgroup/memory/*" -a ! -path "/sys/fs/selinux/*")
+
+          while read -r l_bfs; do
+              a_path+=(-a ! -path ""$l_bfs"/*")
+          done < <(findmnt -Dkerno fstype,target | awk '$1 ~ /^\s*(nfs|proc|smb)/ {print $2}')
+
+          # Populate array with files that will possibly fail one of the audits
+          while IFS= read -r -d $'\0' l_file; do
+              [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+          done < <(find / \( "${a_path[@]}" \) \( -type f -o -type d \) -perm -0002 -print0 2>/dev/null)
+
+          while IFS="^" read -r l_fname l_mode; do
+              # Test files in the array
+              [ -f "$l_fname" ] && a_file+=("$l_fname")
+
+              if [ -d "$l_fname" ]; then
+                  [ ! $(($l_mode & $l_smask)) -gt 0 ] && a_dir+=("$l_fname")
+              fi
+          done < <(printf '%s\n' "${a_arr[@]}")
+
+          # Check files
+          if ! ((${#a_file[@]} > 0)); then
+              l_output="SUCCESS"
+          else
+              l_output2="FAIL"
+          fi
+
+          # Check directories
+          if ! ((${#a_dir[@]} > 0)); then
+              l_output="SUCCESS"
+          else
+              l_output2="FAIL"
+          fi
+
+          unset a_path
+          unset a_arr
+          unset a_file
+          unset a_dir # Remove arrays
+
+          # If l_output2 is empty, we pass
+          if [ -z "$l_output2" ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+          {% endraw %}
+      changed_when: false
+      register: unowned_files_status
+
+    # Extract audit result
+    - set_fact:
+        unowned_files_check:
+          name: 6.1.12 Ensure no unowned or ungrouped files or directories exist
+          scored: true
+          automated: true
+          remediation_status: "{{ true if unowned_files_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "{{ unowned_files_status.stdout }}"
+      changed_when: false
+      when: not audit_only and not unowned_files_check.remediation_status
+
+    # Append remediation description
+    - set_fact:
+        unowned_files_check: "{{ unowned_files_check | combine(remediation_description) }}"
+      changed_when: false
+      when: not audit_only and not unowned_files_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [unowned_files_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.13 Ensure SUID and SGID files are reviewed
+  #
+  # The owner of a file can set the file's permissions to run with the owner's or group's
+  # permissions, even if the user running the program is not the owner or a member of the
+  # group. The most common reason for a SUID or SGID program is to enable users to
+  # perform functions (such as changing their password) that require root privileges.
+  - name: "6.1.13 Ensure SUID and SGID files are reviewed"
+    block:    
+    # 6.1.13 Ensure SUID and SGID files are reviewed | Audit
+    - name: 6.1.13 Ensure SUID and SGID files are reviewed | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          l_output="" l_output2=""
+          a_arr=()
+          a_suid=()
+          a_sgid=() # initialize arrays
+          # Populate array with files that will possibly fail one of the audits
+          while read -r l_mpname; do
+              while IFS= read -r -d $'\0' l_file; do
+                  [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+              done < <(find "$l_mpname" -xdev -not -path "/run/user/*" -type f \( -perm -2000 -o -perm -4000 \) -print0)
+          done <<<"$(findmnt -Derno target)"
+
+          # Test files in the array
+          while IFS="^" read -r l_fname l_mode; do
+              if [ -f "$l_fname" ]; then
+                  l_suid_mask="04000"
+                  l_sgid_mask="02000"
+                  [ $(($l_mode & $l_suid_mask)) -gt 0 ] && a_suid+=("$l_fname")
+                  [ $(($l_mode & $l_sgid_mask)) -gt 0 ] && a_sgid+=("$l_fname")
+              fi
+          done <<<"$(printf '%s\n' "${a_arr[@]}")"
+
+          if ! ((${#a_suid[@]} > 0)); then
+              l_output="PASS"
+          else
+              l_output2="$l_output2\n - List of \"$(printf '%s' "${#a_suid[@]}")\"
+          SUID executable files:\n$(printf '%s\n' "${a_suid[@]}")\n - end of list -\n"
+          fi
+
+          if ! ((${#a_sgid[@]} > 0)); then
+              l_output="PASS"
+          else
+              l_output2="$l_output2\n - List of \"$(printf '%s' "${#a_sgid[@]}")\"
+          SGID executable files:\n$(printf '%s\n' "${a_sgid[@]}")\n - end of list -\n"
+          fi
+
+          [ -n "$l_output2" ] && l_output2="$l_output2\n- Review the preceding
+          list(s) of SUID and/or SGID files to\n- ensure that no rogue programs have
+          been introduced onto the system.\n"
+          unset a_arr
+          unset a_suid
+          unset a_sgid # Remove arrays
+
+          # If l_output2 is empty, Nothing to report
+          if [ -z "$l_output2" ]; then
+              echo 'configured'
+          else
+              echo -e "\n- $l_output2"
+          fi
+          {% endraw %}
+      changed_when: false
+      register: suid_guid_status
+
+    # Extract audit result
+    - set_fact:
+        suid_guid_check:
+          name: 6.1.13 Ensure SUID and SGID files are reviewed
+          scored: false
+          automated: false
+      changed_when: false
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "{{ suid_guid_status.stdout }}"
+      changed_when: false
+      when: not audit_only and not (suid_guid_status.stdout == 'configured')
+
+    # Append remediation description
+    - set_fact:
+        suid_guid_check: "{{ suid_guid_check | combine(remediation_description) }}"
+      changed_when: false
+      when: not audit_only and not (suid_guid_status.stdout == 'configured')
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [suid_guid_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.1.14 Audit system file permissions
+  #
+  # The RPM Package Manager has a number of useful options. One of these, the -V for RPM
+  # option, can be used to verify that system packages are correctly installed. The -V option
+  # can be used to verify a particular package or to verify all system packages. If no output
+  # is returned, the package is installed correctly.
+  - name: "6.1.14 Audit system file permissions"
+    block:    
+    # Extract audit result
+    - set_fact:
+        package_management_check:
+          name: 6.1.14 Audit system file permissions
+          scored: false
+          automated: false
+      changed_when: false
+
+    # Define remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "Consider to audit file system permssions"
+      changed_when: false
+
+    # Append remediation description
+    - set_fact:
+        package_management_check: "{{ package_management_check | combine(remediation_description) }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [package_management_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
