@@ -1,0 +1,290 @@
+# 3.2 Configure Network Kernel Modules
+- name: 3.2 Configure Network Kernel Modules
+  block:
+  # 3.2.1 Ensure dccp kernel module is not available
+  #
+  # The Datagram Congestion Control Protocol (DCCP) is a transport layer protocol that
+  # supports streaming media and telephony. DCCP provides a way to gain access to
+  # congestion control, without having to do it at the application layer, but does not provide
+  # in-sequence delivery.
+  - name: "3.2.1 Ensure dccp kernel module is not available"
+    block:
+    # 3.2.1 Ensure dccp kernel module is not available | Audit
+    - name: "3.2.1 Ensure dccp kernel module is not available | Audit"
+      shell:
+        cmd: modprobe -nqv dccp && echo loaded || echo not_loaded
+      changed_when: false
+      register: dccp_check_loaded_result
+    # Check if module is disabled
+    - name: "3.2.1 Ensure dccp kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?install dccp /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+      changed_when: false
+      register: dccp_check_disabled_result
+    # Check if module is blacklisted
+    - name: "3.2.1 Ensure dccp kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?blacklist dccp" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+      changed_when: false
+      register: dccp_check_blacklisted_result
+
+    # Extract audit result
+    - set_fact:
+        dccp_check:
+          name: 3.2.1 Ensure dccp kernel module is not available
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (dccp_check_loaded_result.stdout == 'not_loaded' or (dccp_check_disabled_result.stdout == 'disabled' and dccp_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [dccp_check] }}"
+      changed_when: false
+
+    # 3.2.1 Ensure dccp kernel module is not available | Remediation
+    - name: "3.2.1 Ensure dccp kernel module is not available | Remediation"
+      lineinfile:
+        path: "/etc/modprobe.d/dccp.conf"
+        regexp: "^(#)?install dccp(\\s|$)"
+        line: "install dccp /bin/true"
+        create: true
+        mode: "0600"
+      when: not audit_only and not dccp_check.remediation_status
+
+    - name: "3.2.1 Ensure dccp kernel module is not available | Remediation"
+      lineinfile:
+        path: /etc/modprobe.d/blacklist.conf
+        regexp: "^(#)?blacklist dccp(\\s|$)"
+        line: "blacklist dccp"
+        create: true
+        mode: "0600"
+      when: not audit_only and not dccp_check.remediation_status
+
+    # Disable dccp filesystems
+    - name: Disabling dccp filesystems
+      modprobe:
+        name: dccp
+        state: absent
+      when: not audit_only and not dccp_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 3.2.2 Ensure tipc kernel module is not available
+  #
+  # The Transparent Inter-Process Communication (TIPC) protocol is designed to provide
+  # communication between cluster nodes.
+  - name: "3.2.2 Ensure tipc kernel module is not available"
+    block:
+    # 3.2.2 Ensure tipc kernel module is not available | Audit
+    - name: "3.2.2 Ensure tipc kernel module is not available | Audit"
+      shell:
+        cmd: modprobe -nqv tipc && echo loaded || echo not_loaded
+      changed_when: false
+      register: tipc_check_loaded_result
+    # Check if module is disabled
+    - name: "3.2.2 Ensure tipc kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?install tipc /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+      changed_when: false
+      register: tipc_check_disabled_result
+    # Check if module is blacklisted
+    - name: "3.2.2 Ensure tipc kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?blacklist tipc" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+      changed_when: false
+      register: tipc_check_blacklisted_result
+
+    # Extract audit result
+    - set_fact:
+        tipc_check:
+          name: 3.2.2 Ensure tipc kernel module is not available
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (tipc_check_loaded_result.stdout == 'not_loaded' or (tipc_check_disabled_result.stdout == 'disabled' and tipc_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [tipc_check] }}"
+      changed_when: false
+
+    # 3.2.2 Ensure tipc kernel module is not available | Remediation
+    - name: "3.2.2 Ensure tipc kernel module is not available | Remediation"
+      lineinfile:
+        path: "/etc/modprobe.d/tipc.conf"
+        regexp: "^(#)?install tipc(\\s|$)"
+        line: "install tipc /bin/true"
+        create: true
+        mode: "0600"
+      when: not audit_only and not tipc_check.remediation_status
+
+    - name: "3.2.2 Ensure tipc kernel module is not available | Remediation"
+      lineinfile:
+        path: /etc/modprobe.d/blacklist.conf
+        regexp: "^(#)?blacklist tipc(\\s|$)"
+        line: "blacklist tipc"
+        create: true
+        mode: "0600"
+      when: not audit_only and not tipc_check.remediation_status
+
+    # Disable tipc filesystems
+    - name: Disabling tipc filesystems
+      modprobe:
+        name: tipc
+        state: absent
+      when: not audit_only and not tipc_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 3.2.3 Ensure rds kernel module is not available
+  #
+  # The Reliable Datagram Sockets (RDS) protocol is a transport layer protocol designed to
+  # provide low-latency, high-bandwidth communications between cluster nodes. It was
+  # developed by the Oracle Corporation.
+  - name: "3.2.3 Ensure rds kernel module is not available"
+    block:
+    # 3.2.3 Ensure rds kernel module is not available | Audit
+    - name: "3.2.3 Ensure rds kernel module is not available | Audit"
+      shell:
+        cmd: modprobe -nqv rds && echo loaded || echo not_loaded
+      changed_when: false
+      register: rds_check_loaded_result
+    # Check if module is disabled
+    - name: "3.2.3 Ensure rds kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?install rds /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+      changed_when: false
+      register: rds_check_disabled_result
+    # Check if module is blacklisted
+    - name: "3.2.3 Ensure rds kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?blacklist rds" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+      changed_when: false
+      register: rds_check_blacklisted_result
+
+    # Extract audit result
+    - set_fact:
+        rds_check:
+          name: 3.2.3 Ensure rds kernel module is not available
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (rds_check_loaded_result.stdout == 'not_loaded' or (rds_check_disabled_result.stdout == 'disabled' and rds_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [rds_check] }}"
+      changed_when: false
+
+    # 3.2.3 Ensure rds kernel module is not available | Remediation
+    - name: "3.2.3 Ensure rds kernel module is not available | Remediation"
+      lineinfile:
+        path: "/etc/modprobe.d/rds.conf"
+        regexp: "^(#)?install rds(\\s|$)"
+        line: "install rds /bin/true"
+        create: true
+        mode: "0600"
+      when: not audit_only and not rds_check.remediation_status
+
+    - name: "3.2.3 Ensure rds kernel module is not available | Remediation"
+      lineinfile:
+        path: /etc/modprobe.d/blacklist.conf
+        regexp: "^(#)?blacklist rds(\\s|$)"
+        line: "blacklist rds"
+        create: true
+        mode: "0600"
+      when: not audit_only and not rds_check.remediation_status
+
+    # Disable rds filesystems
+    - name: Disabling rds filesystems
+      modprobe:
+        name: rds
+        state: absent
+      when: not audit_only and not rds_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+  # 3.2.4 Ensure sctp kernel module is not available
+  #
+  # The Stream Control Transmission Protocol (SCTP) is a transport layer protocol used to
+  # support message oriented communication, with several streams of messages in one
+  # connection. It serves a similar function as TCP and UDP, incorporating features of both.
+  # It is message-oriented like UDP, and ensures reliable in-sequence transport of
+  # messages with congestion control like TCP.
+  - name: "3.2.4 Ensure sctp kernel module is not available"
+    block:
+    # 3.2.4 Ensure sctp kernel module is not available | Audit
+    - name: "3.2.4 Ensure sctp kernel module is not available | Audit"
+      shell:
+        cmd: modprobe -nqv sctp && echo loaded || echo not_loaded
+      changed_when: false
+      register: sctp_check_loaded_result
+    # Check if module is disabled
+    - name: "3.2.4 Ensure sctp kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?install sctp /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+      changed_when: false
+      register: sctp_check_disabled_result
+    # Check if module is blacklisted
+    - name: "3.2.4 Ensure sctp kernel module is not available | Audit"
+      shell:
+        cmd: grep -r -E "^(#)?blacklist sctp" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+      changed_when: false
+      register: sctp_check_blacklisted_result
+
+    # Extract audit result
+    - set_fact:
+        sctp_check:
+          name: 3.2.4 Ensure sctp kernel module is not available
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (sctp_check_loaded_result.stdout == 'not_loaded' or (sctp_check_disabled_result.stdout == 'disabled' and sctp_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [sctp_check] }}"
+      changed_when: false
+
+    # 3.2.4 Ensure sctp kernel module is not available | Remediation
+    - name: "3.2.4 Ensure sctp kernel module is not available | Remediation"
+      lineinfile:
+        path: "/etc/modprobe.d/sctp.conf"
+        regexp: "^(#)?install sctp(\\s|$)"
+        line: "install sctp /bin/true"
+        create: true
+        mode: "0600"
+      when: not audit_only and not sctp_check.remediation_status
+
+    - name: "3.2.4 Ensure sctp kernel module is not available | Remediation"
+      lineinfile:
+        path: /etc/modprobe.d/blacklist.conf
+        regexp: "^(#)?blacklist sctp(\\s|$)"
+        line: "blacklist sctp"
+        create: true
+        mode: "0600"
+      when: not audit_only and not sctp_check.remediation_status
+
+    # Disable sctp filesystems
+    - name: Disabling sctp filesystems
+      modprobe:
+        name: sctp
+        state: absent
+      when: not audit_only and not sctp_check.remediation_status
+    tags:
+    - "server_level_2"
+    - "workstation_level_2"
+    when: "'server_level_2' in levels or 'workstation_level_2' in levels"

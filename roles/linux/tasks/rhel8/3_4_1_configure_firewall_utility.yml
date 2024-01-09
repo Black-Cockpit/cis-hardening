@@ -1,0 +1,113 @@
+# 3.4.1 Configure a firewall utility
+- name: 3.4.1 Configure a firewall utility
+  block:
+  # 3.4.1.1 Ensure nftables is installed
+  #
+  # nftables provides a new in-kernel packet classification framework that is based on a
+  # network-specific Virtual Machine (VM) and a new nft userspace command line tool.
+  - name: "3.4.1.1 Ensure nftables is installed"
+    block:
+    # 3.4.1.1 Ensure nftables is installed | Audit
+    - name: 3.4.1.1 Ensure nftables is installed | Audit
+      shell:
+        cmd: rpm -qa | grep -qE "^nftables" && echo installed || echo not_installed
+      changed_when: false
+      register: nftables_status_check
+
+    # Extract audit result
+    - set_fact:
+        nftables_check:
+          name: 3.4.1.1 Ensure nftables is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nftables_status_check.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nftables_check] }}"
+      changed_when: false
+
+    # 3.4.1.1 Ensure nftables is installed | Remediation
+    - name: 3.4.1.1 Ensure nftables is installed | Remediation
+      package:
+        name: nftables
+        state: present
+      when: not audit_only and not nftables_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+  # 3.4.1.2 Ensure a single firewall configuration utility is in use
+  #
+  # FirewallD - Is a firewall service daemon that provides a dynamic customizable host-
+  # based firewall with a D-Bus interface. Being dynamic, it enables creating, changing, and
+  # deleting the rules without the necessity to restart the firewall daemon each time the
+  # rules are changed
+  # 
+  # NFTables - Includes the nft utility for configuration of the nftables subsystem of the
+  # Linux kernel
+  - name: "3.4.1.2 Ensure a single firewall configuration utility is in use"
+    block:
+    # 3.4.1.2 Ensure a single firewall configuration utility is in use | Audit
+    - name: 3.4.1.2 Ensure a single firewall configuration utility is in use | Audit
+      systemd:
+        name: firewalld
+      changed_when: false
+      ignore_errors: yes
+      register: firewalld_status_check
+
+    # Define firewalld configuration status
+    - set_fact:
+        is_firewalld_enabled: "{{ true if (firewalld_status_check is defined and firewalld_status_check.status.ActiveState == 'active' and firewalld_status_check.status.UnitFileState == 'enabled') else false }}"
+
+    # 3.4.1.2 Ensure a single firewall configuration utility is in use | Audit
+    - name: 3.4.1.2 Ensure a single firewall configuration utility is in use | Audit
+      systemd:
+        name: nftables
+      changed_when: false
+      ignore_errors: yes
+      register: nftables_status_check
+
+    # Define nftables configuration status
+    - set_fact:
+        is_nftables_disabled: "{{ true if (nftables_status_check is defined and nftables_status_check.status.ActiveState == 'inactive' and (nftables_status_check.status.UnitFileState == 'disabled' or nftables_status_check.status.UnitFileState == 'masked')) else false }}"
+
+    # Extract audit result
+    - set_fact:
+        firawall_utility_check:
+          name: 3.4.1.2 Ensure a single firewall configuration utility is in use
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (is_firewalld_enabled and is_nftables_disabled) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [firawall_utility_check] }}"
+      changed_when: false
+
+    # 3.4.1.2 Ensure a single firewall configuration utility is in use | Remediation
+    - name: 3.4.1.2 Ensure a single firewall configuration utility is in use | Remediation
+      systemd:
+        name: firewalld
+        enabled: true
+        state: started
+        force: yes
+      when: not audit_only and not is_firewalld_enabled
+    
+    # 3.4.1.2 Ensure a single firewall configuration utility is in use | Remediation
+    - name: 3.4.1.2 Ensure a single firewall configuration utility is in use | Remediation
+      systemd:
+        name: nftables
+        enabled: false
+        state: stopped
+        masked: true
+        force: yes
+      when: not audit_only and not is_nftables_disabled
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

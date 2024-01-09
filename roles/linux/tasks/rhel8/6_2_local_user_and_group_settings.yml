@@ -1,0 +1,493 @@
+# 6.2 Local User and Group Settings
+- name: 6.2 Local User and Group Settings
+  block:
+  # 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords
+  #
+  # Local accounts can use shadowed passwords. With shadowed passwords, the
+  # passwords are saved in shadow password file, /etc/shadow , encrypted by a salted one-
+  # way hash. Accounts with a shadowed password have an x in the second field in
+  # /etc/passwd .
+  - name: "6.2.1 Ensure accounts in /etc/passwd use shadowed passwords"
+    block:    
+    # 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords | Audit
+    - name: 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords | Audit
+      shell:
+        cmd: |
+          awk -F: '($2 != "x" ) { print $1 " is not set to shadowed passwords "}' /etc/passwd | wc -l
+      changed_when: false
+      register: shadowed_passwords_status
+
+    # Extract audit result
+    - set_fact:
+        shadowed_passwords_check:
+          name: 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (shadowed_passwords_status.stdout | int) == 0 else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [shadowed_passwords_check] }}"
+      changed_when: false
+
+    # 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords | Remediation
+    - name: 6.2.1 Ensure accounts in /etc/passwd use shadowed passwords | Remediation
+      shell:
+        cmd: |
+          sed -e 's/^\([a-zA-Z0-9_]*\):[^:]*:/\1:x:/' -i /etc/passwd
+      when: not audit_only and not shadowed_passwords_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.2.2 Ensure /etc/shadow password fields are not empty
+  #
+  # An account with an empty password field means that anybody may log in as that user
+  # without providing a password.
+  - name: "6.2.2 Ensure /etc/shadow password fields are not empty"
+    block:    
+    # 6.2.2 Ensure /etc/shadow password fields are not empty | Audit
+    - name: 6.2.2 Ensure /etc/shadow password fields are not empty | Audit
+      shell:
+        cmd: |
+          awk -F: '($2 == "" ) { print $1 }' /etc/shadow
+      changed_when: false
+      register: empty_user_password_status
+
+    # Extract audit result
+    - set_fact:
+        empty_user_password_check:
+          name: 6.2.2 Ensure /etc/shadow password fields are not empty
+          scored: true
+          automated: true
+          remediation_status: "{{ true if empty_user_password_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add locked users list
+    - set_fact:
+        empty_user_password_description:
+          remediation: "Consider to review the locked accounts bellow: \n {% for item in empty_user_password_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not empty_user_password_check.remediation_status
+
+    # Append locked users list to audit result
+    - set_fact:
+        empty_user_password_check: "{{ empty_user_password_check | combine(empty_user_password_description) }}"
+      changed_when: false
+      when: not audit_only and not empty_user_password_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [empty_user_password_check] }}"
+      changed_when: false
+
+    # 6.2.2 Ensure /etc/shadow password fields are not empty | Remediation
+    - name: 6.2.2 Ensure /etc/shadow password fields are not empty | Remediation
+      shell:
+        cmd: "passwd -l {{ item }}"
+      loop: "{{ empty_user_password_status.stdout_lines | default([]) | list }}"
+      when: not audit_only and not empty_user_password_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.2.3 Ensure all groups in /etc/passwd exist in /etc/group
+  #
+  # Over time, system administration errors and changes can lead to groups being defined
+  # in /etc/passwd but not in /etc/group .
+  - name: "6.2.3 Ensure all groups in /etc/passwd exist in /etc/group"
+    block:    
+    # 6.2.3 Ensure all groups in /etc/passwd exist in /etc/group | Audit
+    - name: 6.2.3 Ensure all groups in /etc/passwd exist in /etc/group | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          for i in $(cut -s -d: -f4 /etc/passwd | sort -u); do
+              grep -q -P "^.*?:[^:]*:$i:" /etc/group
+              if [ $? -ne 0 ]; then
+                  echo "Group $i is referenced by /etc/passwd but does not exist in /etc/group"
+              fi
+          done
+          {% endraw %}
+      changed_when: false
+      register: groups_list_status
+
+    # Extract audit result
+    - set_fact:
+        groups_list_check:
+          name: 6.2.3 Ensure all groups in /etc/passwd exist in /etc/group
+          scored: true
+          automated: true
+          remediation_status: "{{ true if groups_list_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add not matched group list
+    - set_fact:
+        not_matched_groups_description:
+          remediation: "Consider to review the groups bellow: \n {% for item in groups_list_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not groups_list_check.remediation_status
+
+    # Append not matched group list to audit result
+    - set_fact:
+        groups_list_check: "{{ groups_list_check | combine(not_matched_groups_description) }}"
+      changed_when: false
+      when: not audit_only and not groups_list_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [groups_list_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 6.2.4 Ensure no duplicate UIDs exist
+  #
+  # Although the useradd program will not let you create a duplicate User ID (UID), it is
+  # possible for an administrator to manually edit the /etc/passwd file and change the UID
+  # field.
+  - name: "6.2.4 Ensure no duplicate UIDs exist"
+    block:    
+    # 6.2.4 Ensure no duplicate UIDs exist | Audit
+    - name: 6.2.4 Ensure no duplicate UIDs exist | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          while read -r l_count l_uid; do
+              if [ "$l_count" -gt 1 ]; then
+                  echo -e "Duplicate UID: \"$l_uid\" Users: \"$(awk -F: '($3 == n) { print $1 }' n=$l_uid /etc/passwd | xargs)\""
+              fi
+          done < <(cut -f3 -d":" /etc/passwd | sort -n | uniq -c)
+          {% endraw %}
+      changed_when: false
+      register: users_id_status
+
+    # Extract audit result
+    - set_fact:
+        users_id_check:
+          name: 6.2.4 Ensure no duplicate UIDs exist
+          scored: true
+          automated: true
+          remediation_status: "{{ true if users_id_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add duplicated user id list
+    - set_fact:
+        duplicated_id_description:
+          remediation: "Consider to review the UIDs bellow: \n {% for item in users_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not users_id_check.remediation_status
+
+    # Append duplicated user id list to audit result
+    - set_fact:
+        users_id_check: "{{ users_id_check | combine(duplicated_id_description) }}"
+      changed_when: false
+      when: not audit_only and not users_id_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [users_id_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 6.2.5 Ensure no duplicate GIDs exist
+  #
+  # Although the groupadd program will not let you create a duplicate Group ID (GID), it is
+  # possible for an administrator to manually edit the /etc/group file and change the GID
+  # field.
+  - name: "6.2.5 Ensure no duplicate GIDs exist"
+    block:    
+    # 6.2.5 Ensure no duplicate GIDs exist | Audit
+    - name: 6.2.5 Ensure no duplicate GIDs exist | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          while read -r l_count l_gid; do
+              if [ "$l_count" -gt 1 ]; then
+                  echo -e "Duplicate GID: \"$l_gid\" Groups: \"$(awk -F: '($3 == n) { print $1 }' n=$l_gid /etc/group | xargs)\""
+              fi
+          done < <(cut -f3 -d":" /etc/group | sort -n | uniq -c)
+          {% endraw %}
+      changed_when: false
+      register: groups_id_status
+
+    # Extract audit result
+    - set_fact:
+        groups_id_check:
+          name: 6.2.5 Ensure no duplicate GIDs exist
+          scored: true
+          automated: true
+          remediation_status: "{{ true if groups_id_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add duplicated group id list
+    - set_fact:
+        duplicated_id_description:
+          remediation: "Consider to review the GIDs bellow: \n {% for item in groups_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not groups_id_check.remediation_status
+
+    # Append duplicated group id list to audit result
+    - set_fact:
+        groups_id_check: "{{ groups_id_check | combine(duplicated_id_description) }}"
+      changed_when: false
+      when: not audit_only and not groups_id_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [groups_id_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.2.6 Ensure no duplicate user names exist
+  #
+  # Although the useradd program will not let you create a duplicate user name, it is
+  # possible for an administrator to manually edit the /etc/passwd file and change the
+  # username.
+  - name: "6.2.6 Ensure no duplicate user names exist"
+    block:    
+    # 6.2.6 Ensure no duplicate user names exist | Audit
+    - name: 6.2.6 Ensure no duplicate user names exist | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          while read -r l_count l_user; do
+              if [ "$l_count" -gt 1 ]; then
+                  echo -e "Duplicate User: \"$l_user\" Users: \"$(awk -F: '($1 == n) { print $1 }' n=$l_user /etc/passwd | xargs)\""
+              fi
+          done < <(cut -f1 -d":" /etc/passwd | sort -n | uniq -c)
+          {% endraw %}
+      changed_when: false
+      register: users_name_status
+
+    # Extract audit result
+    - set_fact:
+        users_name_check:
+          name: 6.2.6 Ensure no duplicate user names exist
+          scored: true
+          automated: true
+          remediation_status: "{{ true if users_name_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add duplicated users list
+    - set_fact:
+        duplicated_user_description:
+          remediation: "Consider to review the user names bellow: \n {% for item in users_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not users_name_check.remediation_status
+
+    # Append duplicated users list to audit result
+    - set_fact:
+        users_name_check: "{{ users_name_check | combine(duplicated_user_description) }}"
+      changed_when: false
+      when: not audit_only and not users_name_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [users_name_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 6.2.7 Ensure no duplicate group names exist
+  #
+  # Although the groupadd program will not let you create a duplicate group name, it is
+  # possible for an administrator to manually edit the /etc/group file and change the group
+  # name.
+  - name: "6.2.7 Ensure no duplicate group names exist"
+    block:    
+    # 6.2.7 Ensure no duplicate group names exist | Audit
+    - name: 6.2.7 Ensure no duplicate group names exist | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          while read -r l_count l_group; do
+              if [ "$l_count" -gt 1 ]; then
+                  echo -e "Duplicate Group: \"$l_group\" Groups: \"$(awk -F: '($1 == n) { print $1 }' n=$l_group /etc/group | xargs)\""
+              fi
+          done < <(cut -f1 -d":" /etc/group | sort -n | uniq -c)
+          {% endraw %}
+      changed_when: false
+      register: groups_name_status
+
+    # Extract audit result
+    - set_fact:
+        groups_name_check:
+          name: 6.2.7 Ensure no duplicate group names exist
+          scored: true
+          automated: true
+          remediation_status: "{{ true if groups_name_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add duplicated groups list
+    - set_fact:
+        duplicated_group_description:
+          remediation: "Consider to review the group names bellow: \n {% for item in groups_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not groups_name_check.remediation_status
+
+    # Append duplicated groups list to audit result
+    - set_fact:
+        groups_name_check: "{{ groups_name_check | combine(duplicated_group_description) }}"
+      changed_when: false
+      when: not audit_only and not groups_name_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [groups_name_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 6.2.8 Ensure root path integrity
+  #
+  # The root user can execute any command on the system and could be fooled into
+  # executing programs unintentionally if the PATH is not set correctly.
+  # name.
+  - name: "6.2.8 Ensure root path integrity"
+    block:    
+    # 6.2.8 Ensure root path integrity | Audit
+    - name: 6.2.8 Ensure root path integrity | Audit
+      shell:
+        cmd: |
+          {% raw %}
+          l_output2=""
+          l_pmask="0022"
+          l_maxperm="$(printf '%o' $((0777 & ~$l_pmask)))"
+          l_root_path="$(sudo -Hiu root env | grep '^PATH' | cut -d= -f2)"
+
+          unset a_path_loc && IFS=":" read -ra a_path_loc <<<"$l_root_path"
+
+          grep -q "::" <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains a empty directory (::)"
+
+          grep -Pq ":\h*$" <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains a trailing (:)"
+
+          grep -Pq '(\h+|:)\.(:|\h*$)' <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains current working directory (.)"
+
+          while read -r l_path; do
+              if [ -d "$l_path" ]; then
+                  while read -r l_fmode l_fown; do
+                      [ "$l_fown" != "root" ] && l_output2="$l_output2\n - Directory: \"$l_path\" is owned by: \"$l_fown\" should be owned by \"root\""
+                      [ $(($l_fmode & $l_pmask)) -gt 0 ] && l_output2="$l_output2\n - Directory: \"$l_path\" is mode: \"$l_fmode\" and should be mode: \"$l_maxperm\" or more restrictive"
+                  done <<<"$(stat -Lc '%#a %U' "$l_path")"
+              else
+                  l_output2="$l_output2\n - \"$l_path\" is not a directory"
+              fi
+          done <<<"$(printf "%s\n" "${a_path_loc[@]}")"
+          if [ -z "$l_output2" ]; then
+              echo -e ""
+          else
+              echo -e "$l_output2"
+          fi
+          {% endraw %}
+      changed_when: false
+      register: root_path_integrity_status
+
+    # Extract audit result
+    - set_fact:
+        root_path_integrity_check:
+          name:  6.2.8 Ensure root path integrity
+          scored: true
+          automated: true
+          remediation_status: "{{ true if root_path_integrity_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Add duplicated groups list
+    - set_fact:
+        root_paths_description:
+          remediation: "Consider to review the paths bellow: \n {% for item in root_path_integrity_status.stdout_lines %}{{ item + '\n'}}{% endfor %}"
+      changed_when: false
+      when: not audit_only and not root_path_integrity_check.remediation_status
+
+    # Append duplicated groups list to audit result
+    - set_fact:
+        root_path_integrity_check: "{{ root_path_integrity_check | combine(root_paths_description) }}"
+      changed_when: false
+      when: not audit_only and not root_path_integrity_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [root_path_integrity_check] }}"
+      changed_when: false
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+  # 6.2.9 Ensure root is the only UID 0 account
+  #
+  # This access must be limited to only the default root account and only from the system
+  # console. Administrative access must be through an unprivileged account using an
+  # approved mechanism as noted in Item 5.6 Ensure access to the su command is
+  # restricted.
+  - name: "6.2.9 Ensure root is the only UID 0 account"
+    block:    
+    # 6.2.9 Ensure root is the only UID 0 account | Audit
+    - name: 6.2.9 Ensure root is the only UID 0 account | Audit
+      shell:
+        cmd: |
+          awk -F: '($3 == 0 && $1 != "root") { print $1 }' /etc/passwd
+      changed_when: false
+      register: root_id_users
+
+    # Extract audit result
+    - set_fact:
+        root_id_users_check:
+          name: 6.2.9 Ensure root is the only UID 0 account
+          scored: true
+          automated: true
+          remediation_status: "{{ true if root_id_users.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [root_id_users_check] }}"
+      changed_when: false
+    
+    # 6.2.9 Ensure root is the only UID 0 account | Remediation
+    - name: 6.2.9 Ensure root is the only UID 0 account | Remediation
+      user:
+        name: "{{ item }}"
+        state: absent
+        force: true
+      loop: "{{ root_id_users.stdout_lines | default([]) | list }}"
+      when: not audit_only and not root_id_users_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"

@@ -1,0 +1,21 @@
+galaxy_info:
+  author: Hasni Mehdi
+  description: Linux CIS hardening
+  company: Black Cockpit
+  license: MIT
+  min_ansible_version: 2.15.8
+
+  platforms:
+  - name: Rocky
+    versions:
+    - all
+
+  galaxy_tags:
+  - cis_hardening
+  - cis
+  - linux
+  - linux_security
+  - cis_linux
+  - linux_benchmark
+  - cis_benchmark
+dependencies: []

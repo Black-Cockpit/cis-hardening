@@ -1,0 +1,40 @@
+# defaults file for cis_hardening
+audit_result: []
+reboot_required: false
+
+# Warning Banner Content (issue, issue.net, motd)
+warning_banner: "Authorized uses only. All activity may be monitored and reported."
+
+# Define site policy
+site_policy:
+
+cis_defaults:
+  # Time synchronization ntp servers
+  time_synchronization_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  - 2.pool.ntp.org
+  - 3.pool.ntp.org
+  # Chrony server options
+  chrony_server_options: "minpoll 8"
+
+  # sshd default
+  sshd:
+    client_alive_interval: 45
+    client_alive_count_max: 3
+    login_grace_time: 60
+    log_level: INFO
+    auth_max_retry: 4
+    max_startups:
+      start: 10
+      rate: 30
+      full: 60
+
+  audit_tools:
+  - "/sbin/auditctl"
+  - "/sbin/aureport"
+  - "/sbin/ausearch"
+  - "/sbin/autrace"
+  - "/sbin/auditd"
+  - "/sbin/augenrules"
+

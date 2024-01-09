@@ -1,0 +1,474 @@
+# 4.1.1 Configure cron
+- name: 4.1.1 Configure cron
+  block:
+  # 4.1.1.1 Ensure cron daemon is enabled and active
+  #
+  # The cron daemon is used to execute batch jobs on the system.
+  - name: "4.1.1.1 Ensure cron daemon is enabled and active"
+    block:
+    # 4.1.1.1 Ensure cron daemon is enabled and active | Audit
+    - name: 4.1.1.1 Ensure cron daemon is enabled and active | Audit
+      systemd:
+        name: crond
+      changed_when: false
+      register: cron_status_check
+
+    # Extract audit result
+    - set_fact:
+        cron_check:
+          name: 4.1.1.1 Ensure cron daemon is enabled and active
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (cron_status_check.status.ActiveState == 'active' and cron_status_check.status.UnitFileState == 'enabled') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [cron_check] }}"
+      changed_when: false
+
+    # 4.1.1.1 Ensure cron daemon is enabled and active | Remediation
+    - name: 4.1.1.1 Ensure cron daemon is enabled and active | Remediation
+      systemd:
+        name: crond
+        state: started
+        enabled: true
+        force: true
+      when: not audit_only and not cron_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.2 Ensure permissions on /etc/crontab are configured
+  #
+  # The /etc/crontab file is used by cron to control its own jobs. The commands in this
+  # item make sure that root is the user and group owner of the file and that only the owner
+  # can access the file.
+  - name: "4.1.1.2 Ensure permissions on /etc/crontab are configured"
+    block:
+    # 4.1.1.2 Ensure permissions on /etc/crontab are configured | Audit
+    - name: 4.1.1.2 Ensure permissions on /etc/crontab are configured | Audit
+      stat:
+        path: /etc/crontab
+      changed_when: false
+      register: crontab_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crontab_permission_check:
+          name: 4.1.1.2 Ensure permissions on /etc/crontab are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (crontab_stat_check.stat.mode == '0600' and crontab_stat_check.stat.pw_name == 'root' and crontab_stat_check.stat.gr_name == 'root') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crontab_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.2 Ensure permissions on /etc/crontab are configured | Remediation
+    - name: 4.1.1.2 Ensure permissions on /etc/crontab are configured | Remediation
+      file:
+        path: /etc/crontab
+        owner: root
+        group: root
+        mode: "0600"
+        state: file
+      when: not audit_only and not crontab_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured
+  #
+  # This directory contains system cron jobs that need to run on an hourly basis. The files in
+  # this directory cannot be manipulated by the crontab command, but are instead edited
+  # by system administrators using a text editor. The commands below restrict read/write
+  # and search access to user and group root, preventing regular users from accessing this
+  # directory.
+  - name: "4.1.1.3 Ensure permissions on /etc/cron.hourly are configured"
+    block:
+    # 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Audit
+    - name: 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Audit
+      shell:
+        cmd: 'find /etc/cron.hourly/ -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: crontab_hourly_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crontab_hourly_permission_check:
+          name: 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crontab_hourly_stat_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crontab_hourly_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Remediation
+    - name: "4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Remediation"
+      find:
+        paths: "/etc/cron.hourly/"
+        file_type: file
+        recurse: true
+      register: crontab_hourly_files_list
+      when: not audit_only and not crontab_hourly_permission_check.remediation_status
+
+    # 4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Remediation
+    - name: "4.1.1.3 Ensure permissions on /etc/cron.hourly are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "0700"
+        owner: root
+        group: root
+      with_items:
+      - "{{ crontab_hourly_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not crontab_hourly_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.4 Ensure permissions on /etc/cron.daily are configured
+  #
+  # The /etc/cron.daily directory contains system cron jobs that need to run on a daily
+  # basis. The files in this directory cannot be manipulated by the crontab command, but
+  # are instead edited by system administrators using a text editor. The commands below
+  # restrict read/write and search access to user and group root, preventing regular users
+  # from accessing this directory.
+  - name: "4.1.1.4 Ensure permissions on /etc/cron.daily are configured"
+    block:
+    # 4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Audit
+    - name: 4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Audit
+      shell:
+        cmd: 'find /etc/cron.daily -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: crontab_daily_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crontab_daily_permission_check:
+          name: 4.1.1.4 Ensure permissions on /etc/cron.daily are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crontab_daily_stat_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crontab_daily_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Remediation
+    - name: "4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Remediation"
+      find:
+        paths: "/etc/cron.daily"
+        file_type: file
+        recurse: true
+      register: crontab_daily_files_list
+      when: not audit_only and not crontab_daily_permission_check.remediation_status
+
+    # 4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Remediation
+    - name: "4.1.1.4 Ensure permissions on /etc/cron.daily are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "0700"
+        owner: root
+        group: root
+      with_items:
+      - "{{ crontab_daily_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not crontab_daily_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured
+  #
+  # The /etc/cron.weekly directory contains system cron jobs that need to run on a weekly
+  # basis. The files in this directory cannot be manipulated by the crontab command, but
+  # are instead edited by system administrators using a text editor. The commands below
+  # restrict read/write and search access to user and group root, preventing regular users
+  # from accessing this directory.
+  - name: "4.1.1.5 Ensure permissions on /etc/cron.weekly are configured"
+    block:
+    # 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Audit
+    - name: 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Audit
+      shell:
+        cmd: 'find /etc/cron.weekly -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: crontab_weekly_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crontab_weekly_permission_check:
+          name: 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crontab_weekly_stat_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crontab_weekly_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Remediation
+    - name: "4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Remediation"
+      find:
+        paths: "/etc/cron.weekly"
+        file_type: file
+        recurse: true
+      register: crontab_weekly_files_list
+      when: not audit_only and not crontab_weekly_permission_check.remediation_status
+
+    # 4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Remediation
+    - name: "4.1.1.5 Ensure permissions on /etc/cron.weekly are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "0700"
+        owner: root
+        group: root
+      with_items:
+      - "{{ crontab_weekly_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not crontab_weekly_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured
+  #
+  # The /etc/cron.monthly directory contains system cron jobs that need to run on a
+  # monthly basis. The files in this directory cannot be manipulated by the crontab
+  # command, but are instead edited by system administrators using a text editor. The
+  # commands below restrict read/write and search access to user and group root,
+  # preventing regular users from accessing this directory.
+  - name: "4.1.1.6 Ensure permissions on /etc/cron.monthly are configured"
+    block:
+    # 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Audit
+    - name: 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Audit
+      shell:
+        cmd: 'find /etc/cron.monthly -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: crontab_monthly_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crontab_monthly_permission_check:
+          name: 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crontab_monthly_stat_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crontab_monthly_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Remediation
+    - name: "4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Remediation"
+      find:
+        paths: "/etc/cron.monthly"
+        file_type: file
+        recurse: true
+      register: crontab_monthly_files_list
+      when: not audit_only and not crontab_monthly_permission_check.remediation_status
+
+    # 4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Remediation
+    - name: "4.1.1.6 Ensure permissions on /etc/cron.monthly are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "0700"
+        owner: root
+        group: root
+      with_items:
+      - "{{ crontab_monthly_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not crontab_monthly_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.7 Ensure permissions on /etc/cron.d are configured
+  #
+  # The /etc/cron.d directory contains system cron jobs that need to run in a similar
+  # manner to the hourly, daily weekly and monthly jobs from /etc/crontab , but require
+  # more granular control as to when they run. The files in this directory cannot be
+  # manipulated by the crontab command, but are instead edited by system administrators
+  # using a text editor. The commands below restrict read/write and search access to user
+  # and group root, preventing regular users from accessing this directory.
+  - name: "4.1.1.7 Ensure permissions on /etc/cron.d are configured"
+    block:
+    # 4.1.1.7 Ensure permissions on /etc/cron.d are configured | Audit
+    - name: 4.1.1.7 Ensure permissions on /etc/cron.d are configured | Audit
+      shell:
+        cmd: 'find /etc/cron.d -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+      changed_when: false
+      register: crond_stat_check
+
+    # Extract audit result
+    - set_fact:
+        crond_permission_check:
+          name: 4.1.1.7 Ensure permissions on /etc/cron.d are configured
+          scored: true
+          automated: true
+          remediation_status: "{{ true if crond_stat_check.stdout == '0' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [crond_permission_check] }}"
+      changed_when: false
+
+    # 4.1.1.7 Ensure permissions on /etc/cron.d are configured | Remediation
+    - name: "4.1.1.7 Ensure permissions on /etc/cron.d are configured | Remediation"
+      find:
+        paths: "/etc/cron.d"
+        file_type: file
+        recurse: true
+      register: crond_files_list
+      when: not audit_only and not crond_permission_check.remediation_status
+
+    # 4.1.1.7 Ensure permissions on /etc/cron.d are configured | Remediation
+    - name: "4.1.1.7 Ensure permissions on /etc/cron.d are configured | Remediation"
+      file:
+        name: "{{ item.path }}"
+        mode: "0700"
+        owner: root
+        group: root
+      with_items:
+      - "{{ crond_files_list.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: not audit_only and not crond_permission_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.1.1.8 Ensure crontab is restricted to authorized users
+  #
+  # crontab is the program used to install, deinstall, or list the tables used to drive the cron
+  # daemon. Each user can have their own crontab, and though these are files in
+  # /var/spool/cron/crontabs , they are not intended to be edited directly.
+  #
+  # If the /etc/cron.allow file exists, then you must be listed (one user per line) therein in
+  # order to be allowed to use this command. If the /etc/cron.allow file does not exist but
+  # the /etc/cron.deny file does exist, then you must not be listed in the /etc/cron.deny
+  # file in order to use this command.
+  #
+  # If neither of these files exists, then depending on site-dependent configuration
+  # parameters, only the super user will be allowed to use this command, or all users will be
+  # able to use this command.
+  #
+  # If both files exist then /etc/cron.allow takes precedence. Which means that
+  # /etc/cron.deny is not considered and your user must be listed in /etc/cron.allow in
+  # order to be able to use the crontab.
+  #
+  # Regardless of the existence of any of these files, the root administrative user is always
+  # allowed to setup a crontab.
+  # 
+  # The files /etc/cron.allow and /etc/cron.deny , if they exist, must be either world-
+  # readable, or readable by group crontab . If they are not, then cron will deny access to all
+  # users until the permissions are fixed.
+  #
+  # There is one file for each user's crontab under the /var/spool/cron/crontabs directory.
+  # Users are not allowed to edit the files under that directory directly to ensure that only
+  # users allowed by the system to run periodic tasks can add them, and only syntactically
+  # correct crontabs will be written there. This is enforced by having the directory writable
+  # only by the crontab group and configuring crontab command with the setgid bid set for
+  # that specific group.
+  - name: "4.1.1.8 Ensure crontab is restricted to authorized users"
+    block:
+    # 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
+    - name: 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
+      stat:
+        path: /etc/cron.allow
+      changed_when: false
+      register: cron_allow_stat
+
+    # Audit /etc/cron.allow
+    - set_fact:
+        cron_allow_check: "{{ true if (cron_allow_stat.stat.exists and cron_allow_stat.stat.mode == '0640' and cron_allow_stat.stat.pw_name == 'root' and cron_allow_stat.stat.gr_name == 'root') else false}}"
+
+    # 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
+    - name: 4.1.1.8 Ensure crontab is restricted to authorized users | Audit
+      stat:
+        path: /etc/cron.deny
+      changed_when: false
+      register: cron_deny_stat
+
+    # Audit /etc/cron.deny
+    - set_fact:
+        cron_deny_check: "{{ true if ((cron_allow_stat.stat.exists and not cron_deny_stat.stat.exists) or (cron_deny_stat.stat.exists and cron_deny_stat.stat.mode == '0640' and cron_deny_stat.stat.pw_name == 'root' and cron_deny_stat.stat.gr_name == 'root')) else false}}"
+      changed_when: false
+      
+    # Extract audit result
+    - set_fact:
+        cron_authorization_check:
+          name: 4.1.1.8 Ensure crontab is restricted to authorized users
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (cron_allow_check and cron_deny_check) else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [cron_authorization_check] }}"
+      changed_when: false
+
+    # 4.1.1.8 Ensure crontab is restricted to authorized users | Remediation
+    - name: 4.1.1.8 Ensure crontab is restricted to authorized users | Remediation
+      file:
+        path: /etc/cron.allow
+        owner: root
+        group: root
+        mode: "0640"
+        state: file
+      when: not audit_only and not cron_authorization_check.remediation_status and cron_allow_stat.stat.exists
+    
+    # 4.1.1.8 Ensure crontab is restricted to authorized users | Remediation
+    - name: 4.1.1.8 Ensure crontab is restricted to authorized users | Remediation
+      file:
+        path: /etc/cron.deny
+        owner: root
+        group: root
+        mode: "0640"
+        state: file
+      when: not audit_only and not cron_authorization_check.remediation_status and not cron_allow_stat.stat.exists and not cron_deny_check
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+

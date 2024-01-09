@@ -1,0 +1,272 @@
+# 4.4.2 Configure authselect
+- name: 4.4.2 Configure authselect
+  block:
+  # 4.4.2.1 Ensure active authselect profile includes pam modules
+  #
+  # A custom profile can be created by copying and customizing one of the default profiles.
+  # The default profiles include: sssd, winbind, or the nis. This profile can then be
+  # customized to follow site specific requirements.
+  #
+  # You can select a profile for the authselect utility for a specific host. The profile will be
+  # applied to every user logging into the host.
+  - name: "4.4.1.1 Ensure latest version of pam is installed"
+    block:
+    # 4.4.1.1 Ensure latest version of pam is installed | Audit
+    - name: 4.4.1.1 Ensure latest version of pam is installed | Audit
+      shell:
+        cmd: |
+          if [ -f /etc/authselect/authselect.conf ]; then
+              # Check if pam_pwquality module is configured
+              pam_pwquality=$(grep -Pq -- '\b(pam_pwquality\.so)\b' /etc/authselect/"$(head -1 /etc/authselect/authselect.conf)"/{system,password}-auth && echo 'configured' || echo 'not_configured')
+
+              # Check if pam_pwhistory module is configured
+              pam_pwhistory=$(grep -Pq -- '\b(pam_pwhistory\.so)\b' /etc/authselect/"$(head -1 /etc/authselect/authselect.conf)"/{system,password}-auth && echo 'configured' || echo 'not_configured')
+
+              # Check if pam_faillock module is configured
+              pam_faillock=$(grep -Pq -- '\b(pam_faillock\.so)\b' /etc/authselect/"$(head -1 /etc/authselect/authselect.conf)"/{system,password}-auth && echo 'configured' || echo 'not_configured')
+
+              # Check if pam_unix module is configured
+              pam_unix=$(grep -Pq -- '\b(pam_unix\.so)\b' /etc/authselect/"$(head -1 /etc/authselect/authselect.conf)"/{system,password}-auth && echo 'configured' || echo 'not_configured')
+
+              # Return audit result
+              [[ "$pam_pwquality" == 'configured' ]] && [[ "$pam_pwhistory" == 'configured' ]] && [[ "$pam_faillock" == 'configured' ]] && [[ "$pam_unix" == 'configured' ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: authselect_modules_status_check
+
+     # Extract audit result
+    - set_fact:
+        authselect_modules_check:
+          name: 4.4.1.1 Ensure latest version of pam is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_modules_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_modules_check] }}"
+      changed_when: false
+
+    # 4.4.1.1 Ensure latest version of pam is installed | Remediation
+    - name: 4.4.1.1 Ensure latest version of pam is installed | Remediation
+      shell:
+        cmd: |
+          authselect create-profile 00-cis-profile -b sssd
+          authselect select custom/00-cis-profile with-pwhistory with-faillock without-nullok --backup=PAM_CONFIG_BACKUP --force
+      when: not audit_only and not authselect_modules_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.4.2.2 Ensure pam_faillock module is enabled
+  #
+  # The pam_faillock.so module maintains a list of failed authentication attempts per user
+  # during a specified interval and locks the account in case there were more than the
+  # configured number of consecutive failed authentications (this is defined by the deny
+  # parameter in the faillock configuration). It stores the failure records into per-user files in
+  # the tally directory.
+  - name: "4.4.2.2 Ensure pam_faillock module is enabled"
+    block:
+    # 4.4.2.2 Ensure pam_faillock module is enabled | Audit
+    - name: 4.4.2.2 Ensure pam_faillock module is enabled | Audit
+      shell:
+        cmd: |
+          if [ -f /etc/authselect/authselect.conf ]; then
+              # Check if pam_faillock module is configured
+              grep -Pq -- '\bpam_faillock.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: authselect_pam_faillock_module_status_check
+
+     # Extract audit result
+    - set_fact:
+        authselect_pam_faillock_module_check:
+          name: 4.4.2.2 Ensure pam_faillock module is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_pam_faillock_module_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_pam_faillock_module_check] }}"
+      changed_when: false
+
+    # 4.4.2.2 Ensure pam_faillock module is enabled | Remediation
+    - name: 4.4.2.2 Ensure pam_faillock module is enabled | Remediation
+      shell:
+        cmd: |
+          authselect enable-feature with-faillock
+          authselect apply-changes
+      when: not audit_only and not authselect_pam_faillock_module_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.4.2.3 Ensure pam_pwquality module is enabled
+  #
+  # The pam_pwquality.so module performs password quality checking. This module can
+  # be plugged into the password stack of a given service to provide strength-checking for
+  # passwords. The code was originally based on pam_cracklib module and the module is
+  # backwards compatible with its options.
+  #
+  # The action of this module is to prompt the user for a password and check its strength
+  # against a system dictionary and a set of rules for identifying poor choices.
+  #
+  # The first action is to prompt for a single password, check its strength and then, if it is
+  # considered strong, prompt for the password a second time (to verify that it was typed
+  # correctly on the first occasion). All being well, the password is passed on to subsequent
+  # modules to be installed as the new authentication token.
+  - name: "4.4.2.3 Ensure pam_pwquality module is enabled"
+    block:
+    # 4.4.2.3 Ensure pam_pwquality module is enabled | Audit
+    - name: 4.4.2.3 Ensure pam_pwquality module is enabled | Audit
+      shell:
+        cmd: |
+          if [ -f /etc/authselect/authselect.conf ]; then
+              # Check if pam_pwquality module is configured
+              grep -Pq -- '\bpam_pwquality\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: authselect_pam_pwquality_module_status_check
+
+     # Extract audit result
+    - set_fact:
+        authselect_pam_pwquality_module_check:
+          name: 4.4.2.3 Ensure pam_pwquality module is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_pam_pwquality_module_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_pam_pwquality_module_check] }}"
+      changed_when: false
+
+    # 4.4.2.3 Ensure pam_pwquality module is enabled | Remediation
+    - name: 4.4.2.3 Ensure pam_pwquality module is enabled | Remediation
+      shell:
+        cmd: |
+          authselect enable-feature with-pwquality
+          authselect apply-changes
+      when: not audit_only and not authselect_pam_pwquality_module_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.4.2.4 Ensure pam_pwhistory module is enabled
+  #
+  # The pam_history.so module saves the last passwords for each user in order to force
+  # password change history and keep the user from alternating between the same
+  # password too frequently.
+  - name: "4.4.2.4 Ensure pam_pwhistory module is enabled"
+    block:
+    # 4.4.2.4 Ensure pam_pwhistory module is enabled | Audit
+    - name: 4.4.2.4 Ensure pam_pwhistory module is enabled | Audit
+      shell:
+        cmd: |
+          if [ -f /etc/authselect/authselect.conf ]; then
+              # Check if pam_pwhistory module is configured
+              grep -Pq -- '\bpam_pwhistory\.so\b' /etc/pam.d/{password,system}-auth || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: authselect_pam_pwhistory_module_status_check
+
+     # Extract audit result
+    - set_fact:
+        authselect_pam_pwhistory_module_check:
+          name: 4.4.2.4 Ensure pam_pwhistory module is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_pam_pwhistory_module_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_pam_pwhistory_module_check] }}"
+      changed_when: false
+
+    # 4.4.2.4 Ensure pam_pwhistory module is enabled | Remediation
+    - name: 4.4.2.4 Ensure pam_pwhistory module is enabled | Remediation
+      shell:
+        cmd: |
+          authselect enable-feature with-pwhistory
+          authselect apply-changes
+      when: not audit_only and not authselect_pam_pwhistory_module_check.remediation_status
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+  # 4.4.2.5 Ensure pam_unix module is enabled
+  #
+  # The pam_unix.so module is the standard Unix authentication module. It uses standard
+  # calls from the system's libraries to retrieve and set account information as well as
+  # authentication. Usually this is obtained from the /etc/passwd and the /etc/shadow file
+  # as well if shadow is enabled.
+  - name: "4.4.2.5 Ensure pam_unix module is enabled"
+    block:
+    # 4.4.2.5 Ensure pam_unix module is enabled | Audit
+    - name: 4.4.2.5 Ensure pam_unix module is enabled | Audit
+      shell:
+        cmd: |
+          if [ -f /etc/authselect/authselect.conf ]; then
+              # Check if pam_unix module is configured
+              grep -Pq -- '\bpam_unix\.so\b' /etc/pam.d/{password,system}-auth || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: authselect_pam_unix_module_status_check
+
+    # Extract audit result
+    - set_fact:
+        authselect_pam_unix_module_check:
+          name: 4.4.2.5 Ensure pam_unix module is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if authselect_pam_unix_module_status_check.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Set remediation description
+    - set_fact:
+        remediation_description:
+          remediation: "Consider to create a custom authselect profile and ensure that pam_unix is enabled"
+      changed_when: false
+
+    # Append remediation description to audit result
+    - set_fact:
+        authselect_pam_unix_module_check: "{{ authselect_pam_unix_module_check | combine(remediation_description) }}"
+      changed_when: false
+      when: not audit_only and not authselect_pam_unix_module_check.remediation_status
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [authselect_pam_unix_module_check] }}"
+      changed_when: false
+
+    tags:
+    - "server_level_1"
+    - "workstation_level_1"
+    when: "'server_level_1' in levels or 'workstation_level_1' in levels"
