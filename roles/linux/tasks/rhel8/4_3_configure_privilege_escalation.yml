@@ -11,7 +11,7 @@
     # 4.3.1 Ensure sudo is installed | Audit
     - name: 4.3.1 Ensure sudo is installed | Audit
       shell:
-        cmd: rpm -qa | grep -E '^sudo[-][0-9]' && echo installed || not_installed
+        cmd: rpm -qa | grep -Eq '^sudo[-][0-9]' && echo installed || not_installed
       changed_when: false
       register: sudo_status_check
 

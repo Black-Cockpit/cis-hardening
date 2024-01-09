@@ -184,7 +184,7 @@
         cmd: |
           if [ -f /etc/authselect/authselect.conf ]; then
               # Check if pam_pwhistory module is configured
-              grep -Pq -- '\bpam_pwhistory\.so\b' /etc/pam.d/{password,system}-auth || echo 'not_configured'
+              grep -Pq -- '\bpam_pwhistory\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
           else
               echo 'not_configured'
           fi
@@ -233,7 +233,7 @@
         cmd: |
           if [ -f /etc/authselect/authselect.conf ]; then
               # Check if pam_unix module is configured
-              grep -Pq -- '\bpam_unix\.so\b' /etc/pam.d/{password,system}-auth || echo 'not_configured'
+              grep -Pq -- '\bpam_unix\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
           else
               echo 'not_configured'
           fi

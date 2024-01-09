@@ -149,7 +149,6 @@
               if [ $(("$mode" & {{ expected_file_mask }})) -gt 0 ] || [ "$owner" != "root" ] || [[ ! "$group" =~ "{{ ssh_keys_group }}" ]]; then
                   echo 'not_configured'
               fi
-
           else
               echo 'configured'
           fi
