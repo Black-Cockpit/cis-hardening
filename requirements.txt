@@ -4,7 +4,7 @@ argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
 cffi==1.16.0
 construct==2.10.69
-cryptography==41.0.5
+cryptography==41.0.6
 importlib-resources==6.1.1
 Jinja2==3.1.2
 lxml==4.9.3
