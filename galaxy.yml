@@ -1,0 +1,23 @@
+namespace: hasnimehdi91
+name: cis_hardening
+version: 1.0.0
+readme: README.md
+authors:
+- Hasni Mehdi hasnimehdi@outlook.com
+description: This collection provides roles for the center of internet security benchmarks.
+license_file: 'LICENSE'
+tags:
+- cis_hardening
+- cis
+- linux
+- linux_security
+- cis_linux
+- linux_benchmark
+- cis_benchmark
+dependencies: {}
+repository: https://github.com/Black-Cockpit/ansible-secure-nginx
+documentation: https://github.com/Black-Cockpit/ansible-secure-nginx/blob/master/doc
+homepage: https://github.com/Black-Cockpit/ansible-secure-nginx
+issues: https://github.com/Black-Cockpit/ansible-secure-nginx/issues
+build_ignore:
+- .venv

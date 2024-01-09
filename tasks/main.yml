@@ -1,6 +1,0 @@
-# tasks file for cis_hardening
-- include_tasks:
-    file: "rhel_platforms/main.yml"
-
-- debug:
-    var: audit_result
