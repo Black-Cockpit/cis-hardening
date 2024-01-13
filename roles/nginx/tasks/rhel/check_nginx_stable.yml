@@ -1,0 +1,8 @@
+# Check if package manager repositories are configured correctly
+- name: "{{ rule}} | Audit"
+  shell:
+    cmd: |
+      audit=$(dnf repolist -v nginx-stable)
+      echo "$audit" | grep -q nginx-stable && echo stable || echo unstable
+  changed_when: false
+  register: nginx_stable_repo_status

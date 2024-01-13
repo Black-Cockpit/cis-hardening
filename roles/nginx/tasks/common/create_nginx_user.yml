@@ -1,0 +1,16 @@
+# Create nginx group
+- name: "{{ rule }} | Remediation"
+  group:
+    name: "{{ nginx_group }}"
+    system: true
+    state: present
+
+# Create nginx user
+- name: "{{ rule }} | Remediation"
+  user:
+    name: "{{ nginx_user }}"
+    comment: "Nginx user"
+    shell: "{{ nginx_user_shell }}"
+    home: "{{ nginx_user_home }}"
+    system: true
+    state: present

@@ -1,0 +1,17 @@
+# Install nginx source build dependencies
+- name: "{{ rule }} | Remediation"
+  apt:
+    update_cache: true
+    name: "{{ item }}"
+  loop:
+  - "gcc"
+  - "make"
+  - "build-essential"
+  - "libpcre3"
+  - "libpcre3-dev"
+  - "zlib1g"
+  - "zlib1g-dev"
+  - "libssl-dev"
+  - "libgd-dev"
+  - "libxml2-dev"
+  - "uuid-dev"

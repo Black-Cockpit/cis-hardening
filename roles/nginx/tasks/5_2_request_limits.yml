@@ -1,0 +1,265 @@
+# 5.2 Request Limits
+- name: 5.2 Request Limits
+  block:
+  # 5.2.1 Ensure timeout values for reading the client header and body are set correctly
+  #
+  # The client_header_timeout and client_body_timeout directives define the time the
+  # server will wait for the header or body to be sent from the client. If the client does not
+  # send the entire header in this predefined timeframe, the server will send back a 408
+  # request timeout error.
+  - name: "5.2.1 Ensure timeout values for reading the client header and body are set correctly"
+    block:
+    # 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Audit
+    - name: "5.2.1 Ensure timeout values for reading the client header and body are set correctly | Audit"
+      shell:
+        cmd: |
+          if grep -iq client_body_timeout /etc/nginx/nginx.conf; then
+              value=$(grep -E '^([^#.]){0,}client_body_timeout*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
+              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo /etc/nginx/nginx.conf
+          else
+              echo /etc/nginx/nginx.conf
+          fi
+      changed_when: false
+      register: nginx_client_body_timeout_status
+
+    # 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Audit
+    - name: "5.2.1 Ensure timeout values for reading the client header and body are set correctly | Audit"
+      shell:
+        cmd: |
+          if grep -iq client_header_timeout /etc/nginx/nginx.conf; then
+              value=$(grep -E '^([^#.]){0,}client_header_timeout*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
+              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo /etc/nginx/nginx.conf
+          else
+              echo /etc/nginx/nginx.conf
+          fi
+      changed_when: false
+      register: nginx_client_header_timeout_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_timeout_check:
+          name: 5.2.1 Ensure timeout values for reading the client header and body are set correctly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (nginx_client_body_timeout_status.stdout == '' and nginx_client_header_timeout_status.stdout == '') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_timeout_check] }}"
+      changed_when: false
+
+   # 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation
+    - name: "5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(client_header_timeout|client_body_timeout).+[;]'
+        state: absent
+      when: not audit_only and not nginx_timeout_check.remediation_status
+
+    # 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation
+    - name: 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'client_header_timeout {{ client_header_timeout | default(cis_defaults.client_header_timeout) }};'
+        line: "\tclient_header_timeout {{ client_header_timeout | default(cis_defaults.client_header_timeout) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_timeout_check.remediation_status
+    
+    # 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation
+    - name: 5.2.1 Ensure timeout values for reading the client header and body are set correctly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'client_body_timeout {{ client_body_timeout | default(cis_defaults.client_body_timeout) }};'
+        line: "\tclient_body_timeout {{ client_body_timeout | default(cis_defaults.client_body_timeout) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_timeout_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 5.2.2 Ensure the maximum request body size is set correctly
+  #
+  # The client_max_body_size directive sets the size of the request body that is allowed to
+  # read a client request. This defines the number of bytes allowed in a request and is
+  # equivalent to the Content-Length request header field.
+  - name: "5.2.2 Ensure the maximum request body size is set correctly"
+    block:
+    # 5.2.2 Ensure the maximum request body size is set correctly | Audit
+    - name: "5.2.2 Ensure the maximum request body size is set correctly | Audit"
+      shell:
+        cmd: |
+          if grep -iq client_max_body_size /etc/nginx/nginx.conf; then
+              grep -iq client_max_body_size /etc/nginx/nginx.conf | grep '#' && echo 'not_configured' || echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_client_max_body_size_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_client_max_body_size_check:
+          name: 5.2.2 Ensure the maximum request body size is set correctly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_client_max_body_size_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_client_max_body_size_check] }}"
+      changed_when: false
+
+   # 5.2.2 Ensure the maximum request body size is set correctly | Remediation
+    - name: "5.2.2 Ensure the maximum request body size is set correctly | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(client_max_body_size).+[;]'
+        state: absent
+      when: not audit_only and not nginx_client_max_body_size_check.remediation_status
+
+    # 5.2.2 Ensure the maximum request body size is set correctly | Remediation
+    - name: 5.2.2 Ensure the maximum request body size is set correctly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'client_max_body_size {{ client_max_body_size | default(cis_defaults.client_max_body_size) }};'
+        line: "\tclient_max_body_size {{ client_max_body_size | default(cis_defaults.client_max_body_size) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_client_max_body_size_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 5.2.3 Ensure the maximum buffer size for URIs is defined
+  #
+  # The large_client_header_buffers directive defines the number and size of buffers used
+  # within the URI. A request cannot exceed the size of this buffer when this directive is
+  # configured. The large_client_header_buffers directive should be set to restrict buffer
+  # usage. The number of buffers should generally set to two and the length be set to 1K;
+  # however, this may not be a good fit for your application and may need to be set
+  # differently.
+  - name: "5.2.3 Ensure the maximum buffer size for URIs is defined"
+    block:
+    # 5.2.3 Ensure the maximum buffer size for URIs is defined | Audit
+    - name: "5.2.3 Ensure the maximum buffer size for URIs is defined | Audit"
+      shell:
+        cmd: |
+          if grep -iq large_client_header_buffers /etc/nginx/nginx.conf; then
+              grep -iq large_client_header_buffers /etc/nginx/nginx.conf | grep '#' && echo 'not_configured' || echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_large_client_header_buffers_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_large_client_header_buffers_check:
+          name: 5.2.3 Ensure the maximum buffer size for URIs is defined
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_large_client_header_buffers_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_large_client_header_buffers_check] }}"
+      changed_when: false
+
+   # 5.2.3 Ensure the maximum buffer size for URIs is defined | Remediation
+    - name: "5.2.3 Ensure the maximum buffer size for URIs is defined | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(large_client_header_buffers).+[;]'
+        state: absent
+      when: not audit_only and not nginx_large_client_header_buffers_check.remediation_status
+
+    # 5.2.3 Ensure the maximum buffer size for URIs is defined | Remediation
+    - name: 5.2.3 Ensure the maximum buffer size for URIs is defined | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'large_client_header_buffers {{ large_client_header_buffers | default(cis_defaults.large_client_header_buffers) }};'
+        line: "\tlarge_client_header_buffers {{ large_client_header_buffers | default(cis_defaults.large_client_header_buffers) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_large_client_header_buffers_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 5.2.4 Ensure the number of connections per IP address is limited
+  #
+  # The maximum number of simultaneous connections allowed from a single IP address to
+  # your server should be limited. It should be set to a value that meets your organizational
+  # policies.
+  - name: "5.2.4 Ensure the number of connections per IP address is limited"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_ip_connection_limit_check:
+          name: 5.2.4 Ensure the number of connections per IP address is limited
+          scored: false
+          automated: false
+          remediation: Consider to limit the number of connections per IP.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ip_connection_limit_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+  # 5.2.5 Ensure rate limits by IP address are set
+  #
+  # Rate limiting should be enabled to limit the number of requests an IP address may
+  # make to a server in a given period of time. The configuration values should be set
+  # based on your application's needs and your organizational policy.
+  - name: "5.2.5 Ensure rate limits by IP address are set"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_request_rate_limit_check:
+          name: 5.2.5 Ensure rate limits by IP address are set
+          scored: false
+          automated: false
+          remediation: Consider to limit the number of requests per IP.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_request_rate_limit_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"

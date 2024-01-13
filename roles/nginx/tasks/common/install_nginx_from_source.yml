@@ -1,0 +1,145 @@
+# Get nginx last release link
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: |
+      nginx_last_release_date=$(curl -s https://nginx.org/download/ | sed -e 's@<a\shref=\"@@g' | sed -e 's@\">.*<\/a>@@g' | grep -E "^nginx.*\.tar.gz\s" | awk '{print $2}' | sort -t'-' -k3,3 -k2,2M -k1,1n | tail -n -1)
+      nginx_latest_version=$(curl -s https://nginx.org/download/ | grep $nginx_last_release_date | sed -e 's@<a\shref=\"@@g' | sed -e 's@\">.*<\/a>@@g' | grep -E "^nginx.*\.tar.gz\s" | awk '{print $1}')
+      echo "$nginx_latest_version"
+  register: nginx_latest_version
+
+# Create build directory
+- name: "{{ rule }} | Remediation"
+  file:
+    path: "/tmp/cis_nginx_build_dir"
+    state: directory
+
+# Create build directory
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: rm -rf /tmp/cis_nginx_build_dir/*
+
+# Delete modules directory to make sure that new modules does not conflict old ones
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: |
+      [[ -e /usr/lib64/nginx/ ]] && rm -rf /usr/lib64/nginx/
+      [[ -e /usr/lib/nginx/ ]] && rm -rf /usr/lib64/nginx/
+      [[ -e /usr/share/nginx ]] && rm -rf /usr/share/nginx
+      [[ -e /etc/nginx/modules-enabled/ ]] && rm -rf /etc/nginx/modules-enabled/
+      [[ -e /etc/nginx/modules-available/ ]] && rm -rf /etc/nginx/modules-available/
+      exit 0
+
+# Delete modules directory to make sure that new modules does not conflict old ones
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: |
+      [[ -e /etc/nginx/ ]] && find /etc/nginx/ -type f -name "*.default" -exec rm -rf {} \;
+      exit 0
+
+# Download nginx
+- name: "{{ rule }} | Remediation"
+  get_url:
+    dest: "/tmp/cis_nginx_build_dir/"
+    url: "https://nginx.org/download/{{ nginx_latest_version.stdout }}"
+
+# Download headers-more-nginx-module
+- name: "{{ rule }} | Remediation"
+  get_url:
+    dest: "/tmp/cis_nginx_build_dir/"
+    url: "https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v0.37.tar.gz"
+
+# Extract nginx
+- name: "{{ rule }} | Remediation"
+  unarchive:
+    src: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout }}"
+    dest: "/tmp/cis_nginx_build_dir/"
+    remote_src: true
+
+# Extract nginx
+- name: "{{ rule }} | Remediation"
+  unarchive:
+    src: "/tmp/cis_nginx_build_dir/headers-more-nginx-module-0.37.tar.gz"
+    dest: "/tmp/cis_nginx_build_dir/"
+    remote_src: true
+
+# Create nginx user
+- include_tasks:
+    file: "tasks/common/create_nginx_user.yml"
+  vars:
+    rule: rule
+
+# Define source directly
+- set_fact:
+    nginx_source_dir: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout | replace('.tar.gz','') }}"
+
+# Configure nginx build
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: "./configure {{ build_options }}"
+    chdir: "{{ nginx_source_dir }}"
+
+# Make build nginx
+- name: "{{ rule }} | Remediation"
+  command:
+    argv:
+      - "make"
+      - "-j{{ ansible_facts['processor_nproc'] }}"
+    chdir: "{{ nginx_source_dir }}"
+
+# Install nginx
+- name: "{{ rule }} | Remediation"
+  command:
+    cmd: "make install"
+    chdir: "{{ nginx_source_dir }}"
+
+# Create cache and configuration directories
+- name: "{{ rule }} | Remediation"
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: true
+    owner: "{{ nginx_user }}"
+    group: root
+  loop: "{{ required_directories }}"
+
+# Copy proxy parameters
+- name: "{{ rule }} | Remediation"
+  template:
+    src: "files/etc/nginx/proxy_params"
+    dest: "/etc/nginx/proxy_params"
+    mode: "0644"
+    owner: root
+    group: root
+
+# Copy nginx default confuguration
+- name: "{{ rule }} | Remediation"
+  template:
+    src: "templates/etc/nginx/nginx.conf.j2"
+    dest: "/etc/nginx/nginx.conf"
+    mode: "0660"
+    owner: root
+    group: root
+    force: true
+
+# Copy nginx default confuguration
+- name: "{{ rule }} | Remediation"
+  template:
+    src: "templates/etc/nginx/nginx.conf.j2"
+    dest: "/etc/nginx/nginx.conf.default"
+    mode: "0660"
+    owner: root
+    group: root
+
+# Copy nginx service Unit
+- name: "{{ rule }} | Remediation"
+  template:
+    src: "templates/{{ target_platform }}/lib/systemd/system/nginx.service.j2"
+    dest: "/lib/systemd/system/nginx.service"
+    mode: "0644"
+    owner: root
+    group: root
+
+# Reload deamon
+- name: "{{ rule }} | Remediation"
+  systemd:
+    daemon_reload: true

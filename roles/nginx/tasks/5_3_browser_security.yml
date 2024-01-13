@@ -1,0 +1,210 @@
+# 5.3 Browser Security
+- name: 5.3 Browser Security
+  block:
+  # 5.3.1 Ensure X-Frame-Options header is configured and enabled
+  #
+  # The X-Frame-Options header should be set to allow specific websites or no sites at all
+  # to embed your website as an object within their own, depending on your organizational
+  # policy and application needs.
+  - name: "5.3.1 Ensure X-Frame-Options header is configured and enabled"
+    block:
+    # 5.3.1 Ensure X-Frame-Options header is configured and enabled | Audit
+    - name: "5.3.1 Ensure X-Frame-Options header is configured and enabled | Audit"
+      shell:
+        cmd: |
+          if grep -iq 'X-Frame-Options' /etc/nginx/nginx.conf; then
+              grep -iq 'X-Frame-Options' /etc/nginx/nginx.conf | grep '#' && echo 'not_configured' || echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_x_frame_options_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_x_frame_options_check:
+          name: 5.3.1 Ensure X-Frame-Options header is configured and enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_x_frame_options_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_x_frame_options_check] }}"
+      changed_when: false
+
+    - name: "5.3.1 Ensure X-Frame-Options header is configured and enabled | Remediation"
+      # 5.3.1 Ensure X-Frame-Options header is configured and enabled | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(X-Frame-Options).+[;]'
+        state: absent
+      when: not audit_only and not nginx_x_frame_options_check.remediation_status
+
+    # 5.3.1 Ensure X-Frame-Options header is configured and enabled | Remediation
+    - name: 5.3.1 Ensure X-Frame-Options header is configured and enabled | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'add_header X-Frame-Options "SAMEORIGIN" always;'
+        line: "\tadd_header X-Frame-Options \"SAMEORIGIN\" always;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_x_frame_options_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    when: "'web_server_level_1' in levels or 'web_server_level_2' in levels"
+
+
+
+  # 5.3.2 Ensure X-Content-Type-Options header is configured and enabled
+  #
+  # The X-Content-Type-Options header should be used to force supported user agents to
+  # check an HTTP response's content type header with what is expected from the
+  # destination of the request.
+  - name: "5.3.2 Ensure X-Content-Type-Options header is configured and enabled"
+    block:
+    # 5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Audit
+    - name: "5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Audit"
+      shell:
+        cmd: "if grep -iq 'X-Content-Type-Options' /etc/nginx/nginx.conf ; then\n    if grep -iq 'X-Frame-Options' /etc/nginx/nginx.conf | grep '#'; then\n        echo 'not_configured'\n    else \n        grep -i 'X-Content-Type-Options' /etc/nginx/nginx.conf | grep -q 'nosniff' && echo 'configured' || echo 'not_configured'\n    fi\nelse\n    echo 'not_configured'\nfi\n"
+      changed_when: false
+      register: nginx_x_content_type_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_x_content_type_check:
+          name: 5.3.2 Ensure X-Content-Type-Options header is configured and enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_x_content_type_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_x_content_type_check] }}"
+      changed_when: false
+
+    - name: "5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Remediation"
+      # 5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(X-Content-Type-Options).+[;]'
+        state: absent
+      when: not audit_only and not nginx_x_content_type_check.remediation_status
+
+    # 5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Remediation
+    - name: 5.3.2 Ensure X-Content-Type-Options header is configured and enabled | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'add_header X-Content-Type-Options "nosniff" always;'
+        line: "\tadd_header X-Content-Type-Options \"nosniff\" always;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_x_content_type_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    when: "'web_server_level_1' in levels or 'web_server_level_2' in levels"
+
+
+
+  # 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly
+  #
+  # Content Security Policy allows administrators to specify the locations from which
+  # allowable scripts may be executed, or if scripts may be executed at all. Content Security
+  # Policy should be used to improve user trust of your website.
+  - name: "5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly"
+    block:
+    # 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Audit
+    - name: "5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Audit"
+      shell:
+        cmd: "if grep -iq 'Content-Security-Policy' /etc/nginx/nginx.conf ; then\n    if grep -iq 'Content-Security-Policy' /etc/nginx/nginx.conf | grep '#'; then\n        echo 'not_configured'\n    else \n        grep -i 'Content-Security-Policy' /etc/nginx/nginx.conf | grep -q \"default-src 'self'\" && echo 'configured' || echo 'not_configured'\n    fi\nelse\n    echo 'not_configured'\nfi\n"
+      changed_when: false
+      register: nginx_content_security_policy_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_content_security_policy_check:
+          name: 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_content_security_policy_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_content_security_policy_check] }}"
+      changed_when: false
+
+    - name: "5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Remediation"
+      # 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(Content-Security-Policy).+[;]'
+        state: absent
+      when: not audit_only and not nginx_content_security_policy_check.remediation_status
+
+    # 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Remediation
+    - name: 5.3.3 Ensure that Content Security Policy (CSP) is enabled and configured properly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: "add_header Content-Security-Policy \"default-src 'self'\" always;"
+        line: "\tadd_header Content-Security-Policy \"default-src 'self'\" always;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_content_security_policy_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    when: "'web_server_level_2' in levels"
+
+
+
+  # 5.3.4 Ensure the Referrer Policy is enabled and configured properly
+  #
+  # When an origin site directs a user to another site, a referrer is sent that identifies the
+  # URL the user came from. Depending on your site's specific use, this may present a
+  # privacy concern to your users. The Referrer Policy enables organizations to define what
+  # sites should see that a referral came from your site, which helps protect user privacy.
+  - name: "5.3.4 Ensure the Referrer Policy is enabled and configured properly"
+    block:
+    # 5.3.4 Ensure the Referrer Policy is enabled and configured properly | Audit
+    - name: "5.3.4 Ensure the Referrer Policy is enabled and configured properly | Audit"
+      shell:
+        cmd: "if grep -iq 'Referrer-Policy' /etc/nginx/nginx.conf ; then\n    if grep -iq 'Referrer-Policy' /etc/nginx/nginx.conf | grep '#'; then\n        echo 'not_configured'\n    else \n        grep -i 'Referrer-Policy' /etc/nginx/nginx.conf | grep -q \"no-referrer\" && echo 'configured' || echo 'not_configured'\n    fi\nelse\n    echo 'not_configured'\nfi\n"
+      changed_when: false
+      register: nginx_referrer_policy_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_referrer_policy_check:
+          name: 5.3.4 Ensure the Referrer Policy is enabled and configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_referrer_policy_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_referrer_policy_check] }}"
+      changed_when: false
+
+    - name: "5.3.4 Ensure the Referrer Policy is enabled and configured properly | Remediation"
+      # 5.3.4 Ensure the Referrer Policy is enabled and configured properly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(Referrer-Policy).+[;]'
+        state: absent
+      when: not audit_only and not nginx_referrer_policy_check.remediation_status
+
+    # 5.3.4 Ensure the Referrer Policy is enabled and configured properly | Remediation
+    - name: 5.3.4 Ensure the Referrer Policy is enabled and configured properly | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'add_header Referrer-Policy "no-referrer";'
+        line: "\tadd_header Referrer-Policy \"no-referrer\";"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_referrer_policy_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    when: "'web_server_level_2' in levels"

@@ -1,0 +1,15 @@
+# Install nginx source build dependencies
+- name: "{{ rule }} | Remediation"
+  yum:
+    update_cache: true
+    name: "{{ item }}"
+  loop:
+  - "gcc"
+  - "make"
+  - "gcc-c++"
+  - "zlib-devel"
+  - "pcre-devel"
+  - "openssl-devel"
+  - "gd"
+  - "libxml2"
+  - "uuid"

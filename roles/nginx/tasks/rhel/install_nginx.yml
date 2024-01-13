@@ -1,0 +1,43 @@
+# Remove nginx
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: nginx
+    state: absent
+  when: uninstall_nginx | default(false)
+
+# Install dnf-utils
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: "dnf-utils"
+    state: latest
+
+# Remove repo if exists
+- name: "{{ rule }} | Remediation"
+  file:
+    path: /etc/yum.repos.d/nginx.repo
+    state: absent
+
+# Enable stable repo
+- name: "{{ rule }} | Remediation"
+  copy:
+    dest: /etc/yum.repos.d/nginx.repo
+    content: |
+      [nginx-stable]
+      name=nginx stable repo
+      baseurl=http://nginx.org/packages/centos/$releasever/$basearch/
+      gpgcheck=1
+      enabled=1
+      gpgkey=https://nginx.org/keys/nginx_signing.key
+      module_hotfixes=true
+    owner: root
+    group: root
+    mode: "0644"
+
+# Install nginx
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: "nginx"
+    update_cache: true
+    bugfix: true
+    security: true
+    state: latest

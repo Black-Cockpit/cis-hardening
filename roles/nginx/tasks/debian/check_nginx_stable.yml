@@ -1,0 +1,8 @@
+# Check if package manager repositories are configured correctly
+- name: "{{ rule}} | Audit"
+  shell:
+    cmd: |
+      audit=$(apt policy nginx)
+      echo "$audit" | grep -q stable && echo stable || echo unstable
+  changed_when: false
+  register: nginx_stable_repo_status

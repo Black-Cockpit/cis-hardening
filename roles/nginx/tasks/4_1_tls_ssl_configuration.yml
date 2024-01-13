@@ -1,0 +1,794 @@
+# 4.1 TLS / SSL Configuration
+- name: 4.1 TLS / SSL Configuration
+  block:
+  # 4.1.1 Ensure HTTP is redirected to HTTPS
+  #
+  # Browsers and clients establish encrypted connections with servers by leveraging
+  # HTTPS. Requests leveraging HTTP are unencrypted. Unencrypted requests should be
+  # redirected so they are encrypted. Any listening HTTP port on your web server should
+  # redirect to a server profile that uses encryption. The default HTTP (unencrypted) port is
+  # 80.
+  - name: "4.1.1 Ensure HTTP is redirected to HTTPS"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_https_redirection_check:
+          name: 4.1.1 Ensure HTTP is redirected to HTTPS
+          scored: false
+          automated: false
+          remediation: |
+            Consider to review and edit your web server or proxy configuration file to redirect all unencrypted listening
+            ports, such as port 80, using a redirection through the return directive.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_https_redirection_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+  
+
+  # 4.1.2 Ensure a trusted certificate and trust chain is installed
+  #
+  # Certificates and their trust chains are needed to establish the identity of a web server as
+  # legitimate and trusted. Certificate authorities validate a web server's identity and that
+  # you are the owner of that web server domain name.
+  - name: "4.1.2 Ensure a trusted certificate and trust chain is installed"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_trusted_certificate_check:
+          name: 4.1.2 Ensure a trusted certificate and trust chain is installed
+          scored: false
+          automated: false
+          remediation: Consider to install a trusted certificate and trust chain and configure it with the exiting domains.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_trusted_certificate_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 4.1.3 Ensure private key permissions are restricted
+  #
+  # The server's private key should be protected from unauthorized access by limiting
+  # access based on the principle of least privilege.
+  - name: "4.1.3 Ensure private key permissions are restricted"
+    block:
+    # 4.1.3 Ensure private key permissions are restricted | Audit
+    - name: "4.1.3 Ensure private key permissions are restricted | Audit"
+      shell:
+        cmd: find /etc/nginx -name "*.key" -type f ! -perm 0400
+      changed_when: false
+      register: nginx_private_keys_permissions_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_private_keys_permissions_check:
+          name: 4.1.3 Ensure private key permissions are restricted
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_private_keys_permissions_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_private_keys_permissions_check] }}"
+      changed_when: false
+    
+    # 4.1.3 Ensure private key permissions are restricted | Remediation
+    - name: "4.1.3 Ensure private key permissions are restricted | Remediation"
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: "0400"
+      loop: "{{ nginx_private_keys_permissions_status.stdout_lines | default([]) }}"
+      when: not audit_only and not nginx_private_keys_permissions_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 4.1.4 Ensure only modern TLS protocols are used
+  #
+  # Only modern TLS protocols should be enabled in NGINX for all client connections and
+  # upstream connections. Removing legacy TLS and SSL protocols (SSL 3.0, TLS 1.0 and
+  # 1.1), and enabling emerging and stable TLS protocols (TLS 1.2, and TLS 1.3), ensures
+  # users are able to take advantage of strong security capabilities and protects them from
+  # insecure legacy protocols.
+  - name: "4.1.4 Ensure only modern TLS protocols are used"
+    block:
+    # 4.1.4 Ensure only modern TLS protocols are used | Audit
+    - name: "4.1.4 Ensure only modern TLS protocols are used | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -irs ssl_protocols /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -Eq '(TLSv1|TLSv1.0|TLSv1.1)\s' "$file_path")
+              [[ "$value" != "" ]] || echo "$file_path"
+          done
+          for file_path in $(grep -irs proxy_ssl_protocols /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -Eq '(TLSv1|TLSv1.0|TLSv1.1)\s' "$file_path")
+              [[ "$value" != "" ]] || echo "$file_path"
+          done          
+      changed_when: false
+      register: nginx_modern_tls_status
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Audit
+    - name: "4.1.4 Ensure only modern TLS protocols are used | Audit"
+      shell:
+        cmd: grep -irs ssl_protocols /etc/nginx/nginx.conf | awk -F ':' '{print $1}' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_global_conf_modern_tls_status
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Audit
+    - name: "4.1.4 Ensure only modern TLS protocols are used | Audit"
+      shell:
+        cmd: grep -irs ssl_protocols /etc/nginx/nginx.conf | awk -F ':' '{print $1}' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_global_conf_modern_proxy_tls_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_modrn_tls_check:
+          name: 4.1.4 Ensure only modern TLS protocols are used
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (nginx_modern_tls_status.stdout == '' and nginx_global_conf_modern_tls_status.stdout == 'configured' and nginx_global_conf_modern_proxy_tls_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_modrn_tls_check] }}"
+      changed_when: false
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: 4.1.4 Ensure only modern TLS protocols are used | Remediation
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: '(ssl_protocols TLSv1.2 TLSv1.3;)'
+        line: "\tssl_protocols TLSv1.2 TLSv1.3;"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_modrn_tls_check.remediation_status and not (nginx_global_conf_modern_tls_status.stdout == 'configured')
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: 4.1.4 Ensure only modern TLS protocols are used | Remediation
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: '(proxy_ssl_protocols TLSv1.2 TLSv1.3;)'
+        line: "\tproxy_ssl_protocols TLSv1.2 TLSv1.3;"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_modrn_tls_check.remediation_status and not (nginx_global_conf_modern_proxy_tls_status.stdout == 'configured')
+    
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: "4.1.4 Ensure only modern TLS protocols are used | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{1,}[\s]{0,}(ssl_protocols|proxy_ssl_protocols)*.+[;]'
+        state: absent
+      loop: "{{ nginx_modern_tls_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_modrn_tls_check.remediation_status
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: 4.1.4 Ensure only modern TLS protocols are used | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'ssl_protocols*.+[;]'
+        replace: "ssl_protocols TLSv1.2 TLSv1.3;"
+      loop: "{{ nginx_modrn_tls_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_modrn_tls_check.remediation_status
+    
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: 4.1.4 Ensure only modern TLS protocols are used | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'proxy_ssl_protocols*.+[;]'
+        replace: "proxy_ssl_protocols TLSv1.2 TLSv1.3;"
+      loop: "{{ nginx_modrn_tls_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_modrn_tls_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 4.1.5 Disable weak ciphers
+  #
+  # The ssl_ciphers directive should be used to configure the available ciphers on your web
+  # server, and the proxy_ssl_ciphers directive should be used to configure the available
+  # ciphers for your proxy. Weak ciphers should be disabled based on your company's
+  # policy or an industry best practice compliance profile.
+  # 
+  # The ssl_prefer_server_ciphers should be used to ensure the user agent respects the
+  # server's preferred cipher order and does not set its own. If you are using a proxy or load
+  # balancer, you should use the proxy_ssl_ciphers directive to ensure your upstream
+  # connections are negotiated using secure ciphers.
+  - name: "4.1.5 Disable weak ciphers"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_ssl_ciphers_check:
+          name: 4.1.5 Disable weak ciphers
+          scored: false
+          automated: false
+          remediation: Consider to review the enabled ssl_ciphers and the proxy_ssl_ciphers
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ssl_ciphers_check] }}"
+      changed_when: false
+
+    # 4.1.5 Disable weak ciphers | Audit
+    - name: "4.1.5 Disable weak ciphers | Audit"
+      shell:
+        cmd: |
+          grep -irs ssl_ciphers /etc/nginx | awk -F ':' '{print $1}' | uniq    
+          grep -irs proxy_ssl_ciphers /etc/nginx | awk -F ':' '{print $1}' | uniq
+          echo /etc/nginx/nginx.conf    
+      register: nginx_ssl_ciphers_conf_files
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.4 Ensure only modern TLS protocols are used | Remediation
+    - name: "4.1.4 Ensure only modern TLS protocols are used | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}(ssl_ciphers|proxy_ssl_ciphers).+[;]'
+        state: absent
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.5 Disable weak ciphers | Remediation
+    - name: 4.1.5 Disable weak ciphers | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '(ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }})'
+        line: "\tssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }};"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.5 Disable weak ciphers | Remediation
+    - name: 4.1.5 Disable weak ciphers | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '(proxy_ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }})'
+        line: "\tproxy_ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }};"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 4.1.6 Ensure custom Diffie-Hellman parameters are used
+  #
+  # Custom Diffie-Hellman (DH) key exchange parameters should be used. DH Ephemeral
+  # (DHE) parameters with at least 2048 bits should be generated.
+  - name: "4.1.6 Ensure custom Diffie-Hellman parameters are used"
+    block:
+    # 4.1.6 Ensure custom Diffie-Hellman parameters are used | Audit
+    - name: "4.1.6 Ensure custom Diffie-Hellman parameters are used | Audit"
+      shell:
+        cmd: grep -Eq '^([^#.]){0,}ssl_dhparam*.+[;]' /etc/nginx/nginx.conf && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_ssl_dhparam_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_ssl_dhparam_check:
+          name: 4.1.6 Ensure custom Diffie-Hellman parameters are used
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_ssl_dhparam_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ssl_dhparam_check] }}"
+      changed_when: false
+
+    # 4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation
+    - name: "4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation"
+      shell:
+        cmd: |
+          [[ -e /etc/nginx/ssl ]] || mkdir /etc/nginx/ssl
+          [[ -e /etc/nginx/ssl/cis_dhparam.key ]] && rm -rf /etc/nginx/ssl/cis_dhparam.key
+          openssl dhparam -out /etc/nginx/ssl/cis_dhparam.key 2048
+          chmod 400 /etc/nginx/ssl/cis_dhparam.key
+      when: not audit_only and not nginx_ssl_dhparam_check.remediation_status
+
+    # 4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation
+    - name: "4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(ssl_dhparam).+[;]'
+        state: absent
+      when: not audit_only and not nginx_ssl_dhparam_check.remediation_status
+
+    # 4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation
+    - name: 4.1.6 Ensure custom Diffie-Hellman parameters are used | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '(ssl_dhparam /etc/nginx/ssl/cis_dhparam.key)'
+        line: "\tssl_dhparam /etc/nginx/ssl/cis_dhparam.key;"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_ssl_dhparam_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled
+  #
+  # OCSP allows a user's browser or another user agent to verify the certificate it is seeing
+  # is not revoked. OCSP stapling ensures your server presents this information to the
+  # user's browser in a way that best meets the performance and security needs of your
+  # website. It polls the Certificate Authority's (CA) OCSP server at regular intervals to
+  # ensure it is continuously kept up to date. OCSP stapling helps improve performance
+  # and security, so it should be enabled.
+  - name: "4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled"
+    block:
+    # 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Audit
+    - name: "4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir server /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              server_block=$(grep -Eq '^([^#.]){0,}server\s{01,}\{' "$file_path" && echo 'exists' || echo 'not_exists')
+              if [[ "$server_block" == 'exists' ]]; then
+                  on_values=$(grep -E '^([^#.]){0,}ssl_stapling*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g' | grep on | wc -l)
+                  off_values=$(grep -E '^([^#.]){0,}ssl_stapling*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g' | grep off | wc -l)
+                  [[ "$on_values" -gt 0 && "$off_values" -eq 0 ]] || echo "$file_path"
+              fi
+          done
+          for file_path in $(grep -ir server /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              server_block=$(grep -Eq '^([^#.]){0,}server\s{01,}\{' "$file_path" && echo 'exists' || echo 'not_exists')
+              if [[ "$server_block" == 'exists' ]]; then
+                  on_values=$(grep -E '^([^#.]){0,}ssl_stapling_verify*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g' | grep on | wc -l)
+                  off_values=$(grep -E '^([^#.]){0,}ssl_stapling_verify*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g' | grep off | wc -l)
+                  [[ "$on_values" -gt 0 && "$off_values" -eq 0 ]] || echo "$file_path"
+              fi
+          done
+      changed_when: false
+      register: nginx_ssl_stapling_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_ssl_stapling_check:
+          name: 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_ssl_stapling_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ssl_stapling_check] }}"
+      changed_when: false
+    
+    # 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation
+    - name: "4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}(ssl_stapling|ssl_stapling_verify).+[;]'
+        state: absent
+      loop: "{{ nginx_ssl_stapling_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_ssl_stapling_check.remediation_status
+
+    # 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation
+    - name: 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: 'ssl_stapling*.+(on).+[;]'
+        line: "\tssl_stapling on;"
+        insertafter: '^([^#.]){0,}server\s{01,}\{'
+      loop: "{{ nginx_ssl_stapling_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_ssl_stapling_check.remediation_status
+    
+    # 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation
+    - name: 4.1.7 Ensure Online Certificate Status Protocol (OCSP) stapling is enabled | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: 'ssl_stapling_verify*.+(on).+[;]'
+        line: "\tssl_stapling_verify on;"
+        insertafter: '^([^#.]){0,}server\s{01,}\{'
+      loop: "{{ nginx_ssl_stapling_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_ssl_stapling_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled
+  #
+  # HTTP Strict Transport Security (HSTS) headers instruct a user agent on how to
+  # communicate with a web server. HSTS headers ensure the strict transport security
+  # policies built into browsers and other user agents are informed only to communicate
+  # over HTTPS. HSTS with long validity periods should be used to most effectively secure
+  # your user population.
+  # 
+  # Strict-Transport-Security should have a long max-age, which is recommended to be at
+  # least six months in length. This ensures the browser remembers your website should
+  # only be accessible via HTTPS for this amount of time.
+  - name: "4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled"
+    block:
+    # 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Audit
+    - name: "4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Audit"
+      shell:
+        cmd: |
+          value=$(grep -iEs '(Strict-Transport-Security)' /etc/nginx/nginx.conf | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d' | tail -n -1 || echo '0')
+          is_commented=$(grep -iEqs '(Strict-Transport-Security)' /etc/nginx/nginx.conf | grep "#" && echo 'yes' || echo 'no')
+          [[ "$value" -lt 15768000 && "$is_commented" == 'no' ]] && echo "/etc/nginx/nginx.conf" || echo ''
+      changed_when: false
+      register: nginx_hsts_status
+
+
+    # Extract audit result
+    - set_fact:
+        nginx_hsts_check:
+          name: 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_hsts_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_hsts_check] }}"
+      changed_when: false
+    
+    # 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Remediation
+    - name: "4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Remediation"
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: '[#]{0,}[\s]{0,}(Strict-Transport-Security).+[;]'
+        state: absent
+      when: not audit_only and not nginx_hsts_check.remediation_status
+
+    # 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Remediation
+    - name: 4.1.8 Ensure HTTP Strict Transport Security (HSTS) is enabled | Remediation
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: "^add_header Strict-Transport-Security"
+        line: "\tadd_header Strict-Transport-Security \"max-age={{ strict_transport_security_max_age | default(cis_defaults.strict_transport_security_max_age) }};\" always;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_hsts_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 4.1.9 Ensure upstream server traffic is authenticated with a client certificate
+  #
+  # Client certificate validation allows the upstream server to authenticate the identity of the
+  # client connecting to it. This assists in the establishment of mutual authentication
+  # between the client and the server.
+  - name: "4.1.9 Ensure upstream server traffic is authenticated with a client certificate"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_proxy_ssl_certificate_check:
+          name: 4.1.9 Ensure upstream server traffic is authenticated with a client certificate
+          scored: false
+          automated: false
+          remediation: |
+            Consider to configure the proxy_ssl_certificate and proxy_ssl_certificate_key directives.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_proxy_ssl_certificate_check] }}"
+      changed_when: false
+    tags:
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 4.1.10 Ensure the upstream traffic server certificate is trusted
+  #
+  # The NGINX server should be configured to validate the identity of the upstream server it
+  # is sending information to.
+  - name: "4.1.10 Ensure the upstream traffic server certificate is trusted"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_proxy_ssl_certificate_check:
+          name: 4.1.10 Ensure the upstream traffic server certificate is trusted
+          scored: false
+          automated: false
+          remediation: |
+            Consider to configure the proxy_ssl_trusted_certificate and proxy_ssl_verify directives.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_proxy_ssl_certificate_check] }}"
+      changed_when: false
+    tags:
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+
+  # 4.1.11 Ensure your domain is preloaded
+  #
+  # Preloading your domain hardcodes it as only being accessible through HTTPS by
+  # browsers.
+  #
+  # Note: Preloading should only be done with careful consideration! Your website
+  # and all its subdomains will be forced over HTTPS. If your website or any of its
+  # subdomains are not able to support preloading, you should not preload your site.
+  # Preloading should be opt-in only, and if done, may impact more sites than the nginx
+  # instance you are working on. Removing preloading can be slow and painful, and should
+  # only be done with careful consideration according to https://hstspreload.org.
+  - name: "4.1.11 Ensure your domain is preloaded"
+    block:
+    # 4.1.11 Ensure your domain is preloaded | Audit
+    - name: "4.1.11 Ensure your domain is preloaded | Audit"
+      shell:
+        cmd: |
+          value=$(grep -iEs '(Strict-Transport-Security)' /etc/nginx/nginx.conf | grep -q 'preload' && echo 'configured' || echo 'not_configured')
+          is_commented=$(grep -iEqs '(Strict-Transport-Security)' /etc/nginx/nginx.conf | grep "#" && echo 'yes' || echo 'no')
+          [[ "$value" == 'not_configured' || "$is_commented" == 'yes' ]] && echo "/etc/nginx/nginx.conf" || echo ''
+      changed_when: false
+      register: nginx_preload_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_preload_check:
+          name: 4.1.11 Ensure your domain is preloaded
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_preload_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_preload_check] }}"
+      changed_when: false
+    
+    # 4.1.11 Ensure your domain is preloaded | Remediation
+    - name: "4.1.11 Ensure your domain is preloaded | Remediation"
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: '[#]{0,}[\s]{0,}(Strict-Transport-Security).+[;]'
+        state: absent
+      when: not audit_only and not nginx_preload_check.remediation_status
+
+    # 4.1.11 Ensure your domain is preloaded | Remediation
+    - name: 4.1.11 Ensure your domain is preloaded | Remediation
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: "^add_header Strict-Transport-Security"
+        line: "\tadd_header Strict-Transport-Security \"max-age={{ strict_transport_security_max_age | default(cis_defaults.strict_transport_security_max_age) }}; includeSubDomains; preload;\";"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_preload_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+  # 4.1.12 Ensure session resumption is disabled to enable perfect forward security
+  #
+  # Perfect forward secrecy is an encryption mechanism that enables past session keys to
+  # not be compromised even if the server's private key is compromised. If an attacker
+  # recorded all traffic to a server and stored it and then obtained the private key without
+  # perfect forward secrecy, all communications would be compromised. With perfect
+  # forward secrecy, session keys are generated using Diffie-Hellman for every session a
+  # user initiates, which isolates session compromise to only that communication session.
+  # Allowing session resumption breaks perfect forward secrecy; this expands the surface
+  # area for an attacker to compromise past sessions and communications with a server if
+  # they are able to compromise the session.
+  - name: "4.1.12 Ensure session resumption is disabled to enable perfect forward security"
+    block:
+    # 4.1.12 Ensure session resumption is disabled to enable perfect forward security | Audit
+    - name: "4.1.12 Ensure session resumption is disabled to enable perfect forward security | Audit"
+      shell:
+        cmd: |
+          if grep -iq ssl_session_tickets /etc/nginx/nginx.conf; then
+              value=$(grep -E '^([^#.]){0,}ssl_session_tickets*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+              [[ "$value" == "off" ]] && echo 'configured' || echo 'not_configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_ssl_session_tickets_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_ssl_session_tickets_check:
+          name: 4.1.12 Ensure session resumption is disabled to enable perfect forward security 
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_ssl_session_tickets_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ssl_session_tickets_check] }}"
+      changed_when: false
+
+    # 4.1.12 Ensure session resumption is disabled to enable perfect forward security | Remediation
+    - name: "4.1.12 Ensure session resumption is disabled to enable perfect forward security | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{1,}[\s]{0,}ssl_session_tickets.+[;]'
+        state: absent
+      when: not audit_only and not nginx_ssl_session_tickets_check.remediation_status
+
+    # 4.1.12 Ensure session resumption is disabled to enable perfect forward security | Remediation
+    - name: 4.1.12 Ensure session resumption is disabled to enable perfect forward security | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: 'ssl_session_tickets off;'
+        line: "\tssl_session_tickets off;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      when: not audit_only and not nginx_ssl_session_tickets_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+  # 4.1.13 Ensure HTTP/2.0 is used
+  #
+  # HTTP/2.0 is an optimized and more secure version of the HTTP protocol. It should be
+  # enabled so users can take advantage of it.
+  # Note: Legacy user agents may not be able to connect to a server using HTTP/2.0.
+  - name: "4.1.13 Ensure HTTP/2.0 is used"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_http2_check:
+          name: 4.1.13 Ensure HTTP/2.0 is used
+          scored: false
+          automated: true
+          remediation: |
+            Consider to use HTTP/2.0 under the server directives for all the configured domains.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_http2_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    when: "'web_server_level_2' in levels"
+
+
+
+
+  # 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged
+  #
+  # Perfect forward secrecy protects users of your website by ensuring that even if your
+  # private key is compromised that your user's sessions are not able to be compromised.
+  # This improves upon other ciphers where if your private key was compromised all user
+  # sessions can also be compromised retroactively.
+  - name: "4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_ssl_ciphers_check:
+          name: 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged
+          scored: false
+          automated: false
+          remediation: Consider to review the enabled ssl_ciphers and the proxy_ssl_ciphers
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ssl_ciphers_check] }}"
+      changed_when: false
+
+    # 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Audit
+    - name: "4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Audit"
+      shell:
+        cmd: |
+          grep -irs ssl_ciphers /etc/nginx | awk -F ':' '{print $1}' | uniq    
+          grep -irs proxy_ssl_ciphers /etc/nginx | awk -F ':' '{print $1}' | uniq
+          echo /etc/nginx/nginx.conf    
+      register: nginx_ssl_ciphers_conf_files
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation
+    - name: "4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}(ssl_ciphers|proxy_ssl_ciphers).+[;]'
+        state: absent
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation
+    - name: 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '(ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }})'
+        line: "\tssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }};"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+
+    # 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation
+    - name: 4.1.14 Ensure only Perfect Forward Secrecy Ciphers are Leveraged | Remediation
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '(proxy_ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }})'
+        line: "\tproxy_ssl_ciphers {{ ssl_ciphers.value | default(cis_defaults.ssl_ciphers.value) }};"
+        state: present
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      loop: "{{ nginx_ssl_ciphers_conf_files.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and (ssl_ciphers.enforce_remediation | default(cis_defaults.ssl_ciphers.enforce_remediation))
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+

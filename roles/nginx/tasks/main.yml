@@ -1,0 +1,51 @@
+- include_tasks:
+    file: "tasks/pre_audit.yml"
+
+- include_tasks:
+    file: "tasks/1_1_installation.yml"
+
+- include_tasks:
+    file: "tasks/1_2_configure_software_updates.yml"
+
+- include_tasks:
+    file: "tasks/2_1_minimize_nginx_modules.yml"
+
+- include_tasks:
+    file: "tasks/2_2_account_security.yml"
+
+- include_tasks:
+    file: "tasks/2_3_permissions_and_ownership.yml"
+
+- include_tasks:
+    file: "tasks/2_4_network_configuration.yml"
+
+- include_tasks:
+    file: "tasks/2_5_information_disclosure.yml"
+
+- include_tasks:
+    file: "tasks/3_logging.yml"
+
+- include_tasks:
+    file: "tasks/4_1_tls_ssl_configuration.yml"
+
+- include_tasks:
+    file: "tasks/5_1_access_control.yml"
+
+- include_tasks:
+    file: "tasks/5_1_access_control.yml"
+
+- include_tasks:
+    file: "tasks/5_2_request_limits.yml"
+
+- include_tasks:
+    file: "tasks/5_3_browser_security.yml"
+
+- include_tasks:
+    file: "tasks/best_practices.yml"
+  when: not audit_only and (security_best_practices.enable | default(false))
+
+- include_tasks:
+    file: "tasks/post_audit.yml"
+
+- debug:
+    var: audit_result

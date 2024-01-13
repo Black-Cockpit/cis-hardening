@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+  - name: hasnimehdi91.cis_hardening.nginx
+    vars:
+      audit_only: false
+      levels:
+      - web_server_level_2
+      - load_balancer_level_2
+      - reverse_proxy_level_2

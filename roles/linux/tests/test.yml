@@ -2,4 +2,8 @@
 - hosts: localhost
   remote_user: root
   roles:
-    - cis_hardening
+  - name: hasnimehdi91.cis_hardening.linux
+    vars:
+      audit_only: false
+      levels:
+      - server_level_1

@@ -1,0 +1,82 @@
+# 1.2 Configure Software Updates
+- name: 1.2.1 Ensure package manager repositories are properly configured
+  block:
+  # 1.2.1 Ensure package manager repositories are properly configured
+  #
+  # Systems need to have package manager repositories properly configured to ensure
+  # they receive the latest patches and updates.
+  - name: "1.2.1 Ensure package manager repositories are properly configured"
+    block:
+    # 1.2.1 Ensure package manager repositories are properly configured | Audit
+    - include_tasks:
+        file: "{{ target_platform }}/check_nginx_stable.yml"
+      vars:
+        rule: 1.2.1 Ensure package manager repositories are properly configured
+
+    # Extract audit result
+    - set_fact:
+        nginx_stable_repo_check:
+          name: 1.2.1 Ensure package manager repositories are properly configured
+          scored: false
+          automated: false
+          remediation_status: "{{ true if nginx_stable_repo_status.stdout == 'stable' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_stable_repo_check] }}"
+      changed_when: false
+
+    # Execute remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx.yml"
+      vars:
+        rule: "1.2.1 Ensure package manager repositories are properly configured"
+        uninstall_nginx: true
+      when: not audit_only and not nginx_stable_repo_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: "('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) and not ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels)" 
+
+
+
+  # 1.2.2 Ensure the latest software package is installed
+  #
+  # As new security vulnerabilities are discovered, the corresponding fixes are implemented
+  # by your NGINX software package provider. Installing the latest software version ensures
+  # these fixes are available on your system.
+  - name: "1.2.2 Ensure the latest software package is installed"
+    block:
+    # 1.2.2 Ensure the latest software package is installed | Audit
+    - include_tasks:
+        file: "{{ target_platform }}/check_nginx_latest.yml"
+      vars:
+        rule: 1.2.2 Ensure the latest software package is installed
+
+    # Extract audit result
+    - set_fact:
+        nginx_latest_check:
+          name: 1.2.2 Ensure the latest software package is installed
+          scored: false
+          automated: false
+          remediation_status: "{{ true if nginx_latest_status.stdout == 'latest' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_latest_check] }}"
+      changed_when: false
+
+    # Execute remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx.yml"
+      vars:
+        rule: "1.2.2 Ensure the latest software package is installed"
+      when: not audit_only and not nginx_latest_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: "('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) and not ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels)" 

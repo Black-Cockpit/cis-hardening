@@ -1,0 +1,147 @@
+# Gather system packages
+- name: Pre Audit | Gathering system info
+  package_facts:
+    manager: auto
+
+# Check target platforms 
+- name: "Pre Audit | Check OS version and family"
+  assert:
+    that: ansible_distribution in {{ supported_distribution }}
+    fail_msg: "This role can only be run against Supported OSs. {{ ansible_distribution }} {{ ansible_distribution_major_version }} is not supported."
+    success_msg: "This role is running against a supported OS {{ ansible_distribution }} {{ ansible_distribution_major_version }}"
+  changed_when: false
+  tags:
+  - always
+
+# Set rhel as a target
+- set_fact:
+    target_platform: rhel
+  when: ansible_distribution == 'CentOS' or ansible_os_family == 'RedHat' or ansible_os_family == "Rocky" or ansible_os_family == "AlmaLinux"
+
+# Set debian as a target
+- set_fact:
+    target_platform: debian
+  when: ansible_distribution == 'Ubuntu' or ansible_os_family == 'Debian'
+
+# Define nginx user
+- set_fact:
+    nginx_user: "{{ 'nginx' if target_platform == 'rhel'  else 'www-data' }}"
+
+# Define nginx group
+- set_fact:
+    nginx_group: "{{ 'nginx' if target_platform == 'rhel'  else 'www-data' }}"
+
+# Define nginx home directory
+- set_fact:
+    nginx_user_home: "{{ '/var/cache/nginx' if target_platform == 'rhel' else '/var/www' }}"
+
+# Define nginx home shell
+- set_fact:
+    nginx_user_shell: "{{ '/sbin/nologin' if target_platform == 'rhel' else '/usr/sbin/nologin' }}"
+
+# Define required directories for rhel
+- set_fact:
+    required_directories:
+    - /var/cache/nginx/client_temp
+    - /var/cache/nginx/fastcgi_temp
+    - /var/cache/nginx/proxy_temp
+    - /var/cache/nginx/scgi_temp
+    - /var/cache/nginx/uwsgi_temp
+    - /etc/nginx/conf.d
+    - /etc/nginx/ssl
+  when: target_platform == 'rhel'
+
+# Define required directories for debian
+- set_fact:
+    required_directories:
+    - /var/lib/nginx/body
+    - /var/lib/nginx/fastcgi
+    - /var/lib/nginx/proxy
+    - /var/lib/nginx/scgi
+    - /var/lib/nginx/uwsgi
+    - /etc/nginx/conf.d
+    - /etc/nginx/ssl
+  when: target_platform != 'rhel'
+
+# Set rhel platform options
+- set_fact:
+    build_options: |
+      --conf-path=/etc/nginx/nginx.conf \
+      --error-log-path=/var/log/nginx/error.log \
+      --group={{ nginx_group }} \
+      --http-client-body-temp-path=/var/cache/nginx/client_temp \
+      --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
+      --http-log-path=/var/log/nginx/access.log \
+      --http-proxy-temp-path=/var/cache/nginx/proxy_temp \
+      --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
+      --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp \
+      --lock-path=/var/run/nginx.lock \
+      --modules-path=/usr/lib64/nginx/modules \
+      --pid-path=/var/run/nginx.pid \
+      --prefix=/usr/share/nginx \
+      --sbin-path=/usr/sbin/nginx \
+      --user={{ nginx_user }} \
+      --with-cc-opt='-g -O2 -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' \
+      --with-compat \
+      --with-file-aio \
+      --with-http_addition_module \
+      --with-http_auth_request_module \
+      --with-http_flv_module \
+      --with-http_gunzip_module \
+      --with-http_mp4_module \
+      --with-http_random_index_module \
+      --with-http_realip_module \
+      --with-http_secure_link_module \
+      --with-http_slice_module \
+      --with-http_ssl_module \
+      --with-http_stub_status_module \
+      --with-http_sub_module \
+      --with-http_v2_module \
+      --with-ld-opt='-Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -fPIC' \
+      --with-mail \
+      --with-mail_ssl_module \
+      --with-stream \
+      --with-stream_realip_module \
+      --with-stream_ssl_module \
+      --with-stream_ssl_preread_module \
+      --with-threads \
+      --without-http_gzip_module \
+      --add-module=../headers-more-nginx-module-0.37/
+  when: target_platform == 'rhel'
+
+# Set debian platform options
+- set_fact:
+    build_options: |
+      --conf-path=/etc/nginx/nginx.conf \
+      --group={{ nginx_group }} \
+      --error-log-path=/var/log/nginx/error.log \
+      --http-client-body-temp-path=/var/lib/nginx/body \
+      --http-fastcgi-temp-path=/var/lib/nginx/fastcgi \
+      --http-log-path=/var/log/nginx/access.log \
+      --http-proxy-temp-path=/var/lib/nginx/proxy \
+      --http-scgi-temp-path=/var/lib/nginx/scgi \
+      --http-uwsgi-temp-path=/var/lib/nginx/uwsgi \
+      --lock-path=/var/lock/nginx.lock \
+      --modules-path=/usr/lib/nginx/modules \
+      --pid-path=/run/nginx.pid \
+      --prefix=/usr/share/nginx \
+      --sbin-path=/usr/sbin/nginx \
+      --user={{ nginx_user }} \
+      --with-cc-opt='-g -O2 -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' \
+      --with-compat \
+      --with-http_addition_module \
+      --with-http_auth_request_module \
+      --with-http_gunzip_module \
+      --with-http_realip_module \
+      --with-http_secure_link_module \
+      --with-http_slice_module \
+      --with-http_ssl_module \
+      --with-http_stub_status_module \
+      --with-http_sub_module \
+      --with-http_v2_module \
+      --with-ld-opt='-Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -fPIC' \
+      --with-pcre-jit \
+      --with-threads \
+      --without-http_gzip_module \
+      --add-module=../headers-more-nginx-module-0.37/
+  when: target_platform != 'rhel'

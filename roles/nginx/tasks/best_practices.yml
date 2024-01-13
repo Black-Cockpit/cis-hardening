@@ -1,0 +1,35 @@
+# The X-Xss-Protection Header allows you to leverage browser-based protections against
+# cross-site scripting. This should be implemented on your web servers to protect your users
+# and increase user trust in your site. Your policy should be set in blocking mode when
+# possible to ensure the browser blocks a page if cross-site scripting is detected.
+- name: "Ensure the X-XSS-Protection Header is enabled and configured properly"
+  block:
+  # Remove X-Xss-Protection from configuration
+  - name: "Ensure the X-XSS-Protection Header is enabled and configured properly"
+    lineinfile:
+      path: /etc/nginx/nginx.conf
+      regexp: '[#]{0,}[\s]{0,}(X-Xss-Protection).+[;]'
+      state: absent
+
+  # Add new X-Xss-Protection configuration
+  - name: Ensure the X-XSS-Protection Header is enabled and configured properly
+    lineinfile:
+      dest: "/etc/nginx/nginx.conf"
+      regexp: "^add_header X-Xss-Protection"
+      line: "\tadd_header X-Xss-Protection \"1; mode=block\";"
+      insertafter: '^([^#.]){0,}http\s{0,}\{'
+  when: (security_best_practices.xss_protection_header | default(false))
+
+
+
+# Hide server header
+- name: "Ensure the Server Header is hidden"
+  block:
+  # Add new X-Xss-Protection configuration
+  - name: Ensure the X-XSS-Protection Header is enabled and configured properly
+    lineinfile:
+      dest: "/etc/nginx/nginx.conf"
+      regexp: "^more_clear_headers 'Server';"
+      line: "\tmore_clear_headers 'Server';"
+      insertafter: '^([^#.]){0,}http\s{0,}\{'
+  when: (security_best_practices.hide_server_header | default(false))

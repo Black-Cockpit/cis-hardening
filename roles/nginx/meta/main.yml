@@ -1,0 +1,18 @@
+galaxy_info:
+  author: Hasni Mehdi
+  description: Nginx CIS hardening
+  company: Black Cockpit
+  license: MIT
+  min_ansible_version: 2.1
+
+  platforms:
+  - name: Ubuntu
+    versions:
+    - all
+
+  galaxy_tags:
+  - secure_web_server
+  - nginx_security
+  - cis_hardening
+  - nginx_cis
+dependencies: []
