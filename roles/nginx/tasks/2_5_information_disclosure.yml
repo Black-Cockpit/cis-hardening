@@ -1,0 +1,214 @@
+# 2.5 Information Disclosure
+- name: 2.5 Information Disclosure
+  block:
+  # 2.5.1 Ensure server_tokens directive is set to `off`
+  #
+  # The server_tokens directive is responsible for displaying the NGINX version number
+  # and operating system version on error pages and in the Server HTTP response header
+  # field. This information should not be displayed.
+  - name: "2.5.1 Ensure server_tokens directive is set to `off`"
+    block:
+    # 2.5.1 Ensure server_tokens directive is set to `off` | Audit
+    - name: "2.5.1 Ensure server_tokens directive is set to `off` | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir server_tokens /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}server_tokens*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+              [[ "$value" == "off" ]] || echo "$file_path"
+          done
+      changed_when: false
+      register: nginx_server_tokens_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_server_tokens_check:
+          name: 2.5.1 Ensure server_tokens directive is set to `off`
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_server_tokens_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_server_tokens_check] }}"
+      changed_when: false
+
+    # 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
+    - name: "2.5.1 Ensure server_tokens directive is set to `off` | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{1,}[\s]{0,}server_tokens*.+[;]'
+        state: absent
+      loop: "{{ nginx_server_tokens_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_server_tokens_check.remediation_status
+
+    # 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
+    - name: 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'server_tokens*.+[;]'
+        replace: "server_tokens off;"
+      loop: "{{ nginx_server_tokens_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_server_tokens_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    when: |
+      'web_server_level_1' in levels or 'web_server_level_2' in levels
+
+
+
+  # 2.5.2 Ensure default error and index.html pages do not reference
+  #
+  # The default error and index.html pages for NGINX reveal that the server is NGINX. These
+  # default pages should be removed or modified so they do not advertise the underlying
+  # infrastructure of the server
+  - name: "2.5.2 Ensure default error and index.html pages do not reference"
+    block:
+    # 2.5.2 Ensure default error and index.html pages do not reference | Audit
+    - name: "2.5.2 Ensure default error and index.html pages do not reference | Audit"
+      shell:
+        cmd: grep -isq nginx /usr/share/nginx/html/index.html && echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: nginx_index_page_status
+
+    # 2.5.2 Ensure default error and index.html pages do not reference | Audit
+    - name: "2.5.2 Ensure default error and index.html pages do not reference | Audit"
+      shell:
+        cmd: grep -isq nginx /usr/share/nginx/html/50x.html && echo 'not_configured' || echo 'configured'
+      changed_when: false
+      register: nginx_error_page_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_pages_check:
+          name: 2.5.2 Ensure default error and index.html pages do not reference
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (nginx_index_page_status.stdout == 'configured' and nginx_error_page_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_pages_check] }}"
+      changed_when: false
+
+    # 2.5.2 Ensure default error and index.html pages do not reference | Remediation
+    - name: "2.5.2 Ensure default error and index.html pages do not reference | Remediation"
+      copy:
+        src: "files/usr/share/nginx/html/index.html"
+        dest: "/usr/share/nginx/html/index.html"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not nginx_pages_check.remediation_status and not (nginx_index_page_status.stdout == 'configured')
+
+    # 2.5.2 Ensure default error and index.html pages do not reference | Remediation
+    - name: 2.5.2 Ensure default error and index.html pages do not reference | Remediation
+      copy:
+        src: "files/usr/share/nginx/html/50x.html"
+        dest: "/usr/share/nginx/html/50x.html"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not nginx_pages_check.remediation_status and not (nginx_error_page_status.stdout == 'configured')
+    tags:
+    - "web_server_level_1"
+    when: |
+      'web_server_level_1' in levels or 'web_server_level_2' in levels
+
+
+
+  # 2.5.3 Ensure hidden file serving is disabled
+  #
+  # Disabling hidden files is a defense-in-depth mechanism to help prevent accidentally
+  # exposing sensitive information.
+  - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
+    block:
+    # Extract audit result
+    - set_fact:
+        nginx_hidden_files_check:
+          name: 2.5.3 Ensure hidden file serving is disabled
+          scored: false
+          automated: false
+          remediation: |
+            Consider to add the block bellow of the existing confuguration files under each location context:
+
+            location ~ /\.well-known\/acme-challenge {
+              allow all;
+            }
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_hidden_files_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    when: "'web_server_level_2' in levels"
+
+
+
+  # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure
+  #
+  # The server and x-powered-by header may specify the underlying technology used by an
+  # application. The NGINX reverse proxy may pass these headers if not explicitly directed
+  # to remove them.
+  - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure"
+    block:
+    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit
+    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit"
+      shell:
+        cmd: grep -E '^([^#.]){0,}proxy_hide_header*.+[;]' /etc/nginx/nginx.conf | grep -iq 'X-Powered-By' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_x_powred_by_header_status
+
+    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit
+    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit"
+      shell:
+        cmd: grep -E '^([^#.]){0,}proxy_hide_header*.+[;]' /etc/nginx/nginx.conf | grep -iq 'Server' && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_server_header_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_hidden_headers_check:
+          name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure
+          scored: true
+          automated: true
+          remediation_status: "{{ true if (nginx_x_powred_by_header_status.stdout == 'configured' and nginx_server_header_status.stdout == 'configured') else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_hidden_headers_check] }}"
+      changed_when: false
+
+    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}proxy_hide_header*.+[;]'
+        state: absent
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_x_powred_by_header_status.stdout == 'configured')
+
+    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+    - name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+      lineinfile:
+        dest: "/etc/nginx/nginx.conf"
+        regexp: "^(([\\s]{0,}|[\t]{0,})proxy_hide_header) 'X-Powered-By';"
+        line: "\tproxy_hide_header 'X-Powered-By';"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_x_powred_by_header_status.stdout == 'configured')
+
+    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+    - name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+      lineinfile:
+        dest: "/etc/nginx/nginx.conf"
+        regexp: "^(([\\s]{0,}|[\t]{0,})proxy_hide_header) 'Server';"
+        line: "\tproxy_hide_header 'Server';"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_server_header_status.stdout == 'configured')
+    tags:
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: "('load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) \nor ('load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) \n"

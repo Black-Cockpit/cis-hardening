@@ -1,0 +1,327 @@
+# 3 Logging
+- name: 3 Logging
+  block:
+  # 3.1 Ensure detailed logging is enabled
+  #
+  # System logging should be configured to meet your organizational security and privacy
+  # policies. Enabling detailed logging to include information about events, event sources,
+  # timestamps, and users may assist in incident response activities.
+  # NOTE: Aim to keep sensitive information out of logs. For example, keep sensitive
+  # information out of query strings and URIs to avoid this.
+  - name: "3.1 Ensure detailed logging is enabled"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_log_format_check:
+          name: 3.1 Ensure detailed logging is enabled
+          scored: false
+          automated: false
+          remediation: Consifer to review the log format on /etc/nginx/nginx.conf
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_log_format_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 3.2 Ensure access logging is enabled
+  #
+  # The access_log directive should be on for every core site. It is enabled by default.
+  - name: "3.2 Ensure access logging is enabled"
+    block:
+    # 3.2 Ensure access logging is enabled | Audit
+    - name: "3.2 Ensure access logging is enabled | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir access_log /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}access_log*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+              [[ "$value" != "" ]] || echo "$file_path"
+          done
+
+          value=$(grep -E '^([^#.]){0,}access_log*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+          [[ "$value" != "" ]] || echo "/etc/nginx/nginx.conf"
+      changed_when: false
+      register: nginx_access_log_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_access_log_check:
+          name: 3.2 Ensure access logging is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_access_log_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_access_log_check] }}"
+      changed_when: false
+
+    # 3.2 Ensure access logging is enabled | Remediation
+    - name: "3.2 Ensure access logging is enabled | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}access_log*.+[;]'
+        state: absent
+      loop: "{{ nginx_access_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_access_log_check.remediation_status
+
+    # 3.2 Ensure access logging is enabled | Remediation
+    - name: 3.2 Ensure access logging is enabled | Remediation
+      lineinfile:
+        dest: "{{ item }}"
+        regexp: "^(([\\s]{0,}|[\t]{0,})access_log) /var/log/nginx/host.access.log main;"
+        line: "\taccess_log /var/log/nginx/host.access.log main;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      loop: "{{ nginx_access_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_access_log_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 3.3 Ensure error logging is enabled and set to the info logging level
+  #
+  # Error logging can be useful in identifying an attacker attempting to exploit a system and
+  # recreating an attacker's steps. Error logging also helps with identifying possible issues
+  # with an application.
+  - name: "3.3 Ensure error logging is enabled and set to the info logging level"
+    block:
+    # 3.3 Ensure error logging is enabled and set to the info logging level | Audit
+    - name: "3.3 Ensure error logging is enabled and set to the info logging level | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir error_log /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}error_log*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+              [[ "$value" != "" ]] || echo "$file_path"
+          done
+
+          value=$(grep -E '^([^#.]){0,}error_log*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+          [[ "$value" != "" ]] || echo "/etc/nginx/nginx.conf"
+      changed_when: false
+      register: nginx_error_log_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_error_log_check:
+          name: 3.3 Ensure error logging is enabled and set to the info logging level
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_error_log_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_error_log_check] }}"
+      changed_when: false
+
+    # 3.3 Ensure error logging is enabled and set to the info logging level | Remediation
+    - name: "3.3 Ensure error logging is enabled and set to the info logging level | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}error_log*.+[;]'
+        state: absent
+      loop: "{{ nginx_error_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_error_log_check.remediation_status
+
+    # 3.3 Ensure error logging is enabled and set to the info logging level | Remediation
+    - name: 3.3 Ensure error logging is enabled and set to the info logging level | Remediation
+      lineinfile:
+        dest: "{{ item }}"
+        regexp: "^(([\\s]{0,}|[\t]{0,})error_log) /var/log/nginx/error_log.log info;"
+        line: "\terror_log /var/log/nginx/error_log.log info;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      loop: "{{ nginx_error_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_error_log_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+# 3.2 Ensure access logging is enabled
+  #
+  # The access_log directive should be on for every core site. It is enabled by default.
+  - name: "3.2 Ensure access logging is enabled"
+    block:
+    # 3.2 Ensure access logging is enabled | Audit
+    - name: "3.2 Ensure access logging is enabled | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir access_log /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}access_log*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+              [[ "$value" != "" ]] || echo "$file_path"
+          done
+
+          value=$(grep -E '^([^#.]){0,}access_log*.+[;]' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
+          [[ "$value" != "" ]] || echo "/etc/nginx/nginx.conf"
+      changed_when: false
+      register: nginx_access_log_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_access_log_check:
+          name: 3.2 Ensure access logging is enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_access_log_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_access_log_check] }}"
+      changed_when: false
+
+    # 3.2 Ensure access logging is enabled | Remediation
+    - name: "3.2 Ensure access logging is enabled | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{0,}[\s]{0,}access_log*.+[;]'
+        state: absent
+      loop: "{{ nginx_access_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_access_log_check.remediation_status
+
+    # 3.2 Ensure access logging is enabled | Remediation
+    - name: 3.2 Ensure access logging is enabled | Remediation
+      lineinfile:
+        dest: "{{ item }}"
+        regexp: "^(([\\s]{0,}|[\t]{0,})access_log) /var/log/nginx/host.access.log main;"
+        line: "\taccess_log /var/log/nginx/host.access.log main;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      loop: "{{ nginx_access_log_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_access_log_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 3.4 Ensure log files are rotated
+  #
+  # Log rotation ensures log files do not consume excessive disk space, potentially causing
+  # a denial of service.
+  - name: "3.4 Ensure log files are rotated"
+    block:
+    # 3.4 Ensure log files are rotated | Audit
+    - name: "3.4 Ensure log files are rotated | Audit"
+      shell:
+        cmd: |
+          rotate_values=$(grep -Es '(rotate)\s{1,}[0-9]{1,}' /etc/logrotate.d/nginx | awk '{print $2}' | sed -e 's/\s//g' || echo '0')
+          rotate_period=$(grep -is 'weekly' /etc/logrotate.d/nginx || echo '')
+          [[ "$rotate_values" -gt 0 && "$rotate_values" -lt 14 ]] && [[ "$rotate_period" != '' ]] && echo 'configured' || echo 'not_configured'
+      changed_when: false
+      register: nginx_log_rotation_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_log_rotation_check:
+          name: 3.4 Ensure log files are rotated
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_log_rotation_status.stdout == 'configured' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_log_rotation_check] }}"
+      changed_when: false
+
+    # 3.4 Ensure log files are rotated | Remediation
+    - name: "3.4 Ensure log files are rotated | Remediation"
+      copy:
+        src: "files/etc/logrotate.d/nginx"
+        dest: "/etc/logrotate.d/nginx"
+        owner: root
+        group: root
+        mode: "0644"
+      when: not audit_only and not nginx_log_rotation_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+  
+
+
+  # 3.5 Ensure error logs are sent to a remote syslog server
+  #
+  # Centralized log management helps ensure logs are forensically sound and are available
+  # at a central location for auditing and incident investigation.
+  - name: "3.5 Ensure error logs are sent to a remote syslog server"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_error_log_syslog_check:
+          name: 3.5 Ensure error logs are sent to a remote syslog server
+          scored: false
+          automated: false
+          remediation: Consifer to configure syslog to send error logs to a remote server.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_error_log_syslog_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+  # 3.7 Ensure proxies pass source IP information
+  #
+  # The x-forwarded-for and remote address headers help identify and separate the
+  # originating client IP address of the user agent and the proxy IP address. The two types
+  # of addresses are the same, and one should always be present.
+  - name: "3.7 Ensure proxies pass source IP information"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_ip_info_check:
+          name: 3.7 Ensure proxies pass source IP information
+          scored: false
+          automated: false
+          remediation: |
+            Consifer to add the lines below to all the location context in all the nginx configuration files:
+            
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ip_info_check] }}"
+      changed_when: false
+    tags:
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"

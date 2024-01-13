@@ -1,0 +1,7 @@
+# Remove nginx
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: nginx
+    state: absent
+    update_cache: true
+  ignore_errors: yes

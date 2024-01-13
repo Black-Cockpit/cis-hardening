@@ -1,0 +1,22 @@
+# Remove nginx
+- name: "{{ rule }} | Remediation"
+  apt:
+    name: nginx
+    state: absent
+    purge: true
+    force: true
+  when: uninstall_nginx | default(false)
+
+# Enable nginx stable version
+- name: "{{ rule }} | Remediation"
+  apt_repository:
+    repo: "ppa:nginx/stable"
+    update_cache: yes
+    state: present
+    mode: "0644"
+
+# Install stable version of nginx
+- name: "{{ rule }} | Remediation"
+  apt:
+    name: nginx
+    state: latest

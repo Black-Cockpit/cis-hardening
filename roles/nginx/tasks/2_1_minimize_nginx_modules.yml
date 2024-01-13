@@ -1,0 +1,198 @@
+# Pre Audit | Gathering nginx modules
+- name: "Pre Audit | Gathering nginx modules"
+  shell:
+    cmd: | 
+      command -v nginx &> /dev/null && nginx -V 2>&1 | awk -F ': ' '{printf $2}' | sed -e 's@--@\n--@g'
+  changed_when: false
+  register: nginx_configure_modules
+  when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels" 
+
+# 2.1 Minimize NGINX Modules
+- name: 2.1.1 Ensure only required modules are installed
+  block:
+  # 2.1.1 Ensure only required modules are installed
+  #
+  # This NGINX installation comes with several modules out of the box. These modules are
+  # not all always needed. Installations of NGINX should be hardened to ensure only the
+  # necessary modules are installed.
+  - name: "2.1.1 Ensure only required modules are installed"
+    block:
+    # Extract audit result
+    - set_fact:
+        nginx_module_list_check:
+          name: 2.1.1 Ensure only required modules are installed
+          scored: false
+          automated: false
+          remediation: "Condider to review the list of modules included with the installed version of nginx bellow:\n\n{{ nginx_configure_modules.stdout }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_module_list_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels" 
+
+
+
+  # 2.1.2 Ensure HTTP WebDAV module is not installed
+  #
+  # The http_dav_module enables HTTP Extensions for Web Distributed Authoring and
+  # Versioning (WebDAV) as defined by RFC 4918. This enables file-based operations on
+  # your web server, such as the ability to create, delete, change and move files on your
+  # server. Most modern architectures have replaced this functionality with cloud-based
+  # object storage, in which case the module should not be installed.
+  - name: "2.1.2 Ensure HTTP WebDAV module is not installed"
+    block:
+    # 2.1.2 Ensure HTTP WebDAV module is not installed | Audit
+    - name: "2.1.2 Ensure HTTP WebDAV module is not installed | Audit"
+      shell:
+        cmd: |
+          nginx_modules=$(command -v nginx &> /dev/null && nginx -V 2>&1)
+          echo $nginx_modules | grep -q http_dav_module && echo installed || echo not_installed
+      changed_when: false
+      register: http_dav_module_status
+
+    # Extract audit result
+    - set_fact:
+        http_dav_module_check:
+          name: 2.1.2 Ensure HTTP WebDAV module is not installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if http_dav_module_status.stdout == 'not_installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [http_dav_module_check] }}"
+      changed_when: false
+
+    # 2.1.2 Ensure HTTP WebDAV module is not installed | Remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx_from_source_dependencies.yml"
+      vars:
+        rule: "2.1.2 Ensure HTTP WebDAV module is not installed"
+      when: not audit_only and not http_dav_module_check.remediation_status
+    
+    # 2.1.2 Ensure HTTP WebDAV module is not installed | Remediation
+    - include_tasks:
+        file: "common/install_nginx_from_source.yml"
+      vars:
+        rule: "2.1.2 Ensure HTTP WebDAV module is not installed"
+        uninstall_nginx: true
+      when: not audit_only and not http_dav_module_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels" 
+
+
+
+  # 2.1.3 Ensure modules with gzip functionality are disabled
+  #
+  # gzip is used for compression. Compression functionality should be disabled to prevent
+  # certain types of attacks from being performed successfully.
+  - name: "2.1.3 Ensure modules with gzip functionality are disabled"
+    block:
+    # 2.1.3 Ensure modules with gzip functionality are disabled | Audit
+    - name: "2.1.3 Ensure modules with gzip functionality are disabled | Audit"
+      shell:
+        cmd: |
+          nginx_modules=$(command -v nginx &> /dev/null && nginx -V 2>&1)
+          http_gzip_module=$(echo $nginx_modules | grep -q without-http_gzip_module && echo installed || echo not_installed)
+          http_gzip_static_module=$(echo $nginx_modules | grep -Eq 'with-http_gzip_static_module' && echo installed || echo not_installed)
+          [[ "$http_gzip_module" == 'installed' ]] && [[ "$http_gzip_static_module" == 'not_installed' ]] && echo not_installed || echo installed
+      changed_when: false
+      register: gzip_status
+
+    # Extract audit result
+    - set_fact:
+        gzip_check:
+          name: 2.1.3 Ensure modules with gzip functionality are disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if gzip_status.stdout == 'not_installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gzip_check] }}"
+      changed_when: false
+
+    # 2.1.3 Ensure modules with gzip functionality are disabled | Remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx_from_source_dependencies.yml"
+      vars:
+        rule: "2.1.3 Ensure modules with gzip functionality are disabled"
+      when: not audit_only and not gzip_check.remediation_status
+    
+    # 2.1.3 Ensure modules with gzip functionality are disabled | Remediation
+    - include_tasks:
+        file: "common/install_nginx_from_source.yml"
+      vars:
+        rule: "2.1.3 Ensure modules with gzip functionality are disabled"
+        uninstall_nginx: true
+      when: not audit_only and not gzip_check.remediation_status
+    
+    # 2.1.3 Ensure modules with gzip functionality are disabled | Remediation
+    - name: 2.1.3 Ensure modules with gzip functionality are disabled | Remediation
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}(gzip).+[;]'
+        state: absent
+      when: not audit_only
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels" 
+
+
+
+  # 2.1.4 Ensure the autoindex module is disabled
+  #
+  # The autoindex module processes requests ending with the slash character. This feature
+  # enables directory listing, which could be useful in attacker reconnaissance, so it should
+  # be disabled.
+  - name: "2.1.4 Ensure the autoindex module is disabled"
+    block:
+    # 2.1.4 Ensure the autoindex module is disabled | Audit
+    - name: "2.1.4 Ensure the autoindex module is disabled | Audit"
+      shell:
+        cmd: |
+          egrep -irHs '^\s*autoindex\s*on' /etc/nginx/nginx.conf | awk -F ':' '{print $1}' | uniq
+          egrep -irHs '^\s*autoindex\s*on' /etc/nginx/conf.d/* | awk -F ':' '{print $1}' | uniq
+      changed_when: false
+      register: autoindex_status
+
+    # Extract audit result
+    - set_fact:
+        autoindex_check:
+          name: 2.1.4 Ensure the autoindex module is disabled
+          scored: true
+          automated: true
+          remediation_status: "{{ true if ((autoindex_status.stdout_lines | default([])) | length) == 0 else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [autoindex_check] }}"
+      changed_when: false
+
+    # 2.1.4 Ensure the autoindex module is disabled | Remediation
+    - name: 2.1.4 Ensure the autoindex module is disabled | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'autoindex\s*on'
+        replace: 'autoindex off' 
+      when: not audit_only and not autoindex_check.remediation_status
+      loop: "{{ (autoindex_status.stdout_lines | default([])) | list | unique }}"
+    tags:
+    - "web_server_level_1"
+    - "web_server_level_2"
+    when: "'web_server_level_1' in levels or 'web_server_level_2' in levels" 
+

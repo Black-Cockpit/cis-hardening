@@ -1,0 +1,8 @@
+# Check if the latest software package of nginx is installed
+- name: "{{ rule}} | Audit"
+  shell:
+    cmd: |
+      audit=$(dnf check-update --security --bugfix)
+      echo "$audit" | grep -q nginx && echo out_dated || echo latest
+  changed_when: false
+  register: nginx_latest_status

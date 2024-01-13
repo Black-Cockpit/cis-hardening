@@ -1,0 +1,14 @@
+# Cleanup build directory
+- name: "Post Audit | Cleanup build directory"
+  file:
+    path: "/tmp/cis_nginx_build_dir/"
+    state: absent
+
+# Remove compiler
+- name: "Post Audit | Remove compiler"
+  package:
+    name: "{{ item }}"
+    state: absent
+  loop:
+  - gcc
+  - make

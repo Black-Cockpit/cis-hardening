@@ -1,0 +1,185 @@
+# 2.4 Network Configuration
+- name: 2.4 Network Configuration
+  block:
+  # 2.4.1 Ensure NGINX only listens for network connections on authorized ports
+  #
+  # NGINX can be configured to listen on any port, but it should be configured to listen on
+  # authorized ports only.
+  - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
+    block:
+    # 2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit
+    - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit"
+      shell:
+        cmd: |
+          grep -ir "listen[^;]*;" /etc/nginx | awk -F ':' '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d'
+      changed_when: false
+      register: nginx_ports_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_ports_check:
+          name: 2.4.1 Ensure NGINX only listens for network connections on authorized ports
+          scored: false
+          automated: false
+          remediation: "Consider to review the list of nginx listening ports bellow: \n{% for item in (nginx_ports_status.stdout_lines | default([] | unique)) %}- {{ item + '\n'}}{% endfor %}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_ports_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+  # 2.4.2 Ensure requests for unknown host names are rejected
+  #
+  # Your host header should be part of a predefined allowlist of known good hosts, which
+  # enables blocking access to other hosts. You should treat the host header as another
+  # input to be validated, as it is defined by the user agent.
+  - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_host_check:
+          name: 2.4.2 Ensure requests for unknown host names are rejected
+          scored: false
+          automated: false
+          remediation: "Consider to review all the configured hosts and a 4xx status code for the unknown hosts"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_host_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+  # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0
+  #
+  # Persistent connections are leveraged by all modern browsers to facilitate greater web
+  # performance. The keep-alive timeout limits the time a persistent connection may remain
+  # open. Setting the keep-alive timeout allows this timeout to be controlled on the server
+  # side.
+  - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0"
+    block:
+    # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Audit
+    - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir keepalive_timeout /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}keepalive_timeout*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
+              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo "$file_path"
+          done
+      changed_when: false
+      register: nginx_keepalive_timeout_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_keepalive_timeout_check:
+          name: 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_keepalive_timeout_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_keepalive_timeout_check] }}"
+      changed_when: false
+
+    # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
+    - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{1,}[\s]{0,}keepalive_timeout*.+[;]'
+        state: absent
+      loop: "{{ nginx_keepalive_timeout_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_keepalive_timeout_check.remediation_status
+
+    # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
+    - name: 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'keepalive_timeout*.+[;]'
+        replace: "keepalive_timeout {{ keepalive_timeout | default(cis_defaults.keepalive_timeout) }};"
+      loop: "{{ nginx_keepalive_timeout_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_keepalive_timeout_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+
+
+
+
+  # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0
+  #
+  # The send_timeout directive sets a timeout for transmitting a response to the client
+  # between two successive write operations.
+  - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0"
+    block:
+    # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Audit
+    - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Audit"
+      shell:
+        cmd: |
+          for file_path in $(grep -ir send_timeout /etc/nginx | awk -F ':' '{print $1}' | uniq); do
+              value=$(grep -E '^([^#.]){0,}send_timeout*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
+              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo "$file_path"
+          done
+      changed_when: false
+      register: nginx_send_timeout_status
+    
+    # Extract audit result
+    - set_fact:
+        nginx_send_timeout_check:
+          name: 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_send_timeout_status.stdout == '' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_send_timeout_check] }}"
+      changed_when: false
+
+    # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
+    - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation"
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '[#]{1,}[\s]{0,}send_timeout*.+[;]'
+        state: absent
+      loop: "{{ nginx_send_timeout_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_send_timeout_check.remediation_status
+
+    # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
+    - name: 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
+      replace:
+        path: "{{ item }}"
+        regexp: 'send_timeout*.+[;]'
+        replace: "send_timeout {{ send_timeout | default(cis_defaults.send_timeout) }};"
+      loop: "{{ nginx_send_timeout_status.stdout_lines | default([]) | list | unique }}"
+      when: not audit_only and not nginx_send_timeout_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 

@@ -1,0 +1,58 @@
+# 5.1 Access Control
+- name: 5.1 Access Control
+  block:
+  # 5.1.1 Ensure allow and deny filters limit access to specific IP addresses
+  #
+  # IP-based restrictions act as a defense in depth mechanism. They allow you to allowlist
+  # legitimate paths to your applications and explicitly deny IP addresses you believe to be
+  # malicious.
+  - name: "5.1.1 Ensure allow and deny filters limit access to specific IP addresses"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_access_control_ip_check:
+          name: 5.1.1 Ensure allow and deny filters limit access to specific IP addresses
+          scored: false
+          automated: false
+          remediation: Consider to configure only the allowed IP addresses to access the configured domains.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_access_control_ip_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+
+
+
+  # 5.1.2 Ensure only approved HTTP methods are allowed
+  #
+  # HTTP methods (also known as verbs) allow different actions to be requested from the
+  # web server at a specified path. Only the necessary methods should be enabled.
+  - name: "5.1.2 Ensure only approved HTTP methods are allowed"
+    block:    
+    # Extract audit result
+    - set_fact:
+        nginx_access_control_methods_check:
+          name: 5.1.2 Ensure only approved HTTP methods are allowed
+          scored: false
+          automated: false
+          remediation: Consider to check the HHTP methods on the configured domains.
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_access_control_methods_check] }}"
+      changed_when: false
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: | 
+        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+

@@ -1,0 +1,30 @@
+# defaults file for cis_hardening
+
+# Audit result
+audit_result: []
+
+# Target platform: Set later on the pre-audit tasks 
+target_platform: ''
+
+# Supported platforms
+supported_distribution:
+- CentOS
+- RedHat
+- Rocky
+- AlmaLinux
+- Ubuntu
+- Debian
+
+# Nginx CIS server configuration defaults
+cis_defaults:
+  keepalive_timeout: 10
+  send_timeout: 10
+  ssl_ciphers:
+    enforce_remediation: true
+    value: EECDH:EDH:!NULL:!SSLv2:!RC4:!aNULL:!3DES:!IDEA
+  strict_transport_security_max_age: 15768000
+  client_body_timeout: 10
+  client_header_timeout: 10
+  client_max_body_size: "100K"
+  large_client_header_buffers: "2 1k"
+

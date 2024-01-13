@@ -1,0 +1,7 @@
+# Remove nginx
+- name: "{{ rule }} | Remediation"
+  apt:
+    name: nginx
+    state: absent
+    force: true
+  ignore_errors: yes

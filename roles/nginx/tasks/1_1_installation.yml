@@ -1,0 +1,89 @@
+# 1.1 Installation
+- name: 1.1 Installation
+  block:
+  # 1.1.1 Ensure NGINX is installed
+  #
+  # The CIS NGINX Benchmark recommends using the NGINX binary provided by your
+  # vendor for most situations.
+  - name: "1.1.1 Ensure NGINX is installed"
+    block:
+    # 1.1.1 Ensure NGINX is installed | Audit
+    - name: "1.1.1 Ensure NGINX is installed | Audit"
+      shell:
+        cmd: command -v nginx &> /dev/null && echo installed || echo not_installed
+      changed_when: false
+      register: nginx_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_check:
+          name: 1.1.1 Ensure NGINX is installed
+          scored: true
+          automated: true
+          remediation_status: "{{ true if nginx_status.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_check] }}"
+      changed_when: false
+
+    # 1.1.1 Ensure NGINX is installed | Remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx.yml"
+      vars:
+        rule: "1.1.1 Ensure NGINX is installed"
+      when: not audit_only and not nginx_check.remediation_status
+    tags:
+    - "web_server_level_1"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    when: "('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) and not ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels)"
+
+
+
+  # 1.1.2 Ensure NGINX is installed from source
+  #
+  # Installing NGINX directly from source allows you to install NGINX without the use of a
+  # package manager.
+  - name: "1.1.2 Ensure NGINX is installed from source"
+    block:
+    # 1.1.2 Ensure NGINX is installed from source | Audit
+    - name: "1.1.2 Ensure NGINX is installed from source | Audit"
+      shell:
+        cmd: command -v nginx &> /dev/null && echo installed || echo not_installed
+      changed_when: false
+      register: nginx_from_source_status
+
+    # Extract audit result
+    - set_fact:
+        nginx_from_source_check:
+          name: 1.1.2 Ensure NGINX is installed from source
+          scored: false
+          automated: false
+          remediation_status: "{{ true if nginx_from_source_status.stdout == 'installed' else false }}"
+      changed_when: false
+
+    # Appending audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [nginx_from_source_check] }}"
+      changed_when: false
+
+    # 1.1.2 Ensure NGINX is installed from source | Remediation
+    - include_tasks:
+        file: "{{ target_platform }}/install_nginx_from_source_dependencies.yml"
+      vars:
+        rule: "1.1.2 Ensure NGINX is installed from source"
+      when: not audit_only and not nginx_from_source_check.remediation_status
+
+    # 1.1.2 Ensure NGINX is installed from source | Remediation
+    - include_tasks:
+        file: "common/install_nginx_from_source.yml"
+      vars:
+        rule: "1.1.2 Ensure NGINX is installed from source"
+      when: not audit_only and not nginx_from_source_check.remediation_status
+    tags:
+    - "web_server_level_2"
+    - "load_balancer_level_2"
+    - "reverse_proxy_level_2"
+    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
