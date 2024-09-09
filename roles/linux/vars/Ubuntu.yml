@@ -1,0 +1,10 @@
+---
+# OS Specific Settings for Ubuntu
+apt_gpg_key_urls:
+  - "http://archive.ubuntu.com/ubuntu/ubuntu-keyring.gpg"
+  - "http://archive.ubuntu.com/ubuntu/ubuntu-archive-keyring.gpg"
+apt_keyserver: "keyserver.ubuntu.com"
+apt_key_ids:
+  - "40976EAF437D05B5"
+  - "6A8A38D33F8B67D5"  # Exemples de clés GPG pour les archives Ubuntu
+apt_packager: "Canonical Ltd"

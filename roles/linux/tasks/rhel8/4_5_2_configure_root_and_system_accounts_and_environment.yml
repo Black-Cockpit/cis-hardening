@@ -192,14 +192,12 @@
     - "server_level_1"
     - "workstation_level_1"
     when: "'server_level_1' in levels or 'workstation_level_1' in levels"
-
-
-
+    
   # 4.5.2.4 Ensure root password is set
   #
   # There are a number of methods to access the root account directly. Without a password
   # set any user would be able to gain access and thus control over the entire system.
-  - name: "4.5.2.4 Ensure root password is set"
+    - name: "4.5.2.4 Ensure root password is set"
     block:
     # 4.5.2.4 Ensure root password is set | Audit
     - name: 4.5.2.4 Ensure root password is set | Audit
@@ -208,7 +206,7 @@
           passwd -S root | grep -iq "password set" && echo 'configured' || echo 'not_configured'
       changed_when: false
       register: root_password_set_status_check
-      
+     
     # Extract audit result
     - set_fact:
         root_password_set_check:
@@ -235,7 +233,7 @@
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [root_password_set_check] }}"
       changed_when: false
-    
+   
     # 4.5.2.4 Ensure root password is set | Remediation
     - name: 4.5.2.4 Ensure root password is set | Remediation
       user:

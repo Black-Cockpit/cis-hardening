@@ -3,16 +3,7 @@
   block:
   # 1.6.1 Ensure system wide crypto policy is not set to legacy
   #
-  # When a system-wide policy is set up, the default behavior of applications will be to
-  # follow the policy. Applications will be unable to use algorithms and protocols that do not
-  # meet the policy, unless you explicitly request the application to do so.
-  # The system-wide crypto-policies followed by the crypto core components allow
-  # consistently deprecating and disabling algorithms system-wide.
-  # The LEGACY policy ensures maximum compatibility with version 5 of the operating
-  # system and earlier; it is less secure due to an increased attack surface. In addition to
-  # the DEFAULT level algorithms and protocols, it includes support for the TLS 1.0 and 1.1
-  # protocols. The algorithms DSA , 3DES , and RC4 are allowed, while RSA keys and Diffie-
-  # Hellman parameters are accepted if they are at least 1023 bits long.
+ 
   - name: "1.6.1 Ensure system wide crypto policy is not set to legacy"
     block:
     # 1.6.1 Ensure system wide crypto policy is not set to legacy | Audit

@@ -112,18 +112,18 @@
     - set_fact:
         ssh_keys_group: "{{ ssh_keys_group_check.stdout if (ssh_keys_group_check is defined and ssh_keys_group_check.stdout != '') else 'root' }}"
       changed_when: false
-
-    # 4.2.2 Ensure permissions on SSH private host key files are configured | Audit
+# 4.2.2 Ensure permissions on SSH private host key files are configured | Audit
     # Extract ssh keys file
     - name: 4.2.2 Ensure permissions on SSH private host key files are configured | Audit
-      shell:
-        cmd: |
-          # Loop through ssh files and check if file is a key
-          [ -d /etc/ssh ] && while IFS= read -r -d $'\0' l_file; do
-              if grep -Pq ':\h+OpenSSH\h+private\h+key\b' <<<"$(file "$l_file")"; then
-                  echo "$l_file"
-              fi
-          done < <(find -L /etc/ssh -xdev -type f -print0) || echo ""
+      shell: |
+        # Loop through ssh files and check if file is a key
+        [ -d /etc/ssh ] && while IFS= read -r -d $'\0' l_file; do
+             if grep -Pq ':\h+OpenSSH\h+private\h+key\b' <<<"$(file "$l_file")"; then
+                 echo "$l_file"
+             fi
+        done < <(find -L /etc/ssh -xdev -type f -print0) || echo ""
+      args:
+        executable: /bin/bash
       changed_when: false
       register: ssh_keys_files_list
 
@@ -243,6 +243,9 @@
                   echo "$l_file"
               fi
           done < <(find -L /etc/ssh -xdev -type f -print0) || echo ""
+      changed_when: false
+      args:
+        executable: /bin/bash
       changed_when: false
       register: ssh_public_keys_files_list
 

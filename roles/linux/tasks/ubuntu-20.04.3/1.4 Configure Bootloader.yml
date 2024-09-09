@@ -1,0 +1,91 @@
+- name: "1.4 Configure Bootloader"
+  block:
+
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Audit"
+      shell: |
+        grep "^set superusers" /boot/grub/grub.cfg
+        awk -F. '/^\s*password/ {print $1"."$2"."$3}' /boot/grub/grub.cfg
+      register: grub_config
+      changed_when: false
+
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Evaluate Audit Results"
+      set_fact:
+        grub_check:
+          name: "1.4.1 Ensure bootloader password is set"
+          scored: true
+          automated: false
+          remediation_status: >
+            {% set set_superuser_check = 'set superusers="<username>"' in grub_config.stdout %}
+            {% set password_check = 'password_pbkdf2 <username> grub.pbkdf2.sha512' in grub_config.stdout %}
+            {{ set_superuser_check and password_check }}
+          remediation: "Ensure GRUB superuser and password configuration are set correctly"
+      changed_when: false
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Append audit result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [grub_check] }}"
+      changed_when: false
+
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Remediation"
+      debug:
+        msg: "Ensure GRUB superuser and password configuration are set correctly"
+      when: not audit_only and not grub_check.remediation_status
+      changed_when: false
+
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Create Encrypted Password"
+      shell: |
+        grub-mkpasswd-pbkdf2 --iteration-count=600000 --salt=64
+      register: encrypted_password
+      when: not audit_only and not grub_check.remediation_status
+
+    - name: "1.4.1 Ensure bootloader password is set (Automated) | Add Configuration to /etc/grub.d"
+      block:
+        - name: "Add GRUB superuser and password configuration"
+          lineinfile:
+            path: /etc/grub.d/99_custom
+            line: |
+              set superusers="<username>"
+              password_pbkdf2 <username> {{ encrypted_password.stdout_lines[2] }}
+            create: yes
+          when: not audit_only and not grub_check.remediation_status
+
+        - name: "Update GRUB configuration"
+          shell: update-grub
+          when: not audit_only and not grub_check.remediation_status
+
+         
+  # 1.4.2 Ensure access to bootloader config is configured (Automated)
+    - name: "1.4.2 Ensure access to bootloader config is configured | Audit"
+      shell: "stat -Lc 'Access: (%#a/%A)  Uid: (%u/%U) Gid: (%g/%G)' /boot/grub/grub.cfg"
+      changed_when: false
+      register: bootloader_permissions_check
+
+    # Extract Audit Result
+    - name: "1.4.2 Ensure access to bootloader config is configured | Extract Result"
+      set_fact:
+        bootloader_permissions_check_result:
+          name: "1.4.2 Ensure access to bootloader config is configured"
+          scored: true
+          automated: true
+          remediation_status: "{{ bootloader_permissions_check.stdout == 'Access: (0600/-rw-------)  Uid: (0/root) Gid: (0/root)' }}"
+      changed_when: false
+
+    # Appending Audit Result
+    - name: "1.4.2 Ensure access to bootloader config is configured | Append Result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [bootloader_permissions_check_result] }}"
+      changed_when: false
+
+    # Remediation
+    - name: "Change ownership to root:root | Remediation"
+      file:
+        path: /boot/grub/grub.cfg
+        owner: root
+        group: root
+      when: not bootloader_permissions_check_result.remediation_status
+
+    - name: "Set permissions to 0600 | Remediation"
+      file:
+        path: /boot/grub/grub.cfg
+        mode: '0600'
+      when: not bootloader_permissions_check_result.remediation_status
+

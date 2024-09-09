@@ -1,0 +1,122 @@
+- name: 1.2 Package Management
+  block:
+    - name: 1.2.1 Configure Package Repositories
+      block:
+        - name: "1.2.1.1 Ensure GPG keys are configured | Audit"
+          shell:
+            cmd: |
+              apt-key list
+          changed_when: false
+          ignore_errors: true
+          register: gpg_key_check_status
+
+    # Verify that gpg_key_check_status.rc exists
+    - name: "Check if gpg_key_check_status.rc exists"
+      set_fact:
+        gpg_key_check:
+          name: 1.2.1.1 Ensure GPG keys are configured
+          scored: true
+          automated: false
+          remediation_status: "{{ true if gpg_key_check_status.rc is defined and gpg_key_check_status.rc == 0 else false }}"
+          remediation: "Consider verifying that GPG keys are configured correctly for your system"
+      changed_when: false
+
+    # Append audit result
+    - set_fact:
+        audit_result: "{{ (audit_result | default([])) + [gpg_key_check] }}"
+      changed_when: false
+
+    # 1.2.1.1 Ensure GPG keys are configured | Remediation
+    - name: "1.2.1.1 Ensure GPG keys are configured | Remediation"
+      debug:
+        msg: "Consider verifying that GPG keys are configured correctly for your system"
+      when: not audit_only and not gpg_key_check.remediation_status
+      changed_when: false
+
+  tags:
+    - "server_level_1"
+    - "workstation_level_1"
+  when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+- name: "1.2.1.2 Ensure package manager repositories are configured | Audit"
+  shell: apt-cache policy
+  changed_when: false
+  ignore_errors: true
+  register: apt_policy_check_status
+
+# Check the status of the audit
+- name: "Check apt-cache policy output"
+  set_fact:
+    apt_policy_check:
+      name: 1.2.1.2 Ensure package manager repositories are configured
+      scored: true
+      automated: false
+      remediation_status: "{{ apt_policy_check_status.rc == 0 }}"
+      remediation: "Verify and configure repositories according to site policy"
+  changed_when: false
+
+# Append the audit result to the list of audits
+- set_fact:
+    audit_result: "{{ (audit_result | default([])) + [apt_policy_check] }}"
+  changed_when: false
+
+# Remediation step
+- name: "1.2.1.2 Ensure package manager repositories are configured | Remediation"
+  debug:
+    msg: "Verify and configure repositories according to site policy"
+  when: not audit_only and not apt_policy_check.remediation_status
+  changed_when: false
+
+# 1.2.2 Configure Package Updates
+- name: 1.2.2 Configure Package Updates
+  block:
+    # 1.2.2.1 Ensure updates, patches, and additional security software are installed | Audit
+    - name: 1.2.2.1 Ensure updates, patches, and additional security software are installed | Audit
+      shell: |
+        apt update
+        apt -s upgrade
+      register: package_status
+      changed_when: false
+      failed_when: false
+
+    # Extract audit result
+    - name: 1.2.2.1 Ensure updates, patches, and additional security software are installed | Audit Result
+      set_fact:
+        package_audit:
+          name: 1.2.2.1 Ensure updates, patches, and additional security software are installed
+          scored: true
+          automated: true
+          remediation_status: "{{ 'upgradable' in package_status.stdout or 'updates to install' in package_status.stdout }}"
+          remediation: |
+            "To remediate, run the following commands according to your site policy for applying updates and patches:"
+           
+            
+            
+      changed_when: false
+
+    # Append audit result
+    - name: Append audit result
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [package_audit] }}"
+      changed_when: false
+
+    # 1.2.2.1 Ensure updates, patches, and additional security software are installed | Remediation
+    - name: 1.2.2.1 Ensure updates, patches, and additional security software are installed | Remediation
+      block:
+        - name: Update package list | Remediation
+          apt:
+            update_cache: yes
+          when: not package_audit.remediation_status
+
+        - name: Upgrade all packages | Remediation
+          apt:
+            upgrade: dist
+          when: not package_audit.remediation_status
+
+  when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+
+
+
+
+

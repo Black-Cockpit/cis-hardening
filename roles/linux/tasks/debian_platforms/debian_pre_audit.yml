@@ -6,12 +6,18 @@
 # Check target RHEL platforms 
 - name: "Pre Audit | Check OS version and family"
   assert:
-    that: (ansible_distribution != 'CentOS' and ansible_os_family == 'RedHat' or ansible_os_family == "Rocky" or ansible_os_family == "AlmaLinux") and ansible_distribution_major_version is version_compare('8', '==')
+    that:
+      - (ansible_distribution == 'Ubuntu' and ansible_distribution_major_version == '20') or
+        ((ansible_distribution != 'CentOS' and ansible_os_family == 'RedHat') or
+         ansible_os_family == "Rocky" or
+         ansible_os_family == "AlmaLinux") and
+        ansible_distribution_major_version is version_compare('8', '==')
     fail_msg: "This role can only be run against Supported OSs. {{ ansible_distribution }} {{ ansible_distribution_major_version }} is not supported."
     success_msg: "This role is running against a supported OS {{ ansible_distribution }} {{ ansible_distribution_major_version }}"
   changed_when: false
   tags:
-  - always
+    - always
+
 
 
 
@@ -50,17 +56,15 @@
 
 # List sysconf files:
 - name: "Pre Audit | List sysconf files"
-  block:
-  - name: "Pre Audit | List sysconf files"
-    shell:
-        cmd: "[[ -f /usr/lib/systemd/systemd-sysctl ]] && /usr/lib/systemd/systemd-sysctl --cat-config | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
-    changed_when: false
-    register: sysctl_conf_files_list
-  - set_fact:
-      sysctl_conf_files: "{{ sysctl_conf_files_list.stdout_lines | list }}"
-    changed_when: false
+  shell: |
+    if [ -f /usr/lib/systemd/systemd-sysctl ]; then
+      /usr/lib/systemd/systemd-sysctl --cat-config | grep -E "^#\s/.*\.conf" | awk '{print $2}'
+    fi
+  register: sysconf_files
+  changed_when: false
   tags:
-  - always
+    - always
+
 
 
 - name: "Pre Audit | List sudoers files"

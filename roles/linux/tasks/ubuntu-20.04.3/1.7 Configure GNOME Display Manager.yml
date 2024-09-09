@@ -1,0 +1,47 @@
+- name: "1.7.1 Ensure GDM is removed"
+  block:
+    # 1.7.1 Ensure GDM is removed | Audit
+    - name: " Ensure GDM is removed| Audit"
+      shell: |
+            dpkg-query -s gdm3 &>/dev/null  && echo "gdm3 is installed" || echo "gdm3 is  not installed"
+      register: gdm3_check_result
+
+    # 1.7.1 Ensure GDM is removed | Set fact
+    - name: "Ensure GDM is removed | Set fact"
+      set_fact:
+        gdm3_check:
+            name: Ensure GDM is removed
+            remediation_status: "{{ 'true' if  gdm3_check_result.stdout == 'gdm3 is  not installed' else 'false'}}"
+            remediation: "remove GDM "
+
+      changed_when: false
+
+    # 1.7.1 Ensure GDM is removed | append result
+    - name:  1.7.1 Ensure GDM is removed | append result
+      set_fact:
+         audit_result: "{{ (audit_result | default([])) + [gdm3_check] }}"
+      changed_when: false
+
+    # 1.7.1 Ensure GDM is removed | remediation
+    - name: "Ensure GDM is removed | remediation"
+      apt:
+       name:
+         gdm3
+       state: absent  
+      when:  gdm3_check.remediation_status == 'false'
+
+    - name: "Ensure GDM is removed | aautoremove  remediation"
+      apt:
+       name:
+         gdm3
+       state: absent  
+       autoremove: yes
+      when:  gdm3_check.remediation_status == 'false' 
+
+     
+  
+
+    
+   
+
+                

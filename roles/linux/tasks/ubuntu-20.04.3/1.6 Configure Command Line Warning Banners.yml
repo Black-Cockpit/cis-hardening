@@ -1,0 +1,259 @@
+- name: "1.6.1 Ensure message of the day is configured properly"
+  block:
+    # 1.6.1 Ensure message of the day is configured properly | Audit (Contenu du fichier /etc/motd)
+    - name: "1.6.1 Ensure message of the day is configured properly | Audit"
+      shell: |
+        if [ -f /etc/motd ]; then cat /etc/motd; else echo "File not found"; fi
+      changed_when: false
+      register: motd_content_check
+
+    # 1.6.1 Ensure message of the day is configured properly | Audit (Recherche de motifs indésirables)
+    - name: "1.6.1 Ensure message of the day is configured properly | Audit"
+      shell: |
+        grep -E -i "(\\v|\\r|\\m|\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/\"//g'))" /etc/motd || true
+      changed_when: false
+      register: motd_grep_check
+
+    # Vérification de l'état d'audit et préparation du résultat
+    - name: "1.6.1 Ensure message of the day is configured properly | Set Fact"
+      set_fact:
+        motd_check:
+          name: 1.6.1 Ensure message of the day is configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ 'false' if motd_grep_check.stdout != '' else 'true' }}"
+      changed_when: false
+
+    # Appending audit result
+    - name: "1.6.1 Ensure message of the day is configured properly | Append Result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [motd_check] }}"
+      changed_when: false
+
+    # 1.6.1 Ensure message of the day is configured properly | Remediation (Modification ou suppression du fichier)
+    - name: "1.6.1 Ensure message of the day is configured properly | Remediation"
+      lineinfile:
+        path: /etc/motd
+        line: "Authorized users only. All activity may be monitored and reported."
+        create: true
+      when: not audit_only and motd_check.remediation_status == 'false'
+
+    - name: "1.6.1 Ensure message of the day is configured properly | Remediation (Suppression du fichier)"
+      file:
+        path: /etc/motd
+        state: absent
+      when: not audit_only and motd_check.remediation_status == 'false' and remove_motd_file | default(false)
+
+  tags:
+    - "server_level_2"
+    - "workstation_level_2"
+  when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+    
+- name: "1.6.2 Ensure local login warning banner is configured properly"
+  block:
+    # 1.6.2 Ensure local login warning banner is configured properly | Audit 
+    - name: "1.6.2 Ensure local login warning banner is configured properly | Audit"
+      shell: |
+        if [ -f /etc/issue ]; then cat /etc/issue; else echo "File not found"; fi
+      changed_when: false
+      register: issue_content_check
+
+    # 1.6.2 Ensure local login warning banner is configured properly | Audit 
+    - name: "1.6.2 Ensure local login warning banner is configured properly | Audit"
+      shell: |
+        grep -E -i "(\\v|\\r|\\m|\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/\"//g'))" /etc/issue || true
+      changed_when: false
+      register: issue_grep_check
+
+    - name: "1.6.2 Ensure local login warning banner is configured properly | Set Fact"
+      set_fact:
+        issue_check:
+          name: 1.6.2 Ensure local login warning banner is configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ 'false' if issue_grep_check.stdout != '' else 'true' }}"
+      changed_when: false
+
+    # Appending audit result
+    - name: "1.6.2 Ensure local login warning banner is configured properly | Append Result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_check] }}"
+      changed_when: false
+
+    # 1.6.2 Ensure local login warning banner is configured properly | Remediation
+    - name: "1.6.2 Ensure local login warning banner is configured properly | Remediation"
+      lineinfile:
+        path: /etc/issue
+        line: "Authorized users only. All activity may be monitored and reported."
+        create: true
+      when: issue_check.remediation_status == 'false'
+
+- name: "1.6.3 Ensure remote login warning banner is configured properly"
+  block:
+    # 1.6.3 Ensure remote login warning banner is configured properly | Audit (File content of /etc/issue.net)
+    - name: "1.6.3 Ensure remote login warning banner is configured properly | Audit"
+      shell: |
+        if [ -f /etc/issue.net ]; then cat /etc/issue.net; else echo "File not found"; fi
+      changed_when: false
+      register: issue_net_content_check
+
+    # 1.6.3 Ensure remote login warning banner is configured properly | Audit (Search for undesirable patterns)
+    - name: "1.6.3 Ensure remote login warning banner is configured properly | Audit"
+      shell: |
+        grep -E -i "(\\v|\\r|\\m|\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/\"//g'))" /etc/issue.net || true
+      changed_when: false
+      register: issue_net_grep_check
+
+    # Verify audit status and prepare the result
+    - name: "1.6.3 Ensure remote login warning banner is configured properly | Set Fact"
+      set_fact:
+        issue_net_check:
+          name: 1.6.3 Ensure remote login warning banner is configured properly
+          scored: true
+          automated: true
+          remediation_status: "{{ 'false' if issue_net_grep_check.stdout != '' else 'true' }}"
+      changed_when: false
+
+
+    # Appending audit result
+    - name: "1.6.3 Ensure remote login warning banner is configured properly | Append Result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [issue_net_check] }}"
+      changed_when: false
+
+    # 1.6.3 Ensure remote login warning banner is configured properly | Remediation
+    - name: "1.6.3 Ensure remote login warning banner is configured properly | Remediation"
+      lineinfile:
+        path: /etc/issue.net
+        line: "Authorized users only. All activity may be monitored and reported."
+        create: true
+      when:  issue_net_check.remediation_status == 'false'
+
+  tags:
+    - "server_level_2"
+    - "workstation_level_2"
+  when: "'server_level_2' in levels or 'workstation_level_2' in levels"
+
+
+
+# # # # # 1.6.4
+
+- name: "1.6.4 Ensure access to /etc/motd is configured (Automated)"
+  block:
+    # 1.6.4 Ensure access to /etc/motd is configured | Audit
+    - name: " 1.6.4 Ensure access to /etc/motd is configured | Audit"
+      shell: |
+        if [ -e /etc/motd ]; then
+          stat -Lc 'Access: (%#a/%A) Uid: (%u/%U) Gid: (%g/%G)' /etc/motd
+        fi  
+      
+      register: motd_check_result
+
+    # 1.6.4 Ensure access to /etc/motd is configured | Set fact
+    - name: "1.6.4  Ensure access to /etc/motd is configured | Set fact"
+      set_fact:
+        motd_check:
+          name:  1.6.4 Ensure access to /etc/motd is configured
+          remediation_status: "{{ 'true' if 'Access: (0644/-rw-r--r--) Uid: (0/root) Gid: (0/root)' in motd_check_result.stdout else 'false' }}"
+          remediation: "Configure or remove /etc/motd"
+      changed_when: false
+
+    # 1.6.4 Ensure access to /etc/motd is configured | Append result
+    - name: "1.6.4  Ensure access to /etc/motd is configured | Append result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [motd_check] }}"
+      changed_when: false
+
+    # 1.6.4 Ensure access to /etc/motd is configured | Remediation
+    
+    - name: "Set owner and permissions on /etc/motd"
+      shell: |
+            chown root:root $(readlink -e /etc/motd)
+            chmod u-x,go-wx $(readlink -e /etc/motd)
+      when: motd_check_result.stdout == 'false'
+    - name: "Remove /etc/motd | Remediation " 
+      file:
+        path: /etc/motd
+        state: absent
+      when: motd_check.remediation_status == 'false'
+
+
+
+
+ # 1.6.5
+- name: "1.6.5 Ensure access to /etc/issue is configured (Automated)"
+  block:
+    # 1.6.5 Ensure access to /etc/issue is configured | Audit
+    - name: " 1.6.5 Ensure access to /etc/issue is configured| Audit"
+      shell: |
+        if [ -e /etc/issue  ]; then
+          stat -Lc 'Access: (%#a/%A)  Uid: ( %u/ %U) Gid: { %g/ %G)' /etc/issue
+        fi  
+      
+      register: issue_check_result
+
+    # 1.6.5 Ensure access to /etc/issue is configured | Set fact
+    - name: "1.6.5 Ensure access to /etc/issue is configured | Set fact"
+      set_fact:
+        issue_check:
+          name: 1.6.5 Ensure access to /etc/issue is configured
+          remediation_status: "{{ 'true' if ' Access: (0644/-rw-r--r--)  Uid: ( 0/ root) Gid: { 0/ root) ' in issue_check_result.stdout else 'false' }}"
+          remediation: "Configure etc/issue"
+      changed_when: false
+
+    # 1.6.5 Ensure access to /etc/issue is configured | Append result
+    - name: "1.6.5 Ensure access to /etc/issue is configured| Append result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ issue_check] }}"
+      changed_when: false
+
+    # 1.6.5 Ensure access to /etc/issue is configured |  Remediation
+    - name: "Set owner and permissions on /etc/issue | Remediation"
+      file:
+        path: /etc/issue
+        owner: root
+        group: root
+        mode: '0644'
+      when: issue_check.remediation_status == 'false'
+  
+
+##########
+- name: "1.6.6 Ensure access to /etc/issue.net is configured (Automated)"
+  block:
+    # 1.6.6 Ensure access to /etc/issue.net is configured | Audit
+    - name: " 1.6.6 Ensure access to /etc/issue.net is configured| Audit"
+      shell: |
+        if [ -e /etc/issue.net  ]; then
+          stat -Lc 'Access: (%#a/%A)  Uid: ( %u/ %U) Gid: { %g/ %G)' /etc/issue.net
+        fi  
+      
+      register: issue_check_result
+
+    # 1.6.6 Ensure access to /etc/issue.net is configured | Set fact
+    - name: "1.6.6 Ensure access to /etc/issue.net is configured | Set fact"
+      set_fact:
+        issue_check:
+          name: 1.6.6 Ensure access to /etc/issue.net is configured
+          remediation_status: "{{ 'true' if ' Access: (0644/-rw-r--r--)  Uid: ( 0/ root) Gid: { 0/ root) ' in issue_check_result.stdout else 'false' }}"
+          remediation: "Configure etc/issue.net"
+      changed_when: false
+
+    # 1.6.6 Ensure access to /etc/issue.net is configured | Append result
+    - name: "1.6.6 Ensure access to /etc/issue.net is configured| Append result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ issue_check] }}"
+      changed_when: false
+
+    # 1.6.6 Ensure access to /etc/issue.net is configured |  Remediation
+    - name: "Set owner and permissions on /etc/issue.net | Remediation"
+      file:
+        path: /etc/issue.net
+        owner: root
+        group: root
+        mode: '0644'
+      when: issue_check.remediation_status == 'false'
+   
+      

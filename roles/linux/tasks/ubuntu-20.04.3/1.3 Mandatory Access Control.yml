@@ -1,0 +1,172 @@
+- name: "1.3 Mandatory Access Control"
+  block:
+    - name: "1.3.1 Configure AppArmor"
+      block:
+        - name: "1.3.1.1 Ensure AppArmor is installed | Audit"
+          shell: |
+            if dpkg-query -s apparmor &>/dev/null; then
+              echo "apparmor is installed"
+            else
+              echo "apparmor is not installed"
+            fi
+
+            if dpkg-query -s apparmor-utils &>/dev/null; then
+              echo "apparmor-utils is installed"
+            else
+              echo "apparmor-utils is not installed"
+            fi
+          register: packages_status
+          changed_when: false
+
+    - name: "1.3.1.1 Ensure AppArmor is installed | Check if AppArmor and apparmor-utils are installed"
+      set_fact:
+        apparmor_check:
+          name: "1.3.1.1 Ensure AppArmor is installed"
+          scored: true
+          automated: false
+          remediation_status: "{{ 'apparmor is installed' in packages_status.stdout and 'apparmor-utils is installed' in packages_status.stdout }}"
+          remediation: "Consider installing AppArmor and apparmor-utils if not present"
+      changed_when: false
+
+    - name: "1.3.1.1 Ensure AppArmor is installed | Append audit result"
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [apparmor_check] }}"
+      changed_when: false
+
+    - name: "1.3.1.1 Ensure AppArmor is installed | Remediation"
+      debug:
+        msg: "Consider installing AppArmor and apparmor-utils  not present"
+      when: not apparmor_check.remediation_status
+      changed_when: false
+
+    - name: "1.3.1.1 Ensure AppArmor is installed | Install packages Remediation"
+      apt:
+        name:
+          - apparmor
+          - apparmor-utils
+        state: present
+      when: not apparmor_check.remediation_status
+
+    - name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration | Audit"
+      shell: |
+        grep "^\s*linux" /boot/grub/grub.cfg | grep -v "apparmor=1"
+        grep "^\s*linux" /boot/grub/grub.cfg | grep -v "security=apparmor"
+      register: audit_result
+      changed_when: false
+
+    - name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration | Check audit results"
+      set_fact:
+        apparmor_check:
+          name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration"
+          scored: true
+          automated: true
+          remediation_status: "{{ audit_result.stdout == '' }}"
+          remediation: "Ensure the 'apparmor=1' and 'security=apparmor' parameters are set in /etc/default/grub and run 'update-grub'"
+      changed_when: false
+
+    - name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration | Append audit result"
+      set_fact:
+        audit_result_list: "{{ (audit_result_list | default([])) + [apparmor_check] }}"
+      changed_when: false
+
+    - name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration | Remediation"
+      debug:
+        msg: "Ensure the 'apparmor=1' and 'security=apparmor' parameters are set in /etc/default/grub and run 'update-grub'"
+      when: not audit_only and not apparmor_check.remediation_status
+      changed_when: false
+
+    - name: "1.3.1.2 Ensure AppArmor is enabled in the bootloader configuration | Apply remediation"
+      block:
+        - name: "Edit /etc/default/grub to include AppArmor parameters"
+          lineinfile:
+            path: /etc/default/grub
+            regexp: '^GRUB_CMDLINE_LINUX'
+            line: 'GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor"'
+            create: yes
+
+        - name: "Update GRUB configuration"
+          command: update-grub
+      when: not apparmor_check.remediation_status
+
+- name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode | Audit"
+  shell: |
+    apparmor_status | grep profiles
+    apparmor_status | grep processes
+  register: apparmor_status_output
+  changed_when: false
+
+- name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode | Check audit results"
+  set_fact:
+    apparmor_check:
+      name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode"
+      scored: true
+      automated: true
+      remediation_status: |
+        {% set profiles_loaded = '37 profiles are loaded.' in apparmor_status_output.stdout %}
+        {% set profiles_enforce = '35 profiles are in enforce mode.' in apparmor_status_output.stdout %}
+        {% set profiles_complain = '2 profiles are in complain mode.' in apparmor_status_output.stdout %}
+        {% set processes_defined = '4 processes have profiles defined.' in apparmor_status_output.stdout %}
+        {% set processes_enforce = '4 processes are in enforce mode.' in apparmor_status_output.stdout %}
+        {% set processes_complain = '0 processes are in complain mode.' in apparmor_status_output.stdout %}
+        {% set processes_unconfined = '0 processes are unconfined but have a profile defined.' in apparmor_status_output.stdout %}
+        profiles_loaded and profiles_enforce and profiles_complain and processes_defined and processes_enforce and processes_complain and processes_unconfined
+      remediation: "Ensure all AppArmor profiles are in enforce or complain mode."
+
+- name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode | Append audit result"
+  set_fact:
+    audit_result_list: "{{ (audit_result_list | default([])) + [apparmor_check] }}"
+  changed_when: false
+
+- name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode | Remediation"
+  debug:
+    msg: "Ensure all AppArmor profiles are in enforce or complain mode."
+  when: not audit_only and not apparmor_check.remediation_status
+  changed_when: false
+
+- name: "1.3.1.3 Ensure all AppArmor Profiles are in enforce or complain mode | Apply remediation"
+  block:
+    - name: "Set all AppArmor profiles to enforce mode | Apply remediation"
+      command: aa-enforce /etc/apparmor.d/*
+      when: not audit_only and not apparmor_check.remediation_status
+
+    - name: "Set all AppArmor profiles to complain mode | Apply remediation"
+      command: aa-complain /etc/apparmor.d/*
+      when:  not apparmor_check.remediation_status
+      
+- name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing | Audit"
+  shell: |
+    apparmor_status | grep profiles
+    apparmor_status | grep processes
+  register: apparmor_status_output
+  changed_when: false
+- name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing | Check audit results"
+  set_fact:
+    apparmor_check:
+      name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing"
+      scored: true
+      automated: true
+      remediation_status: |
+        {% set profiles_loaded = '34 profiles are loaded.' in apparmor_status_output.stdout %}
+        {% set profiles_enforce = '34 profiles are in enforce mode.' in apparmor_status_output.stdout %}
+        {% set profiles_complain = '0 profiles are in complain mode.' in apparmor_status_output.stdout %}
+        {% set processes_defined = '2 processes have profiles defined.' in apparmor_status_output.stdout %}
+        {% set processes_enforce = '2 processes are in enforce mode.' in apparmor_status_output.stdout %}
+        {% set processes_complain = '0 processes are in complain mode.' in apparmor_status_output.stdout %}
+        {% set processes_unconfined = '0 processes are unconfined but have a profile defined.' in apparmor_status_output.stdout %}
+        profiles_loaded and profiles_enforce and profiles_complain and processes_defined and processes_enforce and processes_complain and processes_unconfined
+      remediation: "Ensure all AppArmor profiles are in enforce mode."
+
+- name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing | Append audit result"
+  set_fact:
+    audit_result_list: "{{ (audit_result_list | default([])) + [apparmor_check] }}"
+  changed_when: false
+
+- name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing | Remediation"
+  debug:
+    msg: "Ensure all AppArmor profiles are in enforce mode."
+  when: not audit_only and not apparmor_check.remediation_status
+  changed_when: false
+
+- name: "1.3.1.4 Ensure all AppArmor Profiles are enforcing | Apply remediation"
+  command: aa-enforce /etc/apparmor.d/*
+  when: not apparmor_check.remediation_status

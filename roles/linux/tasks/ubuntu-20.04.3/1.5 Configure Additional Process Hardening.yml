@@ -1,0 +1,116 @@
+
+#1.5.3
+#1.5.2
+#1.5.1
+- name: 1.5.4 Ensure prelink is not installed
+  block:
+    # 1.5.4 Ensure prelink is not installed | Audit
+    - name: 1.5.4 Ensure prelink is not installed | Audit
+      shell: |
+        dpkg-query -s prelink &>/dev/null && echo "prelink is installed" || echo "prelink is not installed"
+      register: prelink_status
+      changed_when: false
+      failed_when: false
+
+    # Extract audit result
+    - name: 1.5.4 Ensure prelink is not installed | Audit Result
+      set_fact:
+        prelink_audit:
+          name: 1.5.4 Ensure prelink is not installed
+          scored: true
+          automated: true
+          remediation_status: "{{ false if prelink_status.stdout == 'prelink is installed' else true }}"
+          remediation: |
+            "Prelink is installed,resolve this problem"
+            
+      changed_when: false
+
+    # Append audit result
+    - name: Append audit result
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [prelink_audit] }}"
+      changed_when: false
+
+    # 1.5.4 Ensure prelink is not installed | Remediation
+    - name: 1.5.4 Ensure prelink is not installed | Remediation
+      block:
+        - name: Restore binaries to normal | Remediation
+          command: prelink -ua
+          when: prelink_audit.remediation_status == false
+          ignore_errors: yes
+
+        - name: Uninstall prelink | Remediation
+          apt:
+            name: prelink
+            state: absent
+          when: prelink_audit.remediation_status == false
+          tags:
+            - "server_level_1"
+            - "workstation_level_1"
+
+  when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+- name: 1.5.5 Ensure Automatic Error Reporting is not enabled
+  block:
+    # 1.5.5 Ensure Automatic Error Reporting is not enabled | Check Apport Configuration
+    - name: 1.5.5 Ensure Automatic Error Reporting is not enabled | Check Apport Configuration
+      shell: |
+        dpkg-query -s apport &>/dev/null && grep -P '^\s*enabled\s*=\s*[^0]\b' /etc/default/apport
+      register: apport_config_status
+      changed_when: false
+      failed_when: false
+
+    # 1.5.5 Ensure Automatic Error Reporting is not enabled | Check Apport Service Status
+    - name: 1.5.5 Ensure Automatic Error Reporting is not enabled | Check Apport Service Status
+      shell: |
+        systemctl is-active apport.service | grep '^active'
+      register: apport_service_status
+      changed_when: false
+      failed_when: false
+
+    # Extract audit result
+    - name: 1.5.5 Ensure Automatic Error Reporting is not enabled | Audit Result
+      set_fact:
+        apport_audit:
+          name: 1.5.5 Ensure Automatic Error Reporting is not enabled
+          scored: true
+          automated: true
+          remediation_status: "{{ false if apport_config_status.stdout or apport_service_status.stdout else true }}"
+          remediation: |
+            "The Apport Error Reporting service is enabled or active. To remediate:t"
+            
+      changed_when: false
+
+    # Append audit result
+    - name: Append audit result
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [apport_audit] }}"
+      changed_when: false
+
+    # 1.5.5 Ensure Automatic Error Reporting is not enabled | Remediation
+    - name: 1.5.5 Ensure Automatic Error Reporting is not enabled | Remediation
+      block:
+        - name: Disable Apport Error Reporting | Remediation
+          lineinfile:
+            path: /etc/default/apport
+            line: "enabled=0"
+            create: yes
+          when: apport_audit.remediation_status == false
+
+        - name: Stop and mask Apport service | Remediation
+          systemd:
+            name: apport.service
+            state: stopped
+            enabled: no
+          when: apport_audit.remediation_status == false
+
+        - name: Remove Apport package | Remediation
+          apt:
+            name: apport
+            state: absent
+          when: apport_audit.remediation_status == false
+          tags:
+            - "server_level_1"
+            - "workstation_level_1"
+
+  when: "'server_level_1' in levels or 'workstation_level_1' in levels"
+

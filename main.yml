@@ -1,0 +1,12 @@
+- name: System hardening
+  hosts: web
+  gather_facts: yes
+  any_errors_fatal: yes
+  become: yes
+  roles:
+  - name: linux
+    vars:
+      audit_only: false
+      levels:
+      - server_level_1
+      - server_level_2

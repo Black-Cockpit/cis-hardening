@@ -18,7 +18,7 @@
     register: rsyslog_d_conf_files_list
     changed_when: false
     when: rsyslog_d_conf.stat.exists
-  
+ 
   # Define rsyslog configuration files list
   - set_fact:
       rsyslog_conf_files: "{{ rsyslog_conf_files | default([]) + [item.path]}}"
@@ -152,7 +152,7 @@
       loop_control:
         label: "{{ item.stdout }}"
       changed_when: false
-    
+   
     # Extract audit result
     - set_fact:
         journald_forward_log_check:
@@ -189,7 +189,7 @@
         dest: "/etc/systemd/journald.conf.d/cis_journald_forward.conf"
         content: "ForwardToSyslog=yes"
         mode: "0644"
-        owner: root 
+        owner: root
       when: not audit_only and not journald_forward_log_check.remediation_status
     tags:
     - "server_level_1"
@@ -250,7 +250,7 @@
         mode: "0644"
         owner: "root"
       when: not audit_only and not rsyslog_file_permissions_check.remediation_status
-    
+   
     # 5.1.1.4 Ensure rsyslog default file permissions are configured | Remediation
     - name: 5.1.1.4 Ensure rsyslog default file permissions are configured | Remediation
       service:
@@ -392,7 +392,7 @@
         state: absent
       loop: "{{ rsyslog_conf_files }}"
       when: not audit_only and not rsyslog_as_log_server_check.remediation_status
-    
+   
     # 5.1.1.7 Ensure rsyslog is not configured to receive logs from a remote client | Remediation
     - name: 5.1.1.7 Ensure rsyslog is not configured to receive logs from a remote client | Remediation
       service:
