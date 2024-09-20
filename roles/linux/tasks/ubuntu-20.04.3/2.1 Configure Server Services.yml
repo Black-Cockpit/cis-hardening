@@ -1045,61 +1045,150 @@
 
 
       
-- name: "2.1.18 Ensure web server services are not in use"
-  block:
-     - name: 2.1.18 Ensure web server services are not in use| audit
-       shell: |
-               dpkg-query -s apache2 &>/dev/null && echo "apache2 is installed"   || echo "apache2 is not installed"
-       register: app_check_result
-       changed_when: false
+# - name: "2.1.18 Ensure web server services are not in use"
+#   block:
+#      - name: 2.1.18 Ensure web server services are not in use| audit
+#        shell: |
+#                dpkg-query -s apache2 &>/dev/null && echo "apache2 is installed"   || echo "apache2 is not installed"
+#        register: app_check_result
+#        changed_when: false
 
-     - name: 2.1.18 Ensure web server services are not in use| audit
-       shell: |
-               dpkg-query -s nginx &>/dev/null && echo "nginx is installed"  || echo "nginx is  not installed"
-       register: ngn_check_result
-       changed_when: false
+#      - name: 2.1.18 Ensure web server services are not in use| audit
+#        shell: |
+#                dpkg-query -s nginx &>/dev/null && echo "nginx is installed"  || echo "nginx is  not installed"
+#        register: ngn_check_result
+#        changed_when: false
 
-     - name: 2.1.18 Ensure web server services are not in use| audit
-       shell: |
-           systemctl is-enabled apache2.socket apache2.service nginx.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
-       register: enable_check_result
-       changed_when: false
+#      - name: 2.1.18 Ensure web server services are not in use| audit
+#        shell: |
+#            systemctl is-enabled apache2.socket apache2.service nginx.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
        
     
 
-     - name: 2.1.18 Ensure web server services are not in use | audit
+#      - name: 2.1.18 Ensure web server services are not in use | audit
+#        shell: |
+#                systemctl is-active apache2.socket apache2.service nginx.service 2>/dev/null | grep '^active'    && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.18 Ensure web server services are not in use| set fact
+#        set_fact:
+#             test_check:
+#                 name:  2.1.18 Ensure web server services are not in use
+#                 remediation_status: "{{ 'true' if ngn_check_result.stdout == 'nginx is  not installed' and app_check_result == 'apache2 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask appp et ngnix squid package"
+
+#      - name:   2.1.18 Ensure web server services are not in use| append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ test_check] }}"       
+#        changed_when: false   
+       
+#      - name:  2.1.18 Ensure web server services are not in use | stop | remediation
+#        systemd:
+#          name:   apache2.socket apache2.service nginx.service
+#          state: stopped
+#          enabled: no
+#        when: test_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+#      - name:  2.1.18 Ensure web server services are not in use | mask  | remediation
+#        command: systemctl mask --force apache2.socket apache2.service nginx.service
+#        when: test_check.remediation_status == 'false'  
+        
+#      - name:  2.1.18 Ensure web server services are not in use| ' remove '|   remediation
+#        apt:
+#          name:   apache2 nginx
+#          state: absent
+#          purge: yes
+#        when: test_check.remediation_status == 'false'  
+
+
+      
+# - name: "2.1.19 Ensure xinetd services are not in use"
+#   block:
+#      - name: 2.1.19 Ensure xinetd services are not in use| audit
+#        shell: |
+#                dpkg-query -s xinetd &>/dev/null && echo "xinetd is installed"   || echo "xinetd is  not installed"
+#        register: xint_check_result
+#        changed_when: false
+
+     
+
+#      - name: 2.1.19 Ensure xinetd services are not in use| audit
+#        shell: |
+#            systemctl is-enabled xinetd.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+       
+    
+
+#      - name: 2.1.19 Ensure xinetd services are not in use | audit
+#        shell: |
+#                 systemctl is-active xinetd.service 2>/dev/null | grep '^active'  && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.19 Ensure xinetd services are not in use | set fact
+#        set_fact:
+#             xin_check:
+#                 name:  2.1.19 Ensure xinetd services are not in use 
+#                 remediation_status: "{{ 'true' if xint_check_result.stdout == 'xinetd is  not installed'  and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask package"
+
+#      - name:   2.1.19 Ensure xinetd services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ xin_check] }}"       
+#        changed_when: false   
+       
+#      - name:  2.1.19 Ensure xinetd services are not in use | stop | remediation
+#        systemd:
+#          name:   xinetd.service 
+#          state: stopped
+#          enabled: no
+#        when: xin_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+#      - name:  2.1.19 Ensure xinetd services are not in use | mask  | remediation
+#        command: systemctl mask --force  xinetd.service
+#        when: xin_check.remediation_status == 'false' 
+        
+#      - name:  2.1.19 Ensure xinetd services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  xinetd 
+#          state: absent
+#          purge: yes
+#        when: xin_check.remediation_status == 'false' 
+
+      
+- name: "2.1.20 Ensure X window server services are not in use"
+  block:
+     - name: 2.1.20 Ensure X window server services are not in use| audit
        shell: |
-               systemctl is-active apache2.socket apache2.service nginx.service 2>/dev/null | grep '^active'    && echo "active"    || echo "inactive" 
-       register: active_check_result
+               dpkg-query -s xserver-common &>/dev/null && echo "xserver-common is installed"    || echo "xserver-common is not installed" 
+       register: xserver_check_result
        changed_when: false
 
-     - name: 2.1.18 Ensure web server services are not in use| set fact
-       set_fact:
-            test_check:
-                name:  2.1.18 Ensure web server services are not in use
-                remediation_status: "{{ 'true' if ngn_check_result.stdout == 'nginx is  not installed' and app_check_result == 'apache2 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
-                remediation: " remove mask appp et ngnix squid package"
 
-     - name:   2.1.18 Ensure web server services are not in use| append result 
+     - name: 2.1.20 Ensure X window server services are not in use | set fact
        set_fact:
-            audit_result: "{{ (audit_result | default([])) + [ test_check] }}"       
+            serv_check:
+                name:  2.1.20 Ensure X window server services are not in use 
+                remediation_status: "{{ 'true' if xserver_check_result.stdout == 'xserver-common is not installed'   else 'false'  }}"
+                remediation: " remove mask package"
+
+     - name:   2.1.20 Ensure X window server services are not in use | append result 
+       set_fact:
+            audit_result: "{{ (audit_result | default([])) + [ serv_check] }}"       
        changed_when: false   
        
-     - name:  2.1.18 Ensure web server services are not in use | stop | remediation
-       systemd:
-         name:   apache2.socket apache2.service nginx.service
-         state: stopped
-         enabled: no
-       when: test_check.remediation_status == 'false' 
-       ignore_errors: yes
-      
-     - name:  2.1.18 Ensure web server services are not in use | mask  | remediation
-       command: systemctl mask --force apache2.socket apache2.service nginx.service
-       when: test_check.remediation_status == 'false'  
+  
         
-     - name:  2.1.18 Ensure web server services are not in use| ' remove '|   remediation
+     - name:  2.1.20 Ensure X window server services are not in use| ' remove '|   remediation
        apt:
-         name:   apache2 nginx
+         name:  xserver-common 
          state: absent
          purge: yes
-       when: test_check.remediation_status == 'false'  
+       when: serv_check.remediation_status == 'false' 
+      
