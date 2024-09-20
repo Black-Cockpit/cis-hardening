@@ -1,0 +1,1105 @@
+# - name: "2.1.1 Ensure autofs services are not in use "
+#   block:
+#      - name: 2.1.1 Ensure autofs services are not in use | audit
+#        shell: |
+#             dpkg-query -s autofs &>/dev/null && echo "autofs is installed" || echo "autofs is not installed"
+#        register: autofs_check_result
+#        changed_when: false
+
+#      - name: 2.1.1 Ensure autofs services are not in use | audit
+#        shell: |
+#            systemctl is-enabled autofs.service 2>/dev/null | grep 'enabled' && echo "enabled"    || echo "disabled" 
+           
+#        register: enable_check_result
+       
+#        changed_when: false
+
+#      - name: 2.1.1 Ensure autofs services are not in use | audit
+#        shell: |
+#              systemctl is-active autofs.service 2>/dev/null | grep '^active' && echo "active"    || echo "inactive" 
+           
+#        register: active_check_result
+      
+
+#        changed_when: false
+
+
+#      - name: 2.1.1 Ensure autofs services are not in use | set fact
+#        set_fact:
+#             autofs_check:
+#                 name: 2.1.1 Ensure autofs services are not in use 
+#                 remediation_status: "{{ 'true' if autofs_check_result.stdout == 'autofs is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove the autofs package"
+
+#      - name:  2.1.1 Ensure autofs services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ autofs_check] }}"       
+       
+#        changed_when: false   
+       
+#      - name: 2.1.1 Ensure autofs services are not in use | stop autofs | remediation
+#        systemd:
+#          name:  autofs.service 
+#          state: stopped
+#          enabled: no
+#        when: autofs_check.remediation_status == 'false' 
+#        ignore_errors: yes
+
+#      - name: 2.1.1 Ensure autofs services are not in use | mask autofs | remediation
+#        command: systemctl mask --force  autofs.service
+#        when: autofs_check.remediation_status == 'false' 
+    
+       
+#      -  name: 2.1.1 Ensure autofs services are not in use  ' remove autop'|   remediation
+#         apt:
+#          name:  autofs 
+#          state: absent
+#          purge: yes
+#         when: autofs_check.remediation_status == 'false' 
+        
+
+# - name: "2.1.2 Ensure avahi daemon services are not in use"
+#   block:
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | audit
+#       shell: |
+#         dpkg-query -s avahi-daemon &>/dev/null && echo "avahi-daemon is installed" || echo "avahi-daemon is not installed"
+#       register: avahi_check_result
+#       changed_when: false
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | audit
+#       shell: |
+#          systemctl is-enabled avahi-daemon.service avahi-daemon.socket  2>/dev/null | grep 'enabled'  && echo "enabled" || echo "disabled" 
+#       register: enable_check_result
+#       changed_when: false
+
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | audit
+#       shell: |
+#         systemctl is-active avahi-daemon.service  avahi-daemon.socket 2>/dev/null | grep '^active'  && echo "active" || echo "inactive"
+#       register: active_check_result
+#       changed_when: false
+     
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | set fact
+#       set_fact:
+#         avahi_check:
+#           name: 2.1.2 Ensure avahi daemon services are not in use
+#           remediation_status: "{{ 'true' if avahi_check_result.stdout == 'avahi-daemon is not installed' and enable_check_result.stdout == 'disabled' and active_check_result.stdout == 'inactive' else 'false' }}"
+#           remediation: "remove the avahi package"
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | append audit
+#       set_fact:
+#         audit_result: "{{ (audit_result | default([])) + [ avahi_check ] }}"
+#       changed_when: false
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | remediation (stop avahi-daemon.service)
+#       systemd:
+#         name: avahi-daemon.service
+#         state: stopped
+#         enabled: no
+#       when: avahi_check.remediation_status == 'false'
+#       ignore_errors: yes
+      
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | remediation (stop avahi-daemon.socket)
+#       systemd:
+#         name: avahi-daemon.socket
+#         state: stopped
+#       when: avahi_check.remediation_status == 'false'
+#       ignore_errors: yes
+#       changed_when: false
+
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | remediation (mask avahi-daemon.service)
+#       command: systemctl mask --force avahi-daemon.service
+#       when: avahi_check.remediation_status == 'false'
+#       ignore_errors: yes
+#       changed_when: false
+
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | remediation (mask avahi-daemon.socket)
+#       command: systemctl mask --force avahi-daemon.socket
+#       when: avahi_check.remediation_status == 'false'
+#       ignore_errors: yes
+#       changed_when: false
+
+
+#     - name: 2.1.2 Ensure avahi daemon services are not in use | remediation (remove)
+#       apt:
+#         name: avahi-daemon
+#         state: absent
+#         purge: yes
+#       when: avahi_check.remediation_status == 'false'
+#       changed_when: false
+
+
+
+# - name: 2.1.3 Ensure DHCP server services are not in use
+#   block:
+#     - name: 2.1.3 Ensure DHCP server services are not in use | audit
+#       shell: |
+#         dpkg-query -s isc-dhcp-server &>/dev/null && echo "isc-dhcp-server is installed" || echo "isc-dhcp-server is not installed"
+#       register: dhcp_check_result
+#       changed_when: false
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | audit
+#       shell: |
+#             systemctl is-enabled isc-dhcp-server.service isc-dhcp-server6.service  2>/dev/null | grep 'enabled' && echo "enabled"    || echo "disabled" 
+#       register: enable_check_result
+#       changed_when: false
+
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | audit
+#       shell: |
+#              systemctl is-active isc-dhcp-server.service isc-dhcp-server6.service  2>/dev/null | grep '^active'  && echo "active"    || echo "inactive"
+#       register: active_check_result
+#       changed_when: false
+
+
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | set fact
+#       set_fact:
+#         dhcp_check:
+#           name: 2.1.3 Ensure DHCP server services are not in use
+#           remediation_status: "{{ 'true' if dhcp_check_result.stdout == 'isc-dhcp-server is not installed'  and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false' }}"
+#           remediation: "Remove the isc-dhcp-server package, stop, and mask isc-dhcp-server *"
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | append audit
+#       set_fact:
+#         audit_result: "{{ (audit_result | default([])) + [ dhcp_check ] }}"
+#       changed_when: false
+
+    
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | remediation (stop )
+#       systemd:
+#         name: isc-dhcp-server.service
+#         state: stopped
+#       when: dhcp_check.remediation_status == 'false'
+#       ignore_errors: yes 
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | remediation (stop isc-dhcp-server6.service)
+#       systemd:
+#         name: isc-dhcp-server6.service
+#         state: stopped
+#       when: dhcp_check.remediation_status == 'false' 
+#       ignore_errors: yes
+
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | remediation (mask isc-dhcp-server.service)
+#       command: systemctl mask isc-dhcp-server.service 
+#       when: dhcp_check.remediation_status == 'false' 
+#       changed_when: false 
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | remediation (mask isc-dhcp-server6.service)
+#       command: systemctl mask isc-dhcp-server6.service
+#       when: dhcp_check.remediation_status == 'false'
+#       ignore_errors: yes 
+#       changed_when: false 
+
+#     - name: 2.1.3 Ensure DHCP server services are not in use | remediation (remove isc-dhcp-server)
+#       apt:
+#         name: isc-dhcp-server
+#         state: absent
+#         purge: yes
+#       when: dhcp_check.remediation_status == 'false'
+
+
+# - name: 2.1.4 Ensure DNS server services are not in use
+#   block:
+#     - name: 2.1.4 Ensure DNS server services are not in use | audit
+#       shell: |
+#         dpkg-query -s bind9 &>/dev/null && echo "bind9 is installed" || echo "bind9 is not installed"
+#       register: dns_check_result
+#       changed_when: false
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | audit (check enable)
+#       shell: |
+#         if systemctl is-enabled bind9.service 2>/dev/null | grep 'enabled'; then
+#           echo "enabled"
+#         else
+#           echo "disabled"
+#         fi
+#       register: enable_check_result
+      
+#       changed_when: false
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | audit (check active)
+#       shell: |
+#             if systemctl is-active bind9.service 2>/dev/null | grep  '^active'; then
+#                echo "active"
+#             else
+#                echo "inactive"
+#             fi
+#       register: active_check_result
+      
+#       changed_when: false
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | set fact
+#       set_fact:
+#         dns_check:
+#           name: 2.1.4 Ensure DNS server services are not in use
+#           remediation_status: "{{ 'true' if dns_check_result.stdout == 'bind9 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive' else 'false' }}"
+#           remediation: remove, stop, disable, and mask DNS
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | append result
+#       set_fact:
+#         audit_result: "{{ (audit_result | default([])) + [ dns_check ] }}"
+#       changed_when: false
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (stop and disable DNS)
+#       systemd:
+#         name: bind9.service
+#         state: stopped
+#         enabled: no
+#       when: dns_check.remediation_status == 'false'
+#       ignore_errors: yes
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (mask DNS)
+#       command: systemctl mask --force bind9.service
+#       when: dns_check.remediation_status == 'false'
+
+#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (remove)
+#       apt:
+#         name: bind9
+#         state: absent
+#         purge: yes
+#       when: dns_check.remediation_status == 'false'
+
+
+# - name: "2.1.5 Ensure dnsmasq services are not in use "
+#   block:
+#      - name: 2.1.5 Ensure dnsmasq services are not in use | audit
+#        shell: |
+#             dpkg-query -s dnsmasq &>/dev/null && echo "dnsmasq is installed"  || echo "dnsmasq is  not installed"
+#        register: dnsmasq_check_result
+#        changed_when: false
+
+#      - name: 2.1.5 Ensure dnsmasq services are not in use  | audit
+#        shell: |
+#             systemctl is-enabled dnsmasq.service 2>/dev/null | grep 'enabled' &&  echo "enabled"    || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+
+#      - name: 2.1.5 Ensure dnsmasq services are not in use | audit
+#        shell: |
+#              systemctl is-active dnsmasq.service 2>/dev/null | grep '^active'  && echo "active"  || echo "inactive" 
+            
+#        register: active_check_result
+#        changed_when: false
+
+
+#      - name: 2.1.5 Ensure dnsmasq services are not in use | set fact
+#        set_fact:
+#             dnsmasq_check:
+#                 name: 2.1.5 Ensure dnsmasq services are not in use 
+#                 remediation_status: "{{ 'true' if dnsmasq_check_result.stdout == 'dnsmasq is  not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop dnsmasq  package"
+
+#      - name:  2.1.5 Ensure dnsmasq services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ dnsmasq_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.5 Ensure dnsmasq services are not in use | stop  | remediation
+#        systemd:
+#          name:  dnsmasq.service 
+#          state: stopped
+#          enabled: no
+#        when: dnsmasq_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false
+
+#      - name: 2.1.5 Ensure dnsmasq services are not in use | mask a | rmediation
+#        command: systemctl mask --force   dnsmasq.service 
+#        when: dnsmasq_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false
+    
+       
+#      -  name: 2.1.5 Ensure dnsmasq services are not in use  ' remove '|   remediation
+#         apt:
+#          name:  dnsmasq
+#          state: absent
+#          purge: yes
+#         when: dnsmasq_check.remediation_status == 'false' 
+      
+# - name: "2.1.6 Ensure ftp server services are not in use "
+#   block:
+#      - name: 2.1.6 Ensure ftp server services are not in use | audit
+#        shell: |
+#             dpkg-query -s vsftpd &>/dev/null && echo "vsftpd is installed"   || echo "vsftpd is  not installed"
+#        register: ftp_check_result
+#        changed_when: false
+
+#      - name: 2.1.6 Ensure ftp server services are not in use  | audit
+#        shell: |
+#            if systemctl is-enabled vsftpd.service 2>/dev/null | grep 'enabled' ; then
+#              echo "enabled"
+#            else
+#             echo "disabled"
+#            fi
+#        register: enable_check_result
+#        changed_when: false
+
+#      - name: 2.1.6 Ensure ftp server services are not in use | audit
+#        shell: |
+#             if  systemctl is-active vsftpd.service 2>/dev/null | grep '^active'  ; then
+#               echo "active"
+#             else
+#               echo "inactive"
+#             fi
+#        register: active_check_result
+#        changed_when: false
+
+
+#      - name: 2.1.6 Ensure ftp server services are not in use | set fact
+#        set_fact:
+#             ftp_check:
+#                 name: 2.1.6 Ensure ftp server services are not in use 
+#                 remediation_status: "{{ 'true' if ftp_check_result.stdout == 'vsftpd is  not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop ftp  package"
+
+#      - name:  2.1.6 Ensure ftp server services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ ftp_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.6 Ensure ftp server services are not in use | stop | remediation
+#        systemd:
+#          name:  vsftpd.service
+#          state: stopped
+#          enabled: no
+#        when: ftp_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.6 Ensure ftp server services are not in use | mask  | remediation
+#        command: systemctl mask --force  vsftpd.service 
+#        when: ftp_check.remediation_status == 'false'  
+    
+       
+#      -  name: 2.1.6 Ensure ftp server services are not in use  ' remove '|   remediation
+#         apt:
+#          name:   vsftpd 
+#          state: absent
+#          purge: yes
+#         when:  ftp_check.remediation_status == 'false' 
+      
+# - name: "2.1.7 Ensure ldap server services are not in use "
+#   block:
+#      - name: 2.1.7 Ensure ldap server services are not in use | audit
+#        shell: |
+#              dpkg-query -s slapd &>/dev/null && echo "slapd is installed"    || echo "slapd is not installed"
+#        register: slapd_check_result
+#        changed_when: false
+
+#      - name: 2.1.7 Ensure ldap server services are not in use  | audit
+#        shell: |
+#            systemctl is-enabled slapd.service 2>/dev/null | grep 'enabled' && echo "enabled"    || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+
+#      - name: 2.1.7 Ensure ldap server services are not in use  | audit
+#        shell: |
+#             systemctl is-active slapd.service 2>/dev/null | grep '^active' && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+
+#      - name: 2.1.7 Ensure ldap server services are not in use| set fact
+#        set_fact:
+#             slapd_check:
+#                 name: 2.1.7 Ensure ldap server services are not in use 
+#                 remediation_status: "{{ 'true' if slapd_check_result.stdout == 'slapd is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop slad package"
+
+#      - name:  2.1.7 Ensure ldap server services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ slapd_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.7 Ensure ldap server services are not in use | stop | remediation
+#        systemd:
+#          name:  slapd.service 
+#          state: stopped
+#          enabled: no
+#        when: slapd_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.7 Ensure ldap server services are not in use | mask  | remediation
+#        command: systemctl mask --force  slapd.service  
+#        when: slapd_check.remediation_status == 'false' 
+#        changed_when: false  
+    
+       
+#      -  name: 2.1.7 Ensure ldap server services are not in use   ' remove '|   remediation
+#         apt:
+#          name:   slapd 
+#          state: absent
+#          purge: yes
+#         when:  slapd_check.remediation_status == 'false' 
+#         changed_when: false
+
+      
+# - name: "2.1.8 Ensure message access server services are not in use "
+#   block:
+#      - name: 2.1.8 Ensure message access server services are not in use | audit
+#        shell: |
+#               dpkg-query -s dovecot-imapd &>/dev/null && echo "dovecot-imapd is installed"   || echo "dovecot-imapd is not installed"
+#        register: dovecotimp_check_result
+#        changed_when: false
+
+#      - name: 2.1.8 Ensure message access server services are not in use | audit
+#        shell: |
+#               dpkg-query -s dovecot-pop3d &>/dev/null && echo "dovecot-pop3d is installed"   || echo "dovecot-pop3d is not installed"
+#        register: dovecotpop_check_result
+#        changed_when: false
+
+#      - name: 2.1.8 Ensure message access server services are not in use | audit
+#        shell: |
+#           systemctl is-enabled dovecot.socket dovecot.service 2>/dev/null | grep 'enabled' && echo "enabled" || echo "disabled"
+#        register: enable_check_result
+#        changed_when: false
+
+#      - name: 2.1.8 Ensure message access server services are not in use  | audit
+#        shell: |
+#            systemctl is-active dovecot.socket dovecot.service 2>/dev/null | grep '^active' && echo "active" || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.8 Ensure message access server services are not in use  | set fact
+#        set_fact:
+#             dovecot_check:
+#                 name: 2.1.8 Ensure message access server services are not in use 
+#                 remediation_status: "{{ 'true' if dovecotimp_check_result.stdout == 'dovecot-imapd is not installed' and dovecotpop_check_result.stdout == 'dovecot-pop3d is not installed'  and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop  sovecot package"
+
+#      - name:  2.1.8 Ensure message access server services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ dovecot_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.8 Ensure message access server services are not in use | stop | remediation
+#        systemd:
+#          name:  dovecot.socket
+#          state: stopped
+#          enabled: no
+#        when: dovecot_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+#      - name: 2.1.8 Ensure message access server services are not in use | stop | remediation
+#        systemd:
+#          name:   dovecot.service 
+#          state: stopped
+#          enabled: no
+#        when: dovecot_check.remediation_status == 'false' 
+#        ignore_errors: yes
+       
+
+#      - name: 2.1.8 Ensure message access server services are not in use | mask  | remediation
+#        command: systemctl mask --force  dovecot.service   
+#        when: dovecot_check.remediation_status == 'false' 
+#        changed_when: false 
+       
+#      - name: 2.1.8 Ensure message access server services are not in use | mask  | remediation
+#        command: systemctl mask --force    dovecot.socket 
+#        when: dovecot_check.remediation_status == 'false' 
+#        changed_when: false 
+
+#      -  name: 2.1.8 Ensure message access server services are not in use  ' remove '|   remediation
+#         apt:
+#          name:   dovecot-imapd 
+#          state: absent
+#          purge: yes
+#         when:  dovecot_check.remediation_status == 'false' 
+        
+#      -  name: 2.1.8 Ensure message access server services are not in use  ' remove '|   remediation
+#         apt:
+#          name:   dovecot-pop3d 
+#          state: absent
+#          purge: yes
+#         when:  dovecot_check.remediation_status == 'false' 
+
+      
+# - name: "  2.1.9 Ensure network file system services are not in use "
+#   block:
+#      - name: 2.1.9 Ensure network file system services are not in use| audit
+#        shell: |
+#                dpkg-query -s nfs-kernel-server &>/dev/null && echo "nfs-kernel-server is installed"   || echo "nfs-kernel-server is  not installed"
+#        register: nfs_check_result
+#        changed_when: false
+
+#      - name: 2.1.9 Ensure network file system services are not in use  | audit
+#        shell: |
+#            systemctl is-enabled nfs-server.service 2>/dev/null | grep 'enabled' && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.9 Ensure network file system services are not in use  | audit
+#        shell: |
+#              systemctl is-active nfs-server.service 2>/dev/null | grep '^active' && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.9 Ensure network file system services are not in use  | set fact
+#        set_fact:
+#             nfs_check:
+#                 name: 2.1.9 Ensure network file system services are not in use
+#                 remediation_status: "{{ 'true' if nfs_check_result.stdout == 'nfs-kernel-server is  not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop nfs  package"
+
+#      - name:  2.1.9 Ensure network file system services are not in use  | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [  nfs_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.9 Ensure network file system services are not in use  | stop | remediation
+#        systemd:
+#          name:  nfs-server.service 
+#          state: stopped
+#          enabled: no
+#        when: nfs_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.9 Ensure network file system services are not in use| mask  | remediation
+#        command: systemctl mask --force  nfs-server.service  
+#        when: nfs_check.remediation_status == 'false' 
+#        changed_when: false  
+
+       
+#      -  name: 2.1.9 Ensure network file system services are not in use | ' remove '|   remediation
+#         apt:
+#          name:  nfs-kernel-server 
+#          state: absent
+#          purge: yes
+#         when: nfs_check.remediation_status == 'false'  
+
+
+      
+# - name: " 2.1.10 Ensure nis server services are not in use"
+#   block:
+#      - name: 2.1.10 Ensure nis server services are not in use| audit
+#        shell: |
+#                dpkg-query -s ypserv &>/dev/null && echo "ypserv is installed"    || echo "ypserv is not installed"
+#        register: ypserv_check_result
+#        changed_when: false
+
+#      - name: 2.1.10 Ensure nis server services are not in use  | audit
+#        shell: |
+#            systemctl is-enabled ypserv.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.10 Ensure nis server services are not in use   | audit
+#        shell: |
+#              systemctl is-active ypserv.service 2>/dev/null | grep '^active' && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.10 Ensure nis server services are not in use  | set fact
+#        set_fact:
+#             ypserv_check:
+#                 name: 2.1.10 Ensure nis server services are not in use 
+#                 remediation_status: "{{ 'true' if ypserv_check_result.stdout == 'ypserv is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop ypserv  package"
+
+#      - name:  2.1.10 Ensure nis server services are not in use  | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [  ypserv_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.10 Ensure nis server services are not in use  | stop | remediation
+#        systemd:
+#          name:  ypserv.service 
+#          state: stopped
+#          enabled: no
+#        when:  ypserv_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.10 Ensure nis server services are not in use| mask  | remediation
+#        command: systemctl mask --force  ypserv.service  
+#        when: ypserv_check.remediation_status == 'false' 
+#        changed_when: false  
+
+       
+#      -  name: 2.1.10 Ensure nis server services are not in use | ' remove '|   remediation
+#         apt:
+#          name:  ypserv 
+#          state: absent
+#          purge: yes
+#         when: ypserv_check.remediation_status == 'false'   
+      
+
+      
+# - name: " 2.1.11 Ensure print server services are not in use"
+#   block:
+#      - name: 2.1.11 Ensure print server services are not in use | audit
+#        shell: |
+#                dpkg-query -s cups &>/dev/null && echo "cups is installed"    || echo "cups is  not installed" 
+#        register: cups_check_result
+#        changed_when: false
+
+#      - name: 2.1.11 Ensure print server services are not in use   | audit
+#        shell: |
+#            systemctl is-enabled cups.socket cups.service 2>/dev/null | grep 'enabled'   && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.11 Ensure print server services are not in use  | audit
+#        shell: |
+#              systemctl is-active cups.socket cups.service 2>/dev/null | grep '^active' && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.11 Ensure print server services are not in use  | set fact
+#        set_fact:
+#             cups_check:
+#                 name: 2.1.11 Ensure print server services are not in use  
+#                 remediation_status: "{{ 'true' if cups_check_result.stdout == 'cups is  not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop cups package"
+
+#      - name:  2.1.11 Ensure print server services are not in use  | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [  cups_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.11 Ensure print server services are not in use   | stop | remediation
+#        systemd:
+#          name:   cups.socket
+#          state: stopped
+#          enabled: no
+#        when:   cups_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.11 Ensure print server services are not in use   | stop | remediation
+#        systemd:
+#          name:  cups.service 
+#          state: stopped
+#          enabled: no
+#        when:   cups_check.remediation_status == 'false' 
+#        ignore_errors: yes
+       
+
+#      - name: 2.1.11 Ensure print server services are not in use | mask  | remediation
+#        command: systemctl mask --force  cups.service   cups.socket
+#        when:   cups_check.remediation_status == 'false'
+        
+
+       
+#      -  name: 2.1.11 Ensure print server services are not in use | ' remove '|   remediation
+#         apt:
+#          name:   cups 
+#          state: absent
+#          purge: yes
+#         when: cups_check.remediation_status == 'false'
+
+
+      
+# - name: " 2.1.12 Ensure rpcbind services are not in use"
+#   block:
+#      - name: 2.1.12 Ensure rpcbind services are not in use | audit
+#        shell: |
+#                dpkg-query -s rpcbind &>/dev/null && echo "rpcbind is installed"   || echo "rpcbind is not installed"
+#        register: rpc_check_result
+#        changed_when: false
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use  | audit
+#        shell: |
+#            systemctl is-enabled rpcbind.socket rpcbind.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use   | audit
+#        shell: |
+#             systemctl is-active rpcbind.socket rpcbind.service 2>/dev/null | grep '^active'   && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use  | set fact
+#        set_fact:
+#             rpc_check:
+#                 name: 2.1.12 Ensure rpcbind services are not in use
+#                 remediation_status: "{{ 'true' if rpc_check_result.stdout == 'rpcbind is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop rpc package"
+
+#      - name:  2.1.12 Ensure rpcbind services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [  rpc_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.12 Ensure rpcbind services are not in use   | stop | remediation
+#        systemd:
+#          name:    rpcbind.socket
+#          state: stopped
+#          enabled: no
+#        when:   rpc_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use  | stop | remediation
+#        systemd:
+#          name:  rpcbind.service  
+#          state: stopped
+#          enabled: no
+#        when:  rpc_check.remediation_status == 'false' 
+#        ignore_errors: yes
+       
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use  | mask  | remediation
+#        command: systemctl mask --force rpcbind.socket rpcbind.service 
+#        when:   rpc_check.remediation_status == 'false' 
+
+#      - name: 2.1.12 Ensure rpcbind services are not in use | ' remove '|   remediation
+#        apt:
+#          name:  rpcbind 
+#          state: absent
+#          purge: yes
+#        when:  rpc_check.remediation_status == 'false'
+
+
+      
+# - name: " 2.1.13 Ensure rsync services are not in use"
+#   block:
+#      - name: 2.1.13 Ensure rsync services are not in use | audit
+#        shell: |
+#                dpkg-query -s rsync &>/dev/null && echo "rsync is installed" || echo "rsync is not installed"
+#        register: rsync_check_result
+#        changed_when: false
+
+#      - name: 2.1.13 Ensure rsync services are not in use | audit
+#        shell: |
+#            systemctl is-enabled rsync.service 2>/dev/null | grep 'enabled'   && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.13 Ensure rsync services are not in use | audit
+#        shell: |
+#             systemctl is-active rsync.service 2>/dev/null | grep '^active'   && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name:  2.1.13 Ensure rsync services are not in use| set fact
+#        set_fact:
+#             rsync_check:
+#                 name:  2.1.13 Ensure rsync services are not in use
+#                 remediation_status: "{{ 'true' if rsync_check_result.stdout == 'rsync is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop rsync package"
+
+#      - name:  2.1.13 Ensure rsync services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ rsync_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.13 Ensure rsync services are not in use   | stop | remediation
+#        systemd:
+#          name: rsync.service 
+#          state: stopped
+#          enabled: no
+#        when: rsync_check.remediation_status == 'false' 
+#        ignore_errors: yes
+#        changed_when: false 
+       
+
+#      - name: 2.1.13 Ensure rsync services are not in use  | mask  | remediation
+#        command: systemctl mask --force rsync.service
+#        when: rsync_check.remediation_status == 'false' 
+        
+
+       
+#      - name: 2.1.13 Ensure rsync services are not in use| ' remove '|   remediation
+#        apt:
+#          name: rsync 
+#          state: absent
+#          purge: yes
+#        when: rsync_check.remediation_status == 'false' 
+
+# - name: " 2.1.14 Ensure samba file server services are not in use"
+#   block:
+#      - name: 2.1.14 Ensure samba file server services are not in use | audit
+#        shell: |
+#                dpkg-query -s samba &>/dev/null && echo "samba is installed"  || echo "samba is  not installed"
+#        register: samba_check_result
+#        changed_when: false
+
+#      - name: 2.1.14 Ensure samba file server services are not in use | audit
+#        shell: |
+#           systemctl is-enabled smbd.service 2>/dev/null | grep 'enabled'   && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.14 Ensure samba file server services are not in use | audit
+#        shell: |
+#              systemctl is-active smbd.service 2>/dev/null | grep '^active'  && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name:  2.1.14 Ensure samba file server services are not in use | set fact
+#        set_fact:
+#             samba_check:
+#                 name:  2.1.14 Ensure samba file server services are not in use 
+#                 remediation_status: "{{ 'true' if samba_check_result.stdout == 'samba is  not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop samba package"
+
+#      - name:  2.1.14 Ensure samba file server services are not in use  | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ samba_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.14 Ensure samba file server services are not in use  | stop | remediation
+#        systemd:
+#          name: smbd.service 
+#          state: stopped
+#          enabled: no
+#        when: samba_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+       
+
+#      - name:  2.1.14 Ensure samba file server services are not in use | mask  | remediation
+#        command: systemctl mask --force smbd.service 
+#        when: samba_check.remediation_status == 'false' 
+        
+
+       
+#      - name: 2.1.14 Ensure samba file server services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  samba 
+#          state: absent
+#          purge: yes
+#        when: samba_check.remediation_status == 'false'  
+      
+
+      
+# - name: " 2.1.15 Ensure snmp services are not in use"
+#   block:
+#      - name: 2.1.15 Ensure snmp services are not in use | audit
+#        shell: |
+#                dpkg-query -s snmpd &>/dev/null && echo "snmpd is installed"  || echo "snmpd is not installed"
+#        register: snmpd_check_result
+#        changed_when: false
+
+#      - name: 2.1.15 Ensure snmp services are not in use | audit
+#        shell: |
+#             systemctl is-enabled snmpd.service 2>/dev/null | grep 'enabled'   && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.15 Ensure snmp services are not in use | audit
+#        shell: |
+#              systemctl is-active snmpd.service 2>/dev/null | grep '^active'   && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name:  2.1.15 Ensure snmp services are not in use| set fact
+#        set_fact:
+#             snmpd_check:
+#                 name:  2.1.15 Ensure snmp services are not in use
+#                 remediation_status: "{{ 'true' if snmpd_check_result.stdout == 'snmpd is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop snmpd package"
+
+#      - name:  2.1.15 Ensure snmp services are not in use| append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ snmpd_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.15 Ensure snmp services are not in use | stop | remediation
+#        systemd:
+#          name:  snmpd.service
+#          state: stopped
+#          enabled: no
+#        when: snmpd_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+       
+
+#      - name:  2.1.15 Ensure snmp services are not in use | mask  | remediation
+#        command: systemctl mask --force snmpd.service
+#        when: snmpd_check.remediation_status == 'false'
+        
+
+       
+#      - name: 2.1.15 Ensure snmp services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  snmpd
+#          state: absent
+#          purge: yes
+#        when: snmpd_check.remediation_status == 'false' 
+
+      
+# - name: " 2.1.16 Ensure tftp server services are not in use"
+#   block:
+#      - name: 2.1.16 Ensure tftp server services are not in use | audit
+#        shell: |
+#                dpkg-query -s tftpd-hpa &>/dev/null && echo "tftpd-hpa is installed" || echo "tftpd-hpa is not installed"
+#        register: tftp_check_result
+#        changed_when: false
+
+#      - name: 2.1.16 Ensure tftp server services are not in use | audit
+#        shell: |
+#            systemctl is-enabled tftpd-hpa.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.16 Ensure tftp server services are not in use | audit
+#        shell: |
+#               systemctl is-active tftpd-hpa.service 2>/dev/null | grep '^active'   && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name:  2.1.16 Ensure tftp server services are not in use| set fact
+#        set_fact:
+#             tftp_check:
+#                 name:  2.1.16 Ensure tftp server services are not in use
+#                 remediation_status: "{{ 'true' if tftp_check_result.stdout == 'tftpd-hpa is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop tftp package"
+
+#      - name:  2.1.16 Ensure tftp server services are not in use| append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ tftp_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.16 Ensure tftp server services are not in use | stop | remediation
+#        systemd:
+#          name:  tftpd-hpa.service 
+#          state: stopped
+#          enabled: no
+#        when: tftp_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+#      - name:  2.1.16 Ensure tftp server services are not in use | mask  | remediation
+#        command: systemctl mask --force tftpd-hpa.service
+#        when: tftp_check.remediation_status == 'false' 
+        
+#      - name: 2.1.16 Ensure tftp server services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  tftpd-hpa 
+#          state: absent
+#          purge: yes
+#        when: tftp_check.remediation_status == 'false'  
+      
+# - name: "2.1.17 Ensure web proxy server services are not in use"
+#   block:
+#      - name: 2.1.17 Ensure web proxy server services are not in use| audit
+#        shell: |
+#                dpkg-query -s squid &>/dev/null && echo "squid is installed"  || echo "squid is not installed"
+#        register: squid_check_result
+#        changed_when: false
+
+#      - name: 2.1.17 Ensure web proxy server services are not in use| audit
+#        shell: |
+#            systemctl is-enabled squid.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+#        register: enable_check_result
+#        changed_when: false
+    
+
+#      - name: 2.1.17 Ensure web proxy server services are not in use | audit
+#        shell: |
+#                systemctl is-active squid.service 2>/dev/null | grep '^active'   && echo "active"    || echo "inactive" 
+#        register: active_check_result
+#        changed_when: false
+
+#      - name: 2.1.17 Ensure web proxy server services are not in use| set fact
+#        set_fact:
+#             squid_check:
+#                 name:  2.1.16 Ensure tftp server services are not in use
+#                 remediation_status: "{{ 'true' if squid_check_result.stdout == 'squid is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+#                 remediation: " remove mask stop squid package"
+
+#      - name:   2.1.17 Ensure web proxy server services are not in use| append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ squid_check] }}"       
+#        changed_when: false   
+       
+#      - name: 2.1.17 Ensure web proxy server services are not in use | stop | remediation
+#        systemd:
+#          name:   squid.service
+#          state: stopped
+#          enabled: no
+#        when: squid_check.remediation_status == 'false' 
+#        ignore_errors: yes
+      
+#      - name:  2.1.17 Ensure web proxy server services are not in use | mask  | remediation
+#        command: systemctl mask --force squid.service
+#        when: squid_check.remediation_status == 'false' 
+        
+#      - name: 2.1.17 Ensure web proxy server services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  squid 
+#          state: absent
+#          purge: yes
+#        when: squid_check.remediation_status == 'false' 
+      
+
+
+      
+- name: "2.1.18 Ensure web server services are not in use"
+  block:
+     - name: 2.1.18 Ensure web server services are not in use| audit
+       shell: |
+               dpkg-query -s apache2 &>/dev/null && echo "apache2 is installed"   || echo "apache2 is not installed"
+       register: app_check_result
+       changed_when: false
+
+     - name: 2.1.18 Ensure web server services are not in use| audit
+       shell: |
+               dpkg-query -s nginx &>/dev/null && echo "nginx is installed"  || echo "nginx is  not installed"
+       register: ngn_check_result
+       changed_when: false
+
+     - name: 2.1.18 Ensure web server services are not in use| audit
+       shell: |
+           systemctl is-enabled apache2.socket apache2.service nginx.service 2>/dev/null | grep 'enabled'  && echo "enabled"   || echo "disabled" 
+       register: enable_check_result
+       changed_when: false
+       
+    
+
+     - name: 2.1.18 Ensure web server services are not in use | audit
+       shell: |
+               systemctl is-active apache2.socket apache2.service nginx.service 2>/dev/null | grep '^active'    && echo "active"    || echo "inactive" 
+       register: active_check_result
+       changed_when: false
+
+     - name: 2.1.18 Ensure web server services are not in use| set fact
+       set_fact:
+            test_check:
+                name:  2.1.18 Ensure web server services are not in use
+                remediation_status: "{{ 'true' if ngn_check_result.stdout == 'nginx is  not installed' and app_check_result == 'apache2 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive'  else 'false'  }}"
+                remediation: " remove mask appp et ngnix squid package"
+
+     - name:   2.1.18 Ensure web server services are not in use| append result 
+       set_fact:
+            audit_result: "{{ (audit_result | default([])) + [ test_check] }}"       
+       changed_when: false   
+       
+     - name:  2.1.18 Ensure web server services are not in use | stop | remediation
+       systemd:
+         name:   apache2.socket apache2.service nginx.service
+         state: stopped
+         enabled: no
+       when: test_check.remediation_status == 'false' 
+       ignore_errors: yes
+      
+     - name:  2.1.18 Ensure web server services are not in use | mask  | remediation
+       command: systemctl mask --force apache2.socket apache2.service nginx.service
+       when: test_check.remediation_status == 'false'  
+        
+     - name:  2.1.18 Ensure web server services are not in use| ' remove '|   remediation
+       apt:
+         name:   apache2 nginx
+         state: absent
+         purge: yes
+       when: test_check.remediation_status == 'false'  

@@ -1,0 +1,171 @@
+- name: 2.2.1 Ensure NIS Client is not installed
+  block:
+     - name: 2.2.1 Ensure NIS Client is not installed | audit
+       shell: |
+          dpkg-query -s nis &>/dev/null && echo "nis is installed" || echo "nis is not installed"
+       register: nis_check_result
+       changed_when: false  
+
+     - name: 2.2.1 Ensure NIS Client is not installed | set fact
+       set_fact: 
+           nis_check:
+             name: 2.2.1 Ensure NIS Client is not installed
+             remediation_status: "{{ 'true' if nis_check_result.stdout == 'nis is not installed' else 'false'}}"
+             remediation: "remove NIS"
+
+     - name: 2.2.1 Ensure NIS Client is not installed | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ nis_check ] }}"
+       changed_when: false
+
+     - name: 2.2.1 Ensure NIS Client is not installed | remediation
+       apt:
+         name: nis
+         state: absent
+         purge: yes
+       when: nis_check.remediation_status == 'false'
+
+        
+
+#2.2.2
+- name: 2.2.2 Ensure rsh client is not installed
+  block:
+     - name:  2.2.2 Ensure rsh client is not installed | audit
+       shell: |
+           dpkg-query -s rsh-client &>/dev/null && echo "rsh-client is installed"  || echo "rsh-client is installed"
+       register: rsh_check_result
+       changed_when: false  
+
+     - name:  2.2.2 Ensure rsh client is not installed | set fact
+       set_fact: 
+           rsh_check:
+             name:  2.2.2 Ensure rsh client is not installed
+             remediation_status: "{{ 'true' if rsh_check_result.stdout == 'rsh-client is installed' else 'false'}}"
+             remediation: "remove rsh"
+
+     - name: 2.2.2 Ensure rsh client is not installed | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ rsh_check ] }}"
+       changed_when: false
+
+     - name: 2.2.2 Ensure rsh client is not installed | remediation
+       apt:
+         name: rsh-client 
+         state: absent
+         purge: yes
+       when: rsh_check.remediation_status == 'false'
+
+
+- name: 2.2.3 Ensure talk client is not installed
+  block:
+     - name:  2.2.3 Ensure talk client is not installed | audit
+       shell: |
+            dpkg-query -s talk &>/dev/null && echo "talk is installed"   || echo "talk is not installed"
+       register: talk_check_result
+       changed_when: false  
+
+     - name:  2.2.3 Ensure talk client is not installed | set fact
+       set_fact: 
+           talk_check:
+             name:  2.2.3 Ensure talk client is not installed
+             remediation_status: "{{ 'true' if 'talk is not installed' in talk_check_result.stdout  else 'false'}}"
+             remediation: "remove talk"
+
+     - name: 2.2.3 Ensure talk client is not installed | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ talk_check] }}"
+       changed_when: false
+
+     - name: 2.2.3 Ensure talk client is not installed | remediation
+       apt:
+         name:  talk 
+         state: absent
+         purge: yes
+       when: talk_check.remediation_status == 'false'
+       changed_when: false 
+
+- name: 2.2.4 Ensure telnet client is not installed 
+  block:
+     - name:  2.2.4 Ensure telnet client is not installed  | audit
+       shell: |
+            dpkg-query -s telnet &>/dev/null && echo "telnet is installed"    || echo "telnet is not installed"
+       register: telnet_check_result
+       changed_when: false  
+
+     - name: 2.2.4 Ensure telnet client is not installed  | set fact
+       set_fact: 
+           telnet_check:
+             name:  2.2.4 Ensure telnet client is not installed 
+             remediation_status: "{{ 'true' if telnet_check_result.stdout ==  'telnet is not installed' else 'false'}}"
+             remediation: "remove telnet "
+
+     - name: 2.2.4 Ensure telnet client is not installed  | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ telnet_check] }}"
+       changed_when: false
+
+     - name: 2.2.4 Ensure telnet client is not installed  | remediation
+       apt:
+         name:   telnet 
+         state: absent
+         purge: yes
+       when: telnet_check.remediation_status == 'false'
+       changed_when: false 
+
+
+
+- name: 2.2.5 Ensure ldap client is not installed
+  block:
+     - name: 2.2.5 Ensure ldap client is not installed  | audit
+       shell: |
+            dpkg-query -s ldap-utils &>/dev/null && echo "ldap-utils is installed"   || echo "ldap-utils is not installed"
+       register: idap_check_result
+       changed_when: false  
+
+     - name: 2.2.5 Ensure ldap client is not installed | set fact
+       set_fact: 
+           idap_check:
+             name:  2.2.5 Ensure ldap client is not installed
+             remediation_status: "{{ 'true' if idap_check_result.stdout ==  'ldap-utils is not installed' else 'false'}}"
+             remediation: "remove ldap client"
+
+     - name: 2.2.5 Ensure ldap client is not installed  | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ idap_check] }}"
+       changed_when: false
+
+     - name: 2.2.5 Ensure ldap client is not installed | remediation
+       apt:
+         name:  ldap-utils  
+         state: absent
+         purge: yes
+       when: idap_check.remediation_status == 'false'
+       changed_when: false 
+
+- name: 2.2.6 Ensure ftp client is not installed
+  block:
+     - name: 2.2.6 Ensure ftp client is not installed | audit
+       shell: |
+            dpkg-query -s ftp &>/dev/null && echo "ftp is installed"   || echo "ftp is not installed"
+       register: ftp_check_result
+       changed_when: false  
+
+     - name: 2.2.6 Ensure ftp client is not installed | set fact
+       set_fact: 
+           ftp_check:
+             name:  2.2.6 Ensure ftp client is not installed
+             remediation_status: "{{ 'true' if  'ftp is not installed' in ftp_check_result.stdout  else 'false'}}"
+             remediation: "remove ftp "
+
+     - name: 2.2.6 Ensure ftp client is not installed | append result 
+       set_fact:
+         audit_result: "{{ (audit_result | default([])) + [ ftp_check] }}"
+       changed_when: false
+
+     - name: 2.2.6 Ensure ftp client is not installed| remediation
+       apt:
+         name:  ftp  
+         state: absent
+         purge: yes
+       when: ftp_check.remediation_status == 'false'
+       changed_when: false 
