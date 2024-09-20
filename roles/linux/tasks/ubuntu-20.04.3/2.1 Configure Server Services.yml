@@ -205,66 +205,67 @@
 #       when: dhcp_check.remediation_status == 'false'
 
 
-# - name: 2.1.4 Ensure DNS server services are not in use
-#   block:
-#     - name: 2.1.4 Ensure DNS server services are not in use | audit
-#       shell: |
-#         dpkg-query -s bind9 &>/dev/null && echo "bind9 is installed" || echo "bind9 is not installed"
-#       register: dns_check_result
-#       changed_when: false
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | audit (check enable)
-#       shell: |
-#         if systemctl is-enabled bind9.service 2>/dev/null | grep 'enabled'; then
-#           echo "enabled"
-#         else
-#           echo "disabled"
-#         fi
-#       register: enable_check_result
+- name: 2.1.4 Ensure DNS server services are not in use
+  block:
+    - name: 2.1.4 Ensure DNS server services are not in use | audit
+      shell: |
+        dpkg-query -s bind9 &>/dev/null && echo "bind9 is installed" || echo "bind9 is not installed"
+      register: dns_check_result
+      changed_when: false
+
+    - name: 2.1.4 Ensure DNS server services are not in use | audit (check enable)
+      shell: |
+        if systemctl is-enabled bind9.service 2>/dev/null | grep 'enabled'; then
+          echo "enabled"
+        else
+          echo "disabled"
+        fi
+      register: enable_check_result
       
-#       changed_when: false
+      changed_when: false
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | audit (check active)
-#       shell: |
-#             if systemctl is-active bind9.service 2>/dev/null | grep  '^active'; then
-#                echo "active"
-#             else
-#                echo "inactive"
-#             fi
-#       register: active_check_result
+    - name: 2.1.4 Ensure DNS server services are not in use | audit (check active)
+      shell: |
+            if systemctl is-active bind9.service 2>/dev/null | grep  '^active'; then
+               echo "active"
+            else
+               echo "inactive"
+            fi
+      register: active_check_result
       
-#       changed_when: false
+      changed_when: false
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | set fact
-#       set_fact:
-#         dns_check:
-#           name: 2.1.4 Ensure DNS server services are not in use
-#           remediation_status: "{{ 'true' if dns_check_result.stdout == 'bind9 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive' else 'false' }}"
-#           remediation: remove, stop, disable, and mask DNS
+    - name: 2.1.4 Ensure DNS server services are not in use | set fact
+      set_fact:
+        dns_check:
+          name: 2.1.4 Ensure DNS server services are not in use
+          remediation_status: "{{ 'true' if dns_check_result.stdout == 'bind9 is not installed' and  enable_check_result.stdout == 'disabled' and  active_check_result.stdout == 'inactive' else 'false' }}"
+          remediation: remove, stop, disable, and mask DNS
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | append result
-#       set_fact:
-#         audit_result: "{{ (audit_result | default([])) + [ dns_check ] }}"
-#       changed_when: false
+    - name: 2.1.4 Ensure DNS server services are not in use | append result
+      set_fact:
+        audit_result: "{{ (audit_result | default([])) + [ dns_check ] }}"
+      changed_when: false
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (stop and disable DNS)
-#       systemd:
-#         name: bind9.service
-#         state: stopped
-#         enabled: no
-#       when: dns_check.remediation_status == 'false'
-#       ignore_errors: yes
+    - name: 2.1.4 Ensure DNS server services are not in use | remediation (stop and disable DNS)
+      systemd:
+        name: bind9.service
+        state: stopped
+        enabled: no
+        masked: yes
+        force: true
+      when: dns_check.remediation_status == 'false'
+      ignore_errors: yes
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (mask DNS)
-#       command: systemctl mask --force bind9.service
-#       when: dns_check.remediation_status == 'false'
+   
 
-#     - name: 2.1.4 Ensure DNS server services are not in use | remediation (remove)
-#       apt:
-#         name: bind9
-#         state: absent
-#         purge: yes
-#       when: dns_check.remediation_status == 'false'
+    - name: 2.1.4 Ensure DNS server services are not in use | remediation (remove)
+      apt:
+        name: bind9
+        state: absent
+        purge: yes
+      when: dns_check.remediation_status == 'false'
 
 
 # - name: "2.1.5 Ensure dnsmasq services are not in use "
@@ -1087,15 +1088,35 @@
        
 #      - name:  2.1.18 Ensure web server services are not in use | stop | remediation
 #        systemd:
-#          name:   apache2.socket apache2.service nginx.service
+#          name:   apache2.socket
 #          state: stopped
+#          masked: yes
 #          enabled: no
+#          force: true
 #        when: test_check.remediation_status == 'false' 
 #        ignore_errors: yes
       
-#      - name:  2.1.18 Ensure web server services are not in use | mask  | remediation
-#        command: systemctl mask --force apache2.socket apache2.service nginx.service
-#        when: test_check.remediation_status == 'false'  
+#      - name:  2.1.18 Ensure web server services are not in use | stop | remediation
+#        systemd:
+#          name:   apache2.service
+#          state: stopped
+#          masked: yes
+#          enabled: no
+#          force: true
+#        when: test_check.remediation_status == 'false' 
+#        ignore_errors: yes
+
+
+#      - name:  2.1.18 Ensure web server services are not in use | stop | remediation
+#        systemd:
+#          name:   nginx.service 
+#          state: stopped
+#          masked: yes
+#          enabled: no
+#          force: true
+#        when: test_check.remediation_status == 'false' 
+#        ignore_errors: yes
+   
         
 #      - name:  2.1.18 Ensure web server services are not in use| ' remove '|   remediation
 #        apt:
@@ -1162,33 +1183,33 @@
 #        when: xin_check.remediation_status == 'false' 
 
       
-- name: "2.1.20 Ensure X window server services are not in use"
-  block:
-     - name: 2.1.20 Ensure X window server services are not in use| audit
-       shell: |
-               dpkg-query -s xserver-common &>/dev/null && echo "xserver-common is installed"    || echo "xserver-common is not installed" 
-       register: xserver_check_result
-       changed_when: false
+# - name: "2.1.20 Ensure X window server services are not in use"
+#   block:
+#      - name: 2.1.20 Ensure X window server services are not in use| audit
+#        shell: |
+#                dpkg-query -s xserver-common &>/dev/null && echo "xserver-common is installed"    || echo "xserver-common is not installed" 
+#        register: xserver_check_result
+#        changed_when: false
 
 
-     - name: 2.1.20 Ensure X window server services are not in use | set fact
-       set_fact:
-            serv_check:
-                name:  2.1.20 Ensure X window server services are not in use 
-                remediation_status: "{{ 'true' if xserver_check_result.stdout == 'xserver-common is not installed'   else 'false'  }}"
-                remediation: " remove mask package"
+#      - name: 2.1.20 Ensure X window server services are not in use | set fact
+#        set_fact:
+#             serv_check:
+#                 name:  2.1.20 Ensure X window server services are not in use 
+#                 remediation_status: "{{ 'true' if xserver_check_result.stdout == 'xserver-common is not installed'   else 'false'  }}"
+#                 remediation: " remove mask package"
 
-     - name:   2.1.20 Ensure X window server services are not in use | append result 
-       set_fact:
-            audit_result: "{{ (audit_result | default([])) + [ serv_check] }}"       
-       changed_when: false   
+#      - name:   2.1.20 Ensure X window server services are not in use | append result 
+#        set_fact:
+#             audit_result: "{{ (audit_result | default([])) + [ serv_check] }}"       
+#        changed_when: false   
        
   
         
-     - name:  2.1.20 Ensure X window server services are not in use| ' remove '|   remediation
-       apt:
-         name:  xserver-common 
-         state: absent
-         purge: yes
-       when: serv_check.remediation_status == 'false' 
+#      - name:  2.1.20 Ensure X window server services are not in use| ' remove '|   remediation
+#        apt:
+#          name:  xserver-common 
+#          state: absent
+#          purge: yes
+#        when: serv_check.remediation_status == 'false' 
       
