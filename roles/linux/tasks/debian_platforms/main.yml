@@ -30,10 +30,14 @@
 #- include_tasks:
       #  file: "./ubuntu-20.04.3/1.7 Configure GNOME Display Manager.yml"
 
-- include_tasks:
-       file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
+# - include_tasks:
+#        file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
 
 
 # - include_tasks:
 #        file: "./ubuntu-20.04.3/2.2 Configure Client Services.yml"
+
+- include_tasks:
+       file: "./ubuntu-20.04.3/4.1 Configure UncomplicatedFirewall.yml"
+
        
