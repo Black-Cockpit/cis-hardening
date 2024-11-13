@@ -1,6 +1,5 @@
 - name: "1.4 Configure Bootloader"
   block:
-
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Audit"
       shell: |
         grep "^set superusers" /boot/grub/grub.cfg
@@ -20,22 +19,23 @@
             {{ set_superuser_check and password_check }}
           remediation: "Ensure GRUB superuser and password configuration are set correctly"
       changed_when: false
+
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Append audit result"
       set_fact:
-        audit_result: "{{ (audit_result | default([])) + [grub_check] }}"
+        audit_result: "{{ audit_result | default([]) | union([{'name': grub_check.name, 'scored': grub_check.scored, 'automated': grub_check.automated, 'remediation_status': grub_check.remediation_status, 'remediation': grub_check.remediation}]) }}"
       changed_when: false
 
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Remediation"
       debug:
         msg: "Ensure GRUB superuser and password configuration are set correctly"
-      when: not audit_only and not grub_check.remediation_status
+      when: not grub_check.remediation_status
       changed_when: false
 
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Create Encrypted Password"
       shell: |
         grub-mkpasswd-pbkdf2 --iteration-count=600000 --salt=64
       register: encrypted_password
-      when: not audit_only and not grub_check.remediation_status
+      when: not grub_check.remediation_status
 
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Add Configuration to /etc/grub.d"
       block:
@@ -46,11 +46,13 @@
               set superusers="<username>"
               password_pbkdf2 <username> {{ encrypted_password.stdout_lines[2] }}
             create: yes
-          when: not audit_only and not grub_check.remediation_status
+          when:  not grub_check.remediation_status
 
         - name: "Update GRUB configuration"
           shell: update-grub
-          when: not audit_only and not grub_check.remediation_status
+          when: not grub_check.remediation_status
+
+
 
          
   # 1.4.2 Ensure access to bootloader config is configured (Automated)

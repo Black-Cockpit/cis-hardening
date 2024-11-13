@@ -2,14 +2,14 @@
     file: "./debian_platforms/debian_pre_audit.yml"
 
 
- #- include_tasks:
-    # # file: "./ubuntu-20.04.3/1.1.1 Configure Filesystem Kernel Modules.yml"
+# - include_tasks:
+#     file: "./ubuntu-20.04.3/1.1.1 Configure Filesystem Kernel Modules.yml"
 
 # - include_tasks:
-          #  file: "./ubuntu-20.04.3/1.1.2 Configure Filesystem Partitions.yml"
+#            file: "./ubuntu-20.04.3/1.1.2 Configure Filesystem Partitions.yml"
 
-#- include_vars:
-    #  file: "{{ ansible_distribution }}.yml"
+# - include_vars:
+#      file: "{{ ansible_distribution }}.yml"
 
 # - include_tasks:
 #     file: "./ubuntu-20.04.3/1.2 Package Management.yml"
@@ -17,25 +17,25 @@
 # - include_tasks:
 #    file: "./ubuntu-20.04.3/1.3 Mandatory Access Control.yml"
 
-# - include_tasks:
-#      file: "./ubuntu-20.04.3/1.4 Configure Bootloader.yml"
+- include_tasks:
+     file: "./ubuntu-20.04.3/1.4 Configure Bootloader.yml"
 
-# - include_tasks:
-#      file: "./ubuntu-20.04.3/1.5 Configure Additional Process Hardening.yml"
+- include_tasks:
+     file: "./ubuntu-20.04.3/1.5 Configure Additional Process Hardening.yml"
 
-# - include_tasks:
-#            file: "./ubuntu-20.04.3/1.6 Configure Command Line Warning Banners.yml"
-
-
-#- include_tasks:
-      #  file: "./ubuntu-20.04.3/1.7 Configure GNOME Display Manager.yml"
-
-# - include_tasks:
-#        file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
+- include_tasks:
+           file: "./ubuntu-20.04.3/1.6 Configure Command Line Warning Banners.yml"
 
 
-# - include_tasks:
-#        file: "./ubuntu-20.04.3/2.2 Configure Client Services.yml"
+- include_tasks:
+       file: "./ubuntu-20.04.3/1.7 Configure GNOME Display Manager.yml"
+
+- include_tasks:
+       file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
+
+
+- include_tasks:
+       file: "./ubuntu-20.04.3/2.2 Configure Client Services.yml"
 
 - include_tasks:
        file: "./ubuntu-20.04.3/4.1 Configure UncomplicatedFirewall.yml"
