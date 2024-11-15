@@ -20,24 +20,24 @@
 - include_tasks:
      file: "./ubuntu-20.04.3/1.4 Configure Bootloader.yml"
 
-- include_tasks:
-     file: "./ubuntu-20.04.3/1.5 Configure Additional Process Hardening.yml"
+# - include_tasks:
+#      file: "./ubuntu-20.04.3/1.5 Configure Additional Process Hardening.yml"
 
-- include_tasks:
-           file: "./ubuntu-20.04.3/1.6 Configure Command Line Warning Banners.yml"
-
-
-- include_tasks:
-       file: "./ubuntu-20.04.3/1.7 Configure GNOME Display Manager.yml"
-
-- include_tasks:
-       file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
+# - include_tasks:
+#            file: "./ubuntu-20.04.3/1.6 Configure Command Line Warning Banners.yml"
 
 
-- include_tasks:
-       file: "./ubuntu-20.04.3/2.2 Configure Client Services.yml"
+# - include_tasks:
+#        file: "./ubuntu-20.04.3/1.7 Configure GNOME Display Manager.yml"
 
-- include_tasks:
-       file: "./ubuntu-20.04.3/4.1 Configure UncomplicatedFirewall.yml"
+# - include_tasks:
+#        file: "./ubuntu-20.04.3/2.1 Configure Server Services.yml"
+
+
+# - include_tasks:
+#        file: "./ubuntu-20.04.3/2.2 Configure Client Services.yml"
+
+# - include_tasks:
+#        file: "./ubuntu-20.04.3/4.1 Configure UncomplicatedFirewall.yml"
 
        

@@ -22,7 +22,8 @@
 
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Append audit result"
       set_fact:
-        audit_result: "{{ audit_result | default([]) | union([{'name': grub_check.name, 'scored': grub_check.scored, 'automated': grub_check.automated, 'remediation_status': grub_check.remediation_status, 'remediation': grub_check.remediation}]) }}"
+        audit_result: "{{ audit_result | default([]) }}  # Assurez-vous que c'est une liste vide"
+        audit_result: "{{ audit_result + [{'name': grub_check.name, 'scored': grub_check.scored, 'automated': grub_check.automated, 'remediation_status': grub_check.remediation_status, 'remediation': grub_check.remediation}] }}"
       changed_when: false
 
     - name: "1.4.1 Ensure bootloader password is set (Automated) | Remediation"
@@ -46,48 +47,43 @@
               set superusers="<username>"
               password_pbkdf2 <username> {{ encrypted_password.stdout_lines[2] }}
             create: yes
-          when:  not grub_check.remediation_status
+          when: not grub_check.remediation_status
 
         - name: "Update GRUB configuration"
           shell: update-grub
           when: not grub_check.remediation_status
 
+    - name: "1.4.2 Ensure access to bootloader config is configured (Automated)"
+      block:
+        - name: "1.4.2 Ensure access to bootloader config is configured | Audit"
+          shell: "stat -Lc 'Access: (%#a/%A)  Uid: (%u/%U) Gid: (%g/%G)' /boot/grub/grub.cfg"
+          changed_when: false
+          register: bootloader_permissions_check
 
+        - name: "1.4.2 Ensure access to bootloader config is configured | Extract Result"
+          set_fact:
+            bootloader_permissions_check_result:
+              name: "1.4.2 Ensure access to bootloader config is configured"
+              scored: true
+              automated: true
+              remediation_status: "{{ bootloader_permissions_check.stdout == 'Access: (0600/-rw-------)  Uid: (0/root) Gid: (0/root)' }}"
+          changed_when: false
 
-         
-  # 1.4.2 Ensure access to bootloader config is configured (Automated)
-    - name: "1.4.2 Ensure access to bootloader config is configured | Audit"
-      shell: "stat -Lc 'Access: (%#a/%A)  Uid: (%u/%U) Gid: (%g/%G)' /boot/grub/grub.cfg"
-      changed_when: false
-      register: bootloader_permissions_check
+        - name: "1.4.2 Ensure access to bootloader config is configured | Append Result"
+          set_fact:
+            audit_result: "{{ (audit_result | default([])) + [bootloader_permissions_check_result] }}"
+          changed_when: false
 
-    # Extract Audit Result
-    - name: "1.4.2 Ensure access to bootloader config is configured | Extract Result"
-      set_fact:
-        bootloader_permissions_check_result:
-          name: "1.4.2 Ensure access to bootloader config is configured"
-          scored: true
-          automated: true
-          remediation_status: "{{ bootloader_permissions_check.stdout == 'Access: (0600/-rw-------)  Uid: (0/root) Gid: (0/root)' }}"
-      changed_when: false
+        - name: "Change ownership to root:root | Remediation"
+          file:
+            path: /boot/grub/grub.cfg
+            owner: root
+            group: root
+          when: not bootloader_permissions_check_result.remediation_status
 
-    # Appending Audit Result
-    - name: "1.4.2 Ensure access to bootloader config is configured | Append Result"
-      set_fact:
-        audit_result: "{{ (audit_result | default([])) + [bootloader_permissions_check_result] }}"
-      changed_when: false
-
-    # Remediation
-    - name: "Change ownership to root:root | Remediation"
-      file:
-        path: /boot/grub/grub.cfg
-        owner: root
-        group: root
-      when: not bootloader_permissions_check_result.remediation_status
-
-    - name: "Set permissions to 0600 | Remediation"
-      file:
-        path: /boot/grub/grub.cfg
-        mode: '0600'
-      when: not bootloader_permissions_check_result.remediation_status
+        - name: "Set permissions to 0600 | Remediation"
+          file:
+            path: /boot/grub/grub.cfg
+            mode: '0600'
+          when: not bootloader_permissions_check_result.remediation_status
 
