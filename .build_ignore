@@ -1,3 +1,13 @@
+.git/
+.gitignore
+tests/
+molecule/
+*.log
+*.retry
+__pycache__/
+*.pyc
+**/*.venv
+
 # build products...
 *.py[co]
 build
@@ -59,7 +69,6 @@ docs/docsite/_static/websupport.js
 *.swo
 [._]*.un~
 credentials.yml
-**/*venv
 # test output
 *.retry
 *.out
