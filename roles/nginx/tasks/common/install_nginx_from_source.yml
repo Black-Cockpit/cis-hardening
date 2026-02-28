@@ -4,7 +4,7 @@
     cmd: |
       nginx_last_release_date=$(curl -s https://nginx.org/download/ | sed -e 's@<a\shref=\"@@g' | sed -e 's@\">.*<\/a>@@g' | grep -E "^nginx.*\.tar.gz\s" | awk '{print $2}' | sort -t'-' -k3,3 -k2,2M -k1,1n | tail -n -1)
       nginx_latest_version=$(curl -s https://nginx.org/download/ | grep $nginx_last_release_date | sed -e 's@<a\shref=\"@@g' | sed -e 's@\">.*<\/a>@@g' | grep -E "^nginx.*\.tar.gz\s" | awk '{print $1}')
-      echo "$nginx_latest_version"
+      echo "$nginx_latest_version" 
   register: nginx_latest_version
 
 # Create build directory
@@ -40,7 +40,7 @@
 - name: "{{ rule }} | Remediation"
   get_url:
     dest: "/tmp/cis_nginx_build_dir/"
-    url: "https://nginx.org/download/{{ nginx_latest_version.stdout }}"
+    url: "https://nginx.org/download/{{ nginx_latest_version.stdout | trim }}"
 
 # Download headers-more-nginx-module
 - name: "{{ rule }} | Remediation"
@@ -51,7 +51,7 @@
 # Extract nginx
 - name: "{{ rule }} | Remediation"
   unarchive:
-    src: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout }}"
+    src: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout | trim }}"
     dest: "/tmp/cis_nginx_build_dir/"
     remote_src: true
 
@@ -70,7 +70,7 @@
 
 # Define source directly
 - set_fact:
-    nginx_source_dir: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout | replace('.tar.gz','') }}"
+    nginx_source_dir: "/tmp/cis_nginx_build_dir/{{ nginx_latest_version.stdout | trim | replace('.tar.gz','') }}"
 
 # Configure nginx build
 - name: "{{ rule }} | Remediation"
@@ -82,8 +82,8 @@
 - name: "{{ rule }} | Remediation"
   command:
     argv:
-      - "make"
-      - "-j{{ ansible_facts['processor_nproc'] }}"
+    - "make"
+    - "-j{{ ansible_facts['processor_nproc'] }}"
     chdir: "{{ nginx_source_dir }}"
 
 # Install nginx
