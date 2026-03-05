@@ -3,6 +3,9 @@
 # Audit result
 audit_result: []
 
+# Container mode: Set to true when hardening nginx inside a container
+container: false
+
 # Target platform: Set later on the pre-audit tasks 
 target_platform: ''
 

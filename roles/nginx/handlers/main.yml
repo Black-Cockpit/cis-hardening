@@ -3,5 +3,11 @@
   service:
     name: "nginx"
     state: restarted
+  when: not container
+
+- name: restart nginx
+  command: nginx -s reload
+  when: container
+
 - name: config test
   command: nginx -t

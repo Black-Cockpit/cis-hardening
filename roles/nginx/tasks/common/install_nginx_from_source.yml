@@ -138,8 +138,10 @@
     mode: "0644"
     owner: root
     group: root
+  when: not container
 
 # Reload deamon
 - name: "{{ rule }} | Remediation"
   systemd:
     daemon_reload: true
+  when: not container

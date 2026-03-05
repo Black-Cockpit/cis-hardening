@@ -26,11 +26,11 @@
         cmd: sudo -l -U {{ nginx_user }} | grep -iq 'not allowed to run sudo' && echo configured || echo not_configured
       changed_when: false
       register: nginx_user_privileges_status
-      when: remediation_status
+      when: remediation_status and not container
 
     # Update remediation status
     - set_fact:
-        remediation_status: "{{ true if (remediation_status and (nginx_user_privileges_status.stdout | default()) == 'configured' ) else false }}"
+        remediation_status: "{{ true if (remediation_status and (nginx_user_privileges_status.stdout | default('configured')) == 'configured' ) else false }}"
       changed_when: false
       when: remediation_status
     
@@ -140,9 +140,10 @@
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          not container
+          and (('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
+          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels))
   
 
 
