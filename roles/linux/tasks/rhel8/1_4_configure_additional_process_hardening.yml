@@ -12,13 +12,11 @@
         cmd: 'grep -Eq "^\s{0,}kernel.randomize_va_space\s{0,}=\s{0,}2" /etc/sysctl.conf && echo exists || echo not_exists'
       changed_when: false
       register: aslr_sysctl_conf_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Set ASLR configuration compliance tracker
     - set_fact:
         aslr_configured: "{{ true if aslr_sysctl_conf_check.stdout == 'exists' else false }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Check if one of sysctl configuration files has ASLR configuration
     - name: 1.4.1 Ensure address space layout randomization (ASLR) is enabled | Audit
@@ -26,14 +24,12 @@
         cmd: 'grep -Eq "^\s{0,}kernel.randomize_va_space\s{0,}=\s{0,}2" {{ item }} && echo exists || echo not_exists'
       changed_when: false
       register: aslr_sysctl_conf_files_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop: "{{ sysctl_conf_files }}"
 
     # Check if ASLR is configured in one of the sysctl listed files
     - set_fact:
         aslr_configured: "{{ true if (aslr_configured or item.stdout == 'exists') else false }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop_control:
         label: "{{ item.stdout | default() }}"
       loop: "{{ (aslr_sysctl_conf_files_check.results | default([])) | list }}"
@@ -47,7 +43,6 @@
           echo exists || echo not_exists
       changed_when: false
       register: aslr_ufw_sysctl_conf_files_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Extract audit result
     - set_fact:
@@ -62,13 +57,11 @@
         aslr_rule:
           remediation_status: "{{ true if aslr_configured or aslr_ufw_sysctl_conf_files_check.stdout == 'exists' else false }}" 
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Append remediation status
     - set_fact:
         aslr_configured_check: "{{ aslr_configured_check | combine(aslr_rule) }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Appending audit result
     - set_fact:
@@ -83,7 +76,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and (aslr_configured_check.remediation_status is defined and not aslr_configured_check.remediation_status ) and not is_ipv6_disabled
+      when: not audit_only and (aslr_configured_check.remediation_status is defined and not aslr_configured_check.remediation_status )
     tags:
     - "server_level_1"
     - "workstation_level_1"
@@ -104,13 +97,11 @@
         cmd: 'grep -Eq "^\s{0,}kernel.yama.ptrace_scope\s{0,}=\s{0,}1" /etc/sysctl.conf && echo exists || echo not_exists'
       changed_when: false
       register: ptrace_scope_sysctl_conf_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Set ptrace_scope configuration compliance tracker
     - set_fact:
         ptrace_scope_configured: "{{ true if ptrace_scope_sysctl_conf_check.stdout == 'exists' else false }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Check if one of sysctl configuration files has ptrace_scope configuration
     - name: 1.4.2 Ensure ptrace_scope is restricted | Audit
@@ -118,14 +109,12 @@
         cmd: 'grep -Eq "^\s{0,}kernel.yama.ptrace_scope\s{0,}=\s{0,}1" {{ item }} && echo exists || echo not_exists'
       changed_when: false
       register: ptrace_scope_sysctl_conf_files_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop: "{{ sysctl_conf_files }}"
 
     # Check if ptrace_scope is configured in one of the sysctl listed files
     - set_fact:
         ptrace_scope_configured: "{{ true if (ptrace_scope_configured or item.stdout == 'exists') else false }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
       loop_control:
         label: "{{ item.stdout | default() }}"
       loop: "{{ ptrace_scope_sysctl_conf_files_check.results | default([]) | list }}"
@@ -139,7 +128,6 @@
           echo exists || echo not_exists
       changed_when: false
       register: ptrace_scope_ufw_sysctl_conf_files_check
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Extract audit result
     - set_fact:
@@ -154,13 +142,11 @@
         ptrace_scope_rule:
           remediation_status: "{{ true if ptrace_scope_configured or ptrace_scope_ufw_sysctl_conf_files_check.stdout == 'exists' else false }}" 
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Append remediation status
     - set_fact:
         ptrace_scope_configured_check: "{{ ptrace_scope_configured_check | combine(ptrace_scope_rule) }}"
       changed_when: false
-      when: not is_ipv6_disabled # Not applicable if IPv6 is disabled
 
     # Appending audit result
     - set_fact:
@@ -175,7 +161,7 @@
         state: present
         sysctl_set: true
         reload: true
-      when: not audit_only and (ptrace_scope_configured_check.remediation_status is defined and not ptrace_scope_configured_check.remediation_status ) and not is_ipv6_disabled
+      when: not audit_only and (ptrace_scope_configured_check.remediation_status is defined and not ptrace_scope_configured_check.remediation_status )
     tags:
     - "server_level_1"
     - "workstation_level_1"

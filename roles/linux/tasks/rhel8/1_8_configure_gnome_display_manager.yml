@@ -29,7 +29,7 @@
           name: 1.8.1 Ensure GNOME Display Manager is removed
           scored: true
           automated: true
-          remediation_status: "{{ true if gdm_installed else false }}"
+          remediation_status: "{{ true if not gdm_installed else false }}"
       changed_when: false
 
     # Appending audit result
@@ -49,9 +49,14 @@
         name: gdm3
         state: absent
       when: not audit_only and not gdm_check.remediation_status
+
+    # Update gdm package tracker so the following rules see the removal
+    - set_fact:
+        gdm_installed: false
+      when: not audit_only and not gdm_check.remediation_status
     tags:
     - "server_level_2"
-    when: "'server_level_2' in levels in levels"
+    when: "'server_level_2' in levels"
 
 
 

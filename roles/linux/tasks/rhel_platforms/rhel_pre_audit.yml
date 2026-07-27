@@ -39,11 +39,11 @@
   block:
   - name: "Pre Audit | Check if IPv6 is disabled"
     shell:
-      cmd: echo $([[ -f /sys/module/ipv6/parameters/disable ]] && cat /sys/module/ipv6/parameters/disable || 0)
+      cmd: echo $([[ -f /sys/module/ipv6/parameters/disable ]] && cat /sys/module/ipv6/parameters/disable || echo 1)
     changed_when: false
     register: ipv6_status
   - set_fact:
-      is_ipv6_disabled: "{{ true if ((ipv6_status.stdout | int) == 0) else false }}"
+      is_ipv6_disabled: "{{ true if ((ipv6_status.stdout | int) == 1) else false }}"
     changed_when: false
   tags:
   - always

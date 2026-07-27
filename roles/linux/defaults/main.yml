@@ -2,6 +2,15 @@
 audit_result: []
 reboot_required: false
 
+# Remediation will not be applied unless the audit_only is set to false
+audit_only: true
+
+# Benchmark level
+# Allowed values are `server_level_1`, `server_level_2`, `workstation_level_1` or `workstation_level_2`
+levels:
+- workstation_level_1
+- workstation_level_2
+
 # Warning Banner Content (issue, issue.net, motd)
 warning_banner: "Authorized uses only. All activity may be monitored and reported."
 
