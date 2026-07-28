@@ -1,0 +1,40 @@
+# permissions_etc_shells_configured
+#
+# /etc/shells is a text file which contains the full pathnames of valid login shells. This file
+# is consulted by chsh and available to be queried by other programs.
+
+- name: "permissions_etc_shells_configured | Audit"
+  stat:
+    path: "/etc/shells"
+  changed_when: false
+  register: shells_file_status
+
+# permissions_etc_shells_configured | Audit
+- name: "permissions_etc_shells_configured | Audit"
+  shell:
+    cmd: |
+      [ $(({{ shells_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: shells_permission_status
+  vars:
+    expected_file_mask: "0133"
+
+# Extract audit result
+- set_fact:
+    shells_permission_check:
+      remediation_status: "{{ true if ( shells_file_status.stat.pw_name == 'root' and shells_file_status.stat.gr_name == 'root' and shells_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_shells_configured | Remediation"
+  file:
+    path: "/etc/shells"
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not shells_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ shells_permission_check.remediation_status }}"

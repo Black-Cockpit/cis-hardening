@@ -1,0 +1,58 @@
+# freevxfs_kernel_module_not_available
+#
+# The freevxfs filesystem type is a free version of the Veritas type filesystem. This is the
+# primary filesystem type for HP-UX operating systems.
+
+- name: "freevxfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv freevxfs && echo loaded || echo not_loaded
+  changed_when: false
+  register: freevxfs_check_loaded_result
+# Check if module is disabled
+- name: "freevxfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install freevxfs /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: freevxfs_check_disabled_result
+# Check if module is blacklisted
+- name: "freevxfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist freevxfs" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: freevxfs_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    freevxfs_check:
+      remediation_status: "{{ true if (freevxfs_check_loaded_result.stdout == 'not_loaded' or (freevxfs_check_disabled_result.stdout == 'disabled' and freevxfs_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "freevxfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/freevxfs.conf"
+    regexp: "^(#)?install freevxfs(\\s|$)"
+    line: "install freevxfs /bin/true"
+    create: true
+  when: not audit_only and not freevxfs_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "freevxfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist freevxfs(\\s|$)"
+    line: "blacklist freevxfs"
+    create: true
+    mode: "0600"
+  when: not audit_only and not freevxfs_check.remediation_status
+
+# Disable freevxfs filesystems
+- name: Disabling freevxfs filesystems
+  modprobe:
+    name: freevxfs
+    state: absent
+  when: not audit_only and not freevxfs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ freevxfs_check.remediation_status }}"

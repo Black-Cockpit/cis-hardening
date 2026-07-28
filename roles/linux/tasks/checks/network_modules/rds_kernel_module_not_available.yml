@@ -1,0 +1,60 @@
+# rds_kernel_module_not_available
+#
+# The Reliable Datagram Sockets (RDS) protocol is a transport layer protocol designed to
+# provide low-latency, high-bandwidth communications between cluster nodes. It was
+# developed by the Oracle Corporation.
+
+- name: "rds_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv rds && echo loaded || echo not_loaded
+  changed_when: false
+  register: rds_check_loaded_result
+# Check if module is disabled
+- name: "rds_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install rds /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: rds_check_disabled_result
+# Check if module is blacklisted
+- name: "rds_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist rds" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: rds_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    rds_check:
+      remediation_status: "{{ true if (rds_check_loaded_result.stdout == 'not_loaded' or (rds_check_disabled_result.stdout == 'disabled' and rds_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "rds_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/rds.conf"
+    regexp: "^(#)?install rds(\\s|$)"
+    line: "install rds /bin/true"
+    create: true
+    mode: "0600"
+  when: not audit_only and not rds_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "rds_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist rds(\\s|$)"
+    line: "blacklist rds"
+    create: true
+    mode: "0600"
+  when: not audit_only and not rds_check.remediation_status
+
+# Disable rds filesystems
+- name: Disabling rds filesystems
+  modprobe:
+    name: rds
+    state: absent
+  when: not audit_only and not rds_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ rds_check.remediation_status }}"

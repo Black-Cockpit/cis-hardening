@@ -1,0 +1,70 @@
+# dhcp_server_services_not_use
+#
+# The Dynamic Host Configuration Protocol (DHCP) is a service that allows machines to
+# be dynamically assigned IP addresses. There are two versions of the DHCP protocol
+# DHCPv4 and DHCPv6 . At startup the server may be started for one or the other via the -4
+# or -6 arguments.
+
+- name: "dhcp_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "dhcp-server" && echo installed || echo not_installed
+  changed_when: false
+  register: dhcp_server_status_check
+
+# dhcp_server_services_not_use | Audit
+- name: "dhcp_server_services_not_use | Audit"
+  systemd:
+    name: dhcpd
+  ignore_errors: yes
+  changed_when: false
+  register: dhcp_service_status_check
+  when: dhcp_server_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    dhcp_remediation_status: "{{ true if (dhcp_server_status_check.stdout == 'not_installed' or (dhcp_service_status_check.status.ActiveState == 'inactive' and (dhcp_service_status_check.status.UnitFileState is not defined or dhcp_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+
+# dhcp_server_services_not_use | Audit
+- name: "dhcp_server_services_not_use | Audit"
+  systemd:
+    name: dhcpd6
+  ignore_errors: yes
+  changed_when: false
+  register: dhcp6_service_status_check
+  when: dhcp_server_status_check.stdout == 'installed'
+
+# Append to remediation status
+- set_fact:
+    dhcp_remediation_status: "{{ true if (dhcp_remediation_status and (dhcp6_service_status_check.status.ActiveState == 'inactive' and (dhcp6_service_status_check.status.UnitFileState is not defined or dhcp6_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: dhcp_server_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    dhcp_check:
+      remediation_status: "{{ true if dhcp_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "dhcp_server_services_not_use | Remediation"
+  systemd:
+    name: dhcpd
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not dhcp_check.remediation_status
+
+# dhcp_server_services_not_use | Remediation
+- name: "dhcp_server_services_not_use | Remediation"
+  systemd:
+    name: dhcpd6
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not dhcp_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ dhcp_check.remediation_status }}"

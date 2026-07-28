@@ -1,0 +1,60 @@
+# sshd_kexalgorithms_configured
+#
+# Key exchange is any method in cryptography by which cryptographic keys are
+# exchanged between two parties, allowing use of a cryptographic algorithm. If the sender
+# and receiver wish to exchange encrypted messages, each must be equipped to encrypt
+# messages to be sent and decrypt messages received
+
+- name: "sshd_kexalgorithms_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Extract ssh ciphers
+          sshd_ciphers=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep kexalgorithms)
+
+          # check if ssh has a weak cipher in use
+          if grep -q "diffie-hellman-group1-sha1" <<<"$sshd_ciphers" || grep "diffie-hellman-group-exchange-sha1" <<<"$sshd_ciphers" || \
+               grep "diffie-hellman-group14-sha1" <<<"$sshd_ciphers" ; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_kex_algorithms_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_kex_algorithms_check:
+      remediation_status: "{{ true if ssh_kex_algorithms_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_kexalgorithms_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(KexAlgorithms|#KexAlgorithms)"
+    state: absent
+  when: not audit_only and not ssh_kex_algorithms_check.remediation_status
+
+# sshd_kexalgorithms_configured | Remediation
+- name: "sshd_kexalgorithms_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(KexAlgorithms)"
+    line: 'KexAlgorithms -diffie-hellman-group1-sha1,diffie-hellman-group14-sha1,diffie-hellman-group-exchange-sha1'
+    state: present
+  when: not audit_only and not ssh_kex_algorithms_check.remediation_status
+
+# sshd_kexalgorithms_configured | Remediation
+- name: "sshd_kexalgorithms_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_kex_algorithms_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_kex_algorithms_check.remediation_status }}"

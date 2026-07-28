@@ -1,0 +1,75 @@
+# changes_system_administration_scope_sudoers_collected
+#
+# Monitor scope changes for system administrators. If the system has been properly
+# configured to force system administrators to log in as themselves first and then use the
+# sudo command to execute privileged commands, it is possible to monitor changes in
+# scope. The file /etc/sudoers , or files in /etc/sudoers.d , will be written to when the
+# file(s) or related attributes have changed. The audit records will be tagged with the
+# identifier "scope".
+
+- name: "changes_system_administration_scope_sudoers_collected | Audit"
+  shell:
+    cmd: awk '/^ *-w/ && /\/etc\/sudoers[\/]{0,1}/ && / +-p *wa/ && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  register: audit_watch_sudoers_rule_status_check
+
+# changes_system_administration_scope_sudoers_collected | Audit
+- name: "changes_system_administration_scope_sudoers_collected | Audit"
+  shell:
+    cmd: auditctl -l | awk '/^ *-w/ && /\/etc\/sudoers[\/]{0,1}/ && / +-p *wa/ && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  register: audit_watch_sudoers_running_rule_status_check
+
+# changes_system_administration_scope_sudoers_collected | Audit
+- name: "changes_system_administration_scope_sudoers_collected | Audit"
+  shell:
+    cmd: awk '/^ *-w/ && /\/etc\/sudoers.d[\/]{0,1}/ && / +-p *wa/ && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  register: audit_watch_sudoers_d_rule_status_check
+
+# changes_system_administration_scope_sudoers_collected | Audit
+- name: "changes_system_administration_scope_sudoers_collected | Audit"
+  shell:
+    cmd: auditctl -l | awk '/^ *-w/ && /\/etc\/sudoers.d[\/]{0,1}/ && / +-p *wa/ && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  register: audit_watch_sudoers_d_running_rule_status_check
+
+# Extract audit result
+- set_fact:
+    audit_watch_sudoers_rule_check:
+      remediation_status: "{{ true if ((audit_watch_sudoers_rule_status_check.stdout | int ) > 0 and (audit_watch_sudoers_running_rule_status_check.stdout | int ) > 0 and (audit_watch_sudoers_d_rule_status_check.stdout | int ) > 0 and (audit_watch_sudoers_d_running_rule_status_check.stdout | int ) > 0) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "changes_system_administration_scope_sudoers_collected | Remediation"
+  lineinfile:
+    line: "-w /etc/sudoers -p wa -k scope"
+    regexp: '^[\s]*(-w)[\s]*(\/etc\/sudoers[\/]{0,1})[\s]*(-p)[\s]*(wa)[\s]*(-k)[\s]*[!-~]*$'
+    path: "/etc/audit/rules.d/00-cis-scope.rules"
+    state: present
+    create: true
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_watch_sudoers_rule_check.remediation_status and not ((audit_watch_sudoers_rule_status_check.stdout | int ) > 0)
+
+# changes_system_administration_scope_sudoers_collected | Remediation
+- name: "changes_system_administration_scope_sudoers_collected | Remediation"
+  lineinfile:
+    line: "-w /etc/sudoers.d -p wa -k scope"
+    regexp: '^[\s]*(-w)[\s]*(\/etc\/sudoers.d[\/]{0,1})[\s]*(-p)[\s]*(wa)[\s]*(-k)[\s]*[!-~]*$'
+    path: "/etc/audit/rules.d/00-cis-scope.rules"
+    state: present
+    create: true
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_watch_sudoers_rule_check.remediation_status and not ((audit_watch_sudoers_d_rule_status_check.stdout | int ) > 0)
+
+ # changes_system_administration_scope_sudoers_collected | Remediation
+- name: "changes_system_administration_scope_sudoers_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_watch_sudoers_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_watch_sudoers_rule_check.remediation_status }}"

@@ -1,0 +1,30 @@
+# access_etc_sysconfig_sshd_configured
+#
+# The /etc/sysconfig/sshd file contains environment configuration for the
+# sshd daemon. Access must be restricted to the root user so non privileged
+# users cannot read or modify it.
+
+- name: "access_etc_sysconfig_sshd_configured | Audit"
+  stat:
+    path: /etc/sysconfig/sshd
+  changed_when: false
+  register: sysconfig_sshd_stat
+
+# Extract audit result
+- set_fact:
+    sysconfig_sshd_check:
+      remediation_status: "{{ true if (not sysconfig_sshd_stat.stat.exists or (sysconfig_sshd_stat.stat.mode == '0600' and sysconfig_sshd_stat.stat.pw_name == 'root' and sysconfig_sshd_stat.stat.gr_name == 'root')) else false }}"
+  changed_when: false
+
+# Remediation | Enforce ownership and permissions
+- name: "access_etc_sysconfig_sshd_configured | Remediation"
+  file:
+    name: /etc/sysconfig/sshd
+    mode: "0600"
+    owner: root
+    group: root
+  when: not audit_only and not sysconfig_sshd_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sysconfig_sshd_check.remediation_status }}"

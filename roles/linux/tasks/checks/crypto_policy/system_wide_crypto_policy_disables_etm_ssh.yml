@@ -1,0 +1,36 @@
+# system_wide_crypto_policy_disables_etm_ssh
+#
+# Encrypt-then-MAC (EtM) with SSH is affected by CVE-2023-48795 (Terrapin
+# attack). The system wide crypto policy should disable ssh_etm unless the
+# CVE has been addressed and site policy allows it.
+
+- name: "system_wide_crypto_policy_disables_etm_ssh | Audit"
+  shell:
+    cmd: grep -Psiq -- '^\h*ssh_etm\h*=\h*0\b' /etc/crypto-policies/state/CURRENT.pol 2>/dev/null && echo configured || echo not_configured
+  changed_when: false
+  register: crypto_etm_status
+
+# Extract audit result
+- set_fact:
+    crypto_etm_check:
+      remediation_status: "{{ true if crypto_etm_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Changing the system wide crypto policy affects every service on the host
+# and the rule is not applicable when CVE-2023-48795 has been addressed, so
+# the change is left to site policy
+- name: "system_wide_crypto_policy_disables_etm_ssh | Remediation"
+  debug:
+    msg: "Create a crypto policy module setting ssh_etm = 0 and apply it with update-crypto-policies per site policy"
+  when: not audit_only and not crypto_etm_check.remediation_status
+  changed_when: false
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Create a crypto policy module with ssh_etm = 0 and apply it with update-crypto-policies, or record CVE-2023-48795 as addressed'} }}"
+  changed_when: false
+  when: not crypto_etm_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crypto_etm_check.remediation_status }}"

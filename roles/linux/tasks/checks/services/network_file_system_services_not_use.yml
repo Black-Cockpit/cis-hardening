@@ -1,0 +1,40 @@
+# network_file_system_services_not_use
+#
+# The Network File System (NFS) is one of the first and most widely distributed file
+# systems in the UNIX environment. It provides the ability for systems to mount file
+# systems of other servers through the network.
+
+- name: "network_file_system_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "nfs-utils" && echo installed || echo not_installed
+  changed_when: false
+  register: nfs_status_check
+
+# network_file_system_services_not_use | Audit
+- name: "network_file_system_services_not_use | Audit"
+  systemd:
+    name: nfs-server
+  ignore_errors: yes
+  changed_when: false
+  register: nfs_service_status_check
+  when: nfs_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    nfs_check:
+      remediation_status: "{{ true if (nfs_status_check.stdout == 'not_installed' or (nfs_service_status_check.status.ActiveState == 'inactive' and (nfs_service_status_check.status.UnitFileState is not defined or nfs_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "network_file_system_services_not_use | Remediation"
+  systemd:
+    name: nfs-server
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not nfs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ nfs_check.remediation_status }}"

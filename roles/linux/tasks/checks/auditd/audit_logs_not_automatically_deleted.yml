@@ -1,0 +1,39 @@
+# audit_logs_not_automatically_deleted
+#
+# The max_log_file_action setting determines how to handle the audit log file reaching
+# the max file size. A value of keep_logs will rotate the logs but never delete old logs.
+
+- name: "audit_logs_not_automatically_deleted | Audit"
+  shell:
+    cmd: |
+      [[ $(awk -F '=' '{print $2}' <<< $(grep -E "^\s*max_log_file_action" /etc/audit/auditd.conf || echo "max_log_file_action = ")) == *"keep_logs"* ]] && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: max_log_file_action_status_check
+
+# Extract audit result
+- set_fact:
+    max_log_file_action_check:
+      remediation_status: "{{ true if max_log_file_action_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_logs_not_automatically_deleted | Remediation"
+  lineinfile: 
+    path: /etc/audit/auditd.conf
+    regexp: '^\s*max_log_file_action\s*='
+    state: absent
+  when: not audit_only and not max_log_file_action_check.remediation_status
+
+# audit_logs_not_automatically_deleted | Remediation
+- name: "audit_logs_not_automatically_deleted | Remediation"
+  lineinfile: 
+    path: /etc/audit/auditd.conf
+    regexp: '^(max_log_file_action = keep_logs)'
+    line: max_log_file_action = keep_logs
+    state: present
+  when: not audit_only and not max_log_file_action_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ max_log_file_action_check.remediation_status }}"

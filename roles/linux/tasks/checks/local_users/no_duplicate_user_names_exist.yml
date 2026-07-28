@@ -1,0 +1,43 @@
+# no_duplicate_user_names_exist
+#
+# Although the useradd program will not let you create a duplicate user name, it is
+# possible for an administrator to manually edit the /etc/passwd file and change the
+# username.
+
+- name: "no_duplicate_user_names_exist | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      while read -r l_count l_user; do
+          if [ "$l_count" -gt 1 ]; then
+              echo -e "Duplicate User: \"$l_user\" Users: \"$(awk -F: '($1 == n) { print $1 }' n=$l_user /etc/passwd | xargs)\""
+          fi
+      done < <(cut -f1 -d":" /etc/passwd | sort -n | uniq -c)
+      {% endraw %}
+  changed_when: false
+  register: users_name_status
+
+# Extract audit result
+- set_fact:
+    users_name_check:
+      remediation_status: "{{ true if users_name_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add duplicated users list
+- set_fact:
+    duplicated_user_description:
+      remediation: "Consider to review the user names bellow: \n {% for item in users_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not users_name_check.remediation_status
+
+# Append duplicated users list to audit result
+- set_fact:
+    users_name_check: "{{ users_name_check | combine(duplicated_user_description) }}"
+  changed_when: false
+  when: not users_name_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ users_name_check.remediation_status }}"

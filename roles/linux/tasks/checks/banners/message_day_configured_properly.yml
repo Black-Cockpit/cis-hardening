@@ -1,0 +1,60 @@
+# message_day_configured_properly
+#
+# The contents of the /etc/motd file are displayed to users after login and function as a
+# message of the day for authenticated users.
+#
+# Unix-based systems have typically displayed information about the OS release and
+# patch level upon logging in to the system. This information can be useful to developers
+# who are developing software for a particular OS platform. If mingetty(8) supports the
+# following options, they display operating system information: \m - machine architecture
+# \r - operating system release \s - operating system name \v - operating system version
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Stat if /etc/motd exists
+  stat:
+    path: "/etc/motd"
+  changed_when: false
+  register: modt_file_stat
+
+# Audit | Collect the current configuration state
+- name: "message_day_configured_properly | Audit"
+  shell:
+    cmd: grep -E -i "(\\\v|\\\r|\\\m|\\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/"//g'))" /etc/motd | wc -l
+  changed_when: false
+  register: day_message_status_check
+  when: modt_file_stat.stat.exists
+
+# Extract audit result
+- set_fact:
+    day_message_check:
+      name: "message_day_configured_properly"
+      scored: true
+      automated: true
+  changed_when: false
+
+# Define compliace status
+- set_fact:
+    modt_content_remediation_status: 
+      remediation_status: "{{ true if day_message_status_check.stdout == '0' else false }}"
+  changed_when: false
+  when: modt_file_stat.stat.exists
+
+# Append remediation status to audit result
+- set_fact:
+    day_message_check: "{{ day_message_check | combine(modt_content_remediation_status) }}"
+  changed_when: false
+  when: modt_file_stat.stat.exists
+
+# Appending audit result
+- name: "message_day_configured_properly | Remediation"
+  template:
+    src: rhel/etc/motd.j2
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"
+  when: modt_file_stat.stat.exists and not audit_only and not day_message_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ day_message_check.remediation_status | default(true) }}"

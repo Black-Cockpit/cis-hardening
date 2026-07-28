@@ -1,0 +1,46 @@
+# permissions_etc_cron_d_configured
+#
+# The /etc/cron.d directory contains system cron jobs that need to run in a similar
+# manner to the hourly, daily weekly and monthly jobs from /etc/crontab , but require
+# more granular control as to when they run. The files in this directory cannot be
+# manipulated by the crontab command, but are instead edited by system administrators
+# using a text editor. The commands below restrict read/write and search access to user
+# and group root, preventing regular users from accessing this directory.
+
+- name: "permissions_etc_cron_d_configured | Audit"
+  shell:
+    cmd: 'find /etc/cron.d -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: crond_stat_check
+
+# Extract audit result
+- set_fact:
+    crond_permission_check:
+      remediation_status: "{{ true if crond_stat_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_cron_d_configured | Remediation"
+  find:
+    paths: "/etc/cron.d"
+    file_type: file
+    recurse: true
+  register: crond_files_list
+  when: not audit_only and not crond_permission_check.remediation_status
+
+# permissions_etc_cron_d_configured | Remediation
+- name: "permissions_etc_cron_d_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0700"
+    owner: root
+    group: root
+  with_items:
+  - "{{ crond_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not crond_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crond_permission_check.remediation_status }}"

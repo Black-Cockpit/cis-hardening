@@ -1,0 +1,35 @@
+# net_ipv4_conf_default_forwarding_configured
+#
+# ICMP Redirects are used to send routing information to other hosts. As a host itself
+# does not act as a router (in a host only configuration), there is no need to send
+# redirects.
+# net.ipv4.conf.default.forwarding controls forwarding of IPv4 packet on newly
+
+- name: "net_ipv4_conf_default_forwarding_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv4.conf.default.forwarding 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv4[.]conf[.]default[.]forwarding\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "0" ] && [ "$persisted" = "0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv4_conf_default_forwarding_status
+
+# Extract audit result
+- set_fact:
+    net_ipv4_conf_default_forwarding_check:
+      remediation_status: "{{ true if net_ipv4_conf_default_forwarding_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv4_conf_default_forwarding_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.forwarding
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv4_conf_default_forwarding_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv4_conf_default_forwarding_check.remediation_status }}"

@@ -1,0 +1,72 @@
+# permissions_etc_ssh_sshd_config_configured
+#
+# The file /etc/ssh/sshd_config , and files ending in .conf in the /etc/ssh/sshd_config.d
+# directory, contain configuration specifications for sshd .
+
+- name: "permissions_etc_ssh_sshd_config_configured | Audit"
+  stat:
+    path: /etc/ssh/sshd_config.d
+  changed_when: false
+  register: sshd_config_dir_stat
+
+# permissions_etc_ssh_sshd_config_configured | Audit
+- name: "permissions_etc_ssh_sshd_config_configured | Audit"
+  stat:
+    path: /etc/ssh/sshd_config
+  changed_when: false
+  register: sshd_config_stat
+
+# Audit /etc/at.allow
+- set_fact:
+    sshd_config_check: "{{ true if (sshd_config_stat.stat.exists and sshd_config_stat.stat.mode == '0600' and sshd_config_stat.stat.pw_name == 'root' and sshd_config_stat.stat.gr_name == 'root') else false}}"
+
+# permissions_etc_ssh_sshd_config_configured | Audit
+- name: "permissions_etc_ssh_sshd_config_configured | Audit"
+  shell:
+    cmd: 'find /etc/ssh/sshd_config.d -name "*.conf" -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: sshd_config_files_stat_check
+  when: sshd_config_dir_stat.stat.exists
+
+# Extract audit result
+- set_fact:
+    sshd_permission_check:
+      remediation_status: "{{ true if (sshd_config_check and (not sshd_config_dir_stat.stat.exists or (sshd_config_files_stat_check.stdout == '0'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_ssh_sshd_config_configured | Remediation"
+  file:
+    name: "/etc/ssh/sshd_config"
+    mode: "0600"
+    owner: root
+    group: root
+  when: not audit_only and not sshd_permission_check.remediation_status and not sshd_config_check
+
+# permissions_etc_ssh_sshd_config_configured | Remediation
+- name: "permissions_etc_ssh_sshd_config_configured | Remediation"
+  find:
+    paths: "/etc/ssh/sshd_config.d"
+    file_type: file
+    patterns:
+    - "*.conf"
+    recurse: true
+  register: sshd_config_files_list
+  when: not audit_only and sshd_config_dir_stat.stat.exists and not sshd_permission_check.remediation_status
+
+# permissions_etc_ssh_sshd_config_configured | Remediation
+- name: "permissions_etc_ssh_sshd_config_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0600"
+    owner: root
+    group: root
+  with_items:
+  - "{{ sshd_config_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and sshd_config_dir_stat.stat.exists and not sshd_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sshd_permission_check.remediation_status }}"

@@ -1,0 +1,28 @@
+# tftp_client_not_installed
+#
+# Trivial File Transfer Protocol (TFTP) is a simple protocol for exchanging files between
+# two TCP/IP machines. TFTP servers allow connections from a TFTP Client for sending
+# and receiving files.
+
+- name: "tftp_client_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -qE "^tftp" && echo installed || echo not_installed
+  changed_when: false
+  register: tftp_status_check
+
+# Extract audit result
+- set_fact:
+    tftp_server_check:
+      remediation_status: "{{ true if tftp_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "tftp_client_not_installed | Remediation"
+  package:
+    name: tftp
+    state: absent
+  when: not audit_only and not tftp_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tftp_server_check.remediation_status }}"

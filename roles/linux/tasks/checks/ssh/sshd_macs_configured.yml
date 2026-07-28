@@ -1,0 +1,61 @@
+# sshd_macs_configured
+#
+# This variable limits the types of MAC algorithms that SSH can use during
+# communication.
+
+- name: "sshd_macs_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Extract sshd MACs
+          sshd_macs=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i "MACs")
+
+          # check if ssh has a weak cipher in use
+          if grep -q "hmac-md5" <<<"$sshd_macs" || grep "hmac-md5-96" <<<"$sshd_macs" || grep "hmac-ripemd160" <<<"$sshd_macs" || \
+             grep -q "hmac-sha1-96" <<<"$sshd_macs" || grep "umac-64@openssh.com" <<<"$sshd_macs" || \
+             grep "hmac-md5-etm@openssh.com" <<<"$sshd_macs" || grep "hmac-md5-96-etm@openssh.com" <<<"$sshd_macs" || \
+             grep "hmac-ripemd160-etm@openssh.com" <<<"$sshd_macs" || grep "hmac-sha1-96-etm@openssh.com" <<<"$sshd_macs" || \
+             grep "umac-64-etm@openssh.com" <<<"$sshd_macs" ; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_macs_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_macs_check:
+      remediation_status: "{{ true if ssh_macs_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_macs_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MACs|#MACs)"
+    state: absent
+  when: not audit_only and not ssh_macs_check.remediation_status
+
+# sshd_macs_configured | Remediation
+- name: "sshd_macs_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MACs)"
+    line: 'MACs -hmac-md5,hmac-md5-96,hmac-ripemd160,hmac-sha1-96,umac-64@openssh.com,hmac-md5-etm@openssh.com,hmac-md5-96-etm@openssh.com,hmac-ripemd160-etm@openssh.com,hmac-sha1-96-etm@openssh.com,umac-64-etm@openssh.com'
+    state: present
+  when: not audit_only and not ssh_macs_check.remediation_status
+
+# sshd_macs_configured | Remediation
+- name: "sshd_macs_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_macs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_macs_check.remediation_status }}"

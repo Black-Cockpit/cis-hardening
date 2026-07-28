@@ -1,0 +1,108 @@
+# session_initiation_information_collected
+#
+# Monitor session initiation events. The parameters in this section track changes to the
+# files associated with session events.
+#
+# - /var/run/utmp : tracks all currently logged in users.
+# - /var/log/wtmp : file tracks logins, logouts, shutdown, and reboot events.
+# - /var/log/btmp : keeps track of failed login attempts and can be read by entering
+#                   the command /usr/bin/last -f /var/log/btmp .
+#
+# All audit records will be tagged with the identifier "session."
+
+- name: "session_initiation_information_collected | Audit"
+  shell:
+    cmd: |
+      SESSION_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      awk "/^ *-w/ \
+      &&/"${SESSION_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "/var/run/utmp"
+  - "/var/log/wtmp"
+  - "/var/log/btmp"
+  register: audit_session_initiation_rule_status_check
+
+# session_initiation_information_collected | Audit
+- name: "session_initiation_information_collected | Audit"
+  shell:
+    cmd: |
+      SESSION_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      auditctl -l | awk "/^ *-w/ \
+      &&/"${SESSION_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - "/var/run/utmp"
+  - "/var/log/wtmp"
+  - "/var/log/btmp"
+  register: audit_session_initiation_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all session initiation information rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_session_initiation_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all session initiation information rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_session_initiation_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_session_initiation_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "session_initiation_information_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-session.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_session_initiation_rule_check.remediation_status
+
+# session_initiation_information_collected | Remediation
+- name: "session_initiation_information_collected | Remediation"
+  shell:
+    cmd: |
+      SESSION_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      rule_count=$(awk "/^ *-w/ \
+      &&/"${SESSION_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k session' >> /etc/audit/rules.d/00-cis-session.rules
+  loop:
+  - "/var/run/utmp"
+  - "/var/log/wtmp"
+  - "/var/log/btmp"
+  when: not audit_only and not audit_session_initiation_rule_check.remediation_status
+
+ # session_initiation_information_collected | Remediation
+- name: "session_initiation_information_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_session_initiation_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_session_initiation_rule_check.remediation_status }}"

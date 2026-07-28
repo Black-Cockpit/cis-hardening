@@ -1,0 +1,41 @@
+# permissions_etc_gshadow_configured
+#
+# The /etc/gshadow file is used to store the information about groups that is critical to the
+# security of those accounts, such as the hashed password and other security
+# information.
+
+- name: "permissions_etc_gshadow_configured | Audit"
+  stat:
+    path: "/etc/gshadow"
+  changed_when: false
+  register: gshadow_file_status
+
+# permissions_etc_gshadow_configured | Audit
+- name: "permissions_etc_gshadow_configured | Audit"
+  shell:
+    cmd: |
+      [ $(({{ gshadow_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: gshadow_permission_status
+  vars:
+    expected_file_mask: "0777"
+
+# Extract audit result
+- set_fact:
+    gshadow_permission_check:
+      remediation_status: "{{ true if ( gshadow_file_status.stat.pw_name == 'root' and gshadow_file_status.stat.gr_name == 'root' and gshadow_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_gshadow_configured | Remediation"
+  file:
+    path: "/etc/gshadow"
+    mode: "0000"
+    owner: root
+    group: root
+  when: not audit_only and not gshadow_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gshadow_permission_check.remediation_status }}"

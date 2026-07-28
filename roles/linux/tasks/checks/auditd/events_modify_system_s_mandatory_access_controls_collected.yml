@@ -1,0 +1,102 @@
+# events_modify_system_s_mandatory_access_controls_collected
+#
+# Monitor SELinux, an implementation of mandatory access controls. The parameters
+# below monitor any write access (potential additional, deletion or modification of files in
+# the directory) or attribute changes to the /etc/selinux/ and /usr/share/selinux/
+# directories.
+# Note: If a different Mandatory Access Control method is used, changes to the
+# corresponding directories should be audited.
+
+- name: "events_modify_system_s_mandatory_access_controls_collected | Audit"
+  shell:
+    cmd: |
+      MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      awk "/^ *-w/ \
+      &&/"${MAC_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "/etc/selinux"
+  - "/usr/share/selinux"
+  register: audit_mac_rule_status_check
+
+# events_modify_system_s_mandatory_access_controls_collected | Audit
+- name: "events_modify_system_s_mandatory_access_controls_collected | Audit"
+  shell:
+    cmd: |
+      MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      auditctl -l | awk "/^ *-w/ \
+      &&/"${MAC_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - "/etc/selinux"
+  - "/usr/share/selinux"
+  register: audit_mac_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all system's Mandatory Access modification rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_mac_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all system's Mandatory Access modification rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_mac_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_mac_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "events_modify_system_s_mandatory_access_controls_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-MAC-policy.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_mac_rule_check.remediation_status
+
+# events_modify_system_s_mandatory_access_controls_collected | Remediation
+- name: "events_modify_system_s_mandatory_access_controls_collected | Remediation"
+  shell:
+    cmd: |
+      MAC_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      rule_count=$(awk "/^ *-w/ \
+      &&/"${MAC_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k MAC-policy' >> /etc/audit/rules.d/00-cis-MAC-policy.rules
+  loop:
+  - "/etc/selinux"
+  - "/usr/share/selinux"
+  when: not audit_only and not audit_mac_rule_check.remediation_status
+
+ # events_modify_system_s_mandatory_access_controls_collected | Remediation
+- name: "events_modify_system_s_mandatory_access_controls_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_mac_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_mac_rule_check.remediation_status }}"

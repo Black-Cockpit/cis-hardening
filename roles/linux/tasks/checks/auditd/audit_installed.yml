@@ -1,0 +1,27 @@
+# audit_installed
+#
+# auditd is the userspace component to the Linux Auditing System. It's responsible for
+# writing audit records to the disk.
+
+- name: "audit_installed | Audit"
+  shell:
+    cmd: rpm -q audit | grep -Eq 'audit[\-][0-9]' && echo 'installed' || echo 'not_installed'
+  changed_when: false
+  register: auditd_status_check
+
+# Extract audit result
+- set_fact:
+    auditd_check:
+      remediation_status: "{{ true if auditd_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_installed | Remediation"
+  package:
+    name: audit
+    state: present
+  when: not audit_only and not auditd_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ auditd_check.remediation_status }}"

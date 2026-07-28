@@ -1,0 +1,34 @@
+# only_approved_services_listening_network_interface
+#
+# A network port is identified by its number, the associated IP address, and the type of the
+# communication protocol such as TCP or UDP.
+# A listening port is a network port on which an application or process listens on, acting as
+# a communication endpoint.
+# Each listening port can be open or closed (filtered) using a firewall. In general terms, an
+# open port is a network port that accepts incoming packets from remote locations.
+
+- name: "only_approved_services_listening_network_interface | Audit"
+  shell:
+    cmd: ss -plntu | awk '{if (NR>1){split($NF,a,"\"");print "Service " a[2] " listening on " $5 " " $1}}'
+  changed_when: false
+  register: listening_ports_status_check
+
+# Extract audit result
+- set_fact:
+    listening_ports_check:
+      name: "only_approved_services_listening_network_interface"
+      scored: false
+      automated: false
+      remediation: "Consider to verify the list of services bellow: \n {% for item in listening_ports_status_check.stdout_lines %}{{ item + '\n'}}{% endfor %}"
+  changed_when: false
+
+# Appending audit result
+- name: "only_approved_services_listening_network_interface | Remediation"
+  debug:
+    var: listening_ports_check.remediation
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

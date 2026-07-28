@@ -1,0 +1,28 @@
+# rsyslog_service_enabled
+#
+# Once the rsyslog package is installed, ensure that the service is enabled.
+
+- name: "rsyslog_service_enabled | Audit"
+  systemd:
+    name: rsyslog
+  changed_when: false
+  register: rsyslog_service_status_check
+
+# Extract audit result
+- set_fact:
+    rsyslog_service_check:
+      remediation_status: "{{ true if (rsyslog_service_status_check.status.ActiveState == 'active' and rsyslog_service_status_check.status.UnitFileState == 'enabled') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "rsyslog_service_enabled | Remediation"
+  systemd:
+    name: rsyslog
+    state: started
+    enabled: true
+    force: true
+  when: not audit_only and not rsyslog_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ rsyslog_service_check.remediation_status }}"

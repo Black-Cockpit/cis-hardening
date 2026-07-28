@@ -1,0 +1,103 @@
+# bogus_icmp_responses_ignored
+#
+# Setting net.ipv4.icmp_ignore_bogus_error_responses to 1 prevents the kernel from
+# logging bogus responses (RFC-1122 non-compliant) from broadcast reframes, keeping
+# file systems from filling up with useless log messages.
+
+- name: "bogus_icmp_responses_ignored | Audit"
+  shell:
+    cmd: |
+      ipv4="$(sysctl "net.ipv4.icmp_ignore_bogus_error_responses" | awk -F= '{print $2}')";
+      echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: bogus_icmp_responses_current_status_conf_check
+
+# Define remediation status
+- set_fact:
+    bogus_icmp_responses_remediation_status: "{{ true if bogus_icmp_responses_current_status_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Check net.ipv4.icmp_ignore_bogus_error_responses is disabled on sysctl.conf file
+- name: "bogus_icmp_responses_ignored | Audit"
+  shell:
+    cmd: 'grep -Eq "^\s{0,}net.ipv4.icmp_ignore_bogus_error_responses\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+  changed_when: false
+  register: bogus_icmp_responses_sysctl_conf_check
+
+# Update remediation status
+- set_fact:
+    bogus_icmp_responses_remediation_status: "{{ true if (bogus_icmp_responses_remediation_status and bogus_icmp_responses_sysctl_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: bogus_icmp_responses_remediation_status
+
+# Check if one of sysctl configuration files has net.ipv4.icmp_ignore_bogus_error_responses configuration
+- name: "bogus_icmp_responses_ignored | Audit"
+  shell:
+    cmd: |
+      'item_exists=$(grep -E "^\s{0,}net.ipv4.icmp_ignore_bogus_error_responses\s{0,}" {{ item }}';
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.icmp_ignore_bogus_error_responses\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: bogus_icmp_responses_conf_check
+  loop: "{{ sysctl_conf_files }}"
+
+# Update remediation status
+- set_fact:
+    bogus_icmp_responses_remediation_status: "{{ true if (bogus_icmp_responses_remediation_status or item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ bogus_icmp_responses_conf_check.results | list }}"
+  when: bogus_icmp_responses_remediation_status
+
+# Check if net.ipv4.icmp_ignore_bogus_error_responses is configured in one of the UFW sysctl configuration files
+- name: "bogus_icmp_responses_ignored | Audit"
+  shell:
+    cmd: |
+      ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+      item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.icmp_ignore_bogus_error_responses\s{0,}" $(echo $ufw_conf))
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.icmp_ignore_bogus_error_responses\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: bogus_icmp_responses_ufw_sysctl_conf_files_check
+
+# Update remediation status
+- set_fact:
+    bogus_icmp_responses_remediation_status: "{{ true if (bogus_icmp_responses_remediation_status and bogus_icmp_responses_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: bogus_icmp_responses_remediation_status
+
+# Extract audit result
+- set_fact:
+    bogus_icmp_responses_check:
+      remediation_status: "{{ true if bogus_icmp_responses_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "bogus_icmp_responses_ignored | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.icmp_ignore_bogus_error_responses
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not bogus_icmp_responses_check.remediation_status
+
+# bogus_icmp_responses_ignored | Remediation
+- name: "bogus_icmp_responses_ignored | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not bogus_icmp_responses_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ bogus_icmp_responses_check.remediation_status }}"

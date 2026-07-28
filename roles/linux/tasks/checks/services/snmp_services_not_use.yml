@@ -1,0 +1,47 @@
+# snmp_services_not_use
+#
+# Simple Network Management Protocol (SNMP) is a widely used protocol for monitoring
+# the health and welfare of network equipment, computer equipment and devices like
+# UPSs.
+# Net-SNMP is a suite of applications used to implement SNMPv1 (RFC 1157), SNMPv2
+# (RFCs 1901-1908), and SNMPv3 (RFCs 3411-3418) using both IPv4 and IPv6.
+# Support for SNMPv2 classic (a.k.a. "SNMPv2 historic" - RFCs 1441-1452) was dropped
+# with the 4.0 release of the UCD-snmp package.
+# The Simple Network Management Protocol (SNMP) server is used to listen for SNMP
+# commands from an SNMP management system, execute the commands or collect the
+# information and then send results back to the requesting system.
+
+- name: "snmp_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "net-snmp" && echo installed || echo not_installed
+  changed_when: false
+  register: snmpd_status_check
+
+# snmp_services_not_use | Audit
+- name: "snmp_services_not_use | Audit"
+  systemd:
+    name: snmpd
+  ignore_errors: yes
+  changed_when: false
+  register: snmpd_service_status_check
+  when: snmpd_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    snmpd_check:
+      remediation_status: "{{ true if (snmpd_status_check.stdout == 'not_installed' or (snmpd_service_status_check.status.ActiveState == 'inactive' and (snmpd_service_status_check.status.UnitFileState is not defined or snmpd_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "snmp_services_not_use | Remediation"
+  systemd:
+    name: snmpd
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not snmpd_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ snmpd_check.remediation_status }}"

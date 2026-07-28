@@ -1,0 +1,61 @@
+# dccp_kernel_module_not_available
+#
+# The Datagram Congestion Control Protocol (DCCP) is a transport layer protocol that
+# supports streaming media and telephony. DCCP provides a way to gain access to
+# congestion control, without having to do it at the application layer, but does not provide
+# in-sequence delivery.
+
+- name: "dccp_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv dccp && echo loaded || echo not_loaded
+  changed_when: false
+  register: dccp_check_loaded_result
+# Check if module is disabled
+- name: "dccp_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install dccp /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: dccp_check_disabled_result
+# Check if module is blacklisted
+- name: "dccp_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist dccp" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: dccp_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    dccp_check:
+      remediation_status: "{{ true if (dccp_check_loaded_result.stdout == 'not_loaded' or (dccp_check_disabled_result.stdout == 'disabled' and dccp_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "dccp_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/dccp.conf"
+    regexp: "^(#)?install dccp(\\s|$)"
+    line: "install dccp /bin/true"
+    create: true
+    mode: "0600"
+  when: not audit_only and not dccp_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "dccp_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist dccp(\\s|$)"
+    line: "blacklist dccp"
+    create: true
+    mode: "0600"
+  when: not audit_only and not dccp_check.remediation_status
+
+# Disable dccp filesystems
+- name: Disabling dccp filesystems
+  modprobe:
+    name: dccp
+    state: absent
+  when: not audit_only and not dccp_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ dccp_check.remediation_status }}"

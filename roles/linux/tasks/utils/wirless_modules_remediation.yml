@@ -1,0 +1,46 @@
+# Shared remediation tasks for the wireless_interfaces_disabled check:
+# disables one wireless kernel module (the loop item) by writing an install
+# /bin/true entry, blacklisting it and unloading it. The committed legacy
+# version of this file was invalid YAML and compared registered results to
+# strings without .stdout, so it could never load: the conditions below
+# implement the evident intent.
+
+# Check if module is disabled
+- name: "wireless_interfaces_disabled | Pre Remediation"
+  shell:
+    cmd: 'grep -r -E "^(#)?install {{ item }} /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled'
+  changed_when: false
+  register: wireless_module_check_disabled_result
+
+# Check if module is blacklisted
+- name: "wireless_interfaces_disabled | Pre Remediation"
+  shell:
+    cmd: 'grep -r -E "^(#)?blacklist {{ item }}" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted'
+  changed_when: false
+  register: wireless_module_blacklisted_check_result
+
+# Remediation | Enforce the required configuration line
+- name: "wireless_interfaces_disabled | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/{{ item }}.conf"
+    regexp: "^(#)?install {{ item }}(\\s|$)"
+    line: "install {{ item }} /bin/true"
+    create: true
+    mode: "0600"
+  when: wireless_module_check_disabled_result.stdout != 'disabled'
+
+# Remediation | Enforce the required configuration line
+- name: "wireless_interfaces_disabled | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist {{ item }}(\\s|$)"
+    line: "blacklist {{ item }}"
+    create: true
+    mode: "0600"
+  when: wireless_module_blacklisted_check_result.stdout != 'blacklisted'
+
+# Unload the wireless module
+- name: "wireless_interfaces_disabled | Remediation"
+  modprobe:
+    name: "{{ item }}"
+    state: absent 

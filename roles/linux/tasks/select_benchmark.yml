@@ -1,0 +1,15 @@
+# Select which benchmark mapping applies to this host and load it.
+# benchmark_mapping can be set by the user to force a specific benchmark.
+- name: "Select benchmark | Resolve mapping for {{ ansible_distribution }}"
+  set_fact:
+    benchmark_mapping: "{{ benchmark_mapping | default(default_benchmark_mapping[ansible_distribution] | default('rocky8_v2')) }}"
+
+# Load the selected benchmark mapping (rules, numbers, titles, levels)
+- name: "Select benchmark | Load {{ benchmark_mapping }} mapping"
+  include_vars:
+    file: "benchmarks/{{ benchmark_mapping }}.yml"
+
+# Load the check id to topic directory lookup
+- name: "Select benchmark | Load check topic lookup"
+  include_vars:
+    file: "check_topics.yml"

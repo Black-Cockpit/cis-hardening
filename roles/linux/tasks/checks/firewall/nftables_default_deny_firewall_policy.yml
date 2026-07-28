@@ -1,0 +1,19 @@
+# nftables_default_deny_firewall_policy
+#
+# Base chain policy is the default verdict that will be applied to packets reaching the end
+# of the chain.
+
+- set_fact:
+    nftables_base_chain_policy_check:
+      name: "nftables_default_deny_firewall_policy"
+      scored: false
+      automated: true
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

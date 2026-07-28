@@ -1,0 +1,117 @@
+# events_modify_user_group_information_collected
+#
+# Record events affecting the modification of user or group information, including that of
+# passwords and old passwords if in use.
+#
+# - /etc/group            : system groups
+# - /etc/passwd           : system users
+# - /etc/gshadow          : encrypted password for each group
+# - /etc/shadow           : system user passwords
+# - /etc/security/opasswd : storage of old passwords if the relevant PAM module is in use
+#
+# The parameters in this section will watch the files to see if they have been opened for
+# write or have had attribute changes (e.g. permissions) and tag them with the identifier
+# "identity" in the audit log file.
+
+- name: "events_modify_user_group_information_collected | Audit"
+  shell:
+    cmd: |
+      USER_GROUP_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      awk "/^ *-w/ \
+      &&/"${USER_GROUP_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "/etc/group"
+  - "/etc/passwd"
+  - "/etc/gshadow"
+  - "/etc/shadow"
+  - "/etc/security/opasswd"
+  register: audit_user_group_files_rule_status_check
+
+# events_modify_user_group_information_collected | Audit
+- name: "events_modify_user_group_information_collected | Audit"
+  shell:
+    cmd: |
+      USER_GROUP_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      auditctl -l | awk "/^ *-w/ \
+      &&/"${USER_GROUP_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - "/etc/group"
+  - "/etc/passwd"
+  - "/etc/gshadow"
+  - "/etc/shadow"
+  - "/etc/security/opasswd"
+  register: audit_user_group_files_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all user/group files rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_user_group_files_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all user/group files rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_user_group_files_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_user_group_files_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "events_modify_user_group_information_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-identity.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_user_group_files_rule_check.remediation_status
+
+# events_modify_user_group_information_collected | Remediation
+- name: "events_modify_user_group_information_collected | Remediation"
+  shell:
+    cmd: |
+      USER_GROUP_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      rule_count=$(awk "/^ *-w/ \
+      &&/"${USER_GROUP_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k identity' >> /etc/audit/rules.d/00-cis-identity.rules
+  loop:
+  - "/etc/group"
+  - "/etc/passwd"
+  - "/etc/gshadow"
+  - "/etc/shadow"
+  - "/etc/security/opasswd"
+  when: not audit_only and not audit_user_group_files_rule_check.remediation_status
+
+ # events_modify_user_group_information_collected | Remediation
+- name: "events_modify_user_group_information_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_user_group_files_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_user_group_files_rule_check.remediation_status }}"

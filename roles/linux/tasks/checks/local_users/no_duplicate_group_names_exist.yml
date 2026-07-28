@@ -1,0 +1,43 @@
+# no_duplicate_group_names_exist
+#
+# Although the groupadd program will not let you create a duplicate group name, it is
+# possible for an administrator to manually edit the /etc/group file and change the group
+# name.
+
+- name: "no_duplicate_group_names_exist | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      while read -r l_count l_group; do
+          if [ "$l_count" -gt 1 ]; then
+              echo -e "Duplicate Group: \"$l_group\" Groups: \"$(awk -F: '($1 == n) { print $1 }' n=$l_group /etc/group | xargs)\""
+          fi
+      done < <(cut -f1 -d":" /etc/group | sort -n | uniq -c)
+      {% endraw %}
+  changed_when: false
+  register: groups_name_status
+
+# Extract audit result
+- set_fact:
+    groups_name_check:
+      remediation_status: "{{ true if groups_name_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add duplicated groups list
+- set_fact:
+    duplicated_group_description:
+      remediation: "Consider to review the group names bellow: \n {% for item in groups_name_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not groups_name_check.remediation_status
+
+# Append duplicated groups list to audit result
+- set_fact:
+    groups_name_check: "{{ groups_name_check | combine(duplicated_group_description) }}"
+  changed_when: false
+  when: not groups_name_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ groups_name_check.remediation_status }}"

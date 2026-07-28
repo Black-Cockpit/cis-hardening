@@ -1,0 +1,36 @@
+# net_ipv6_conf_default_accept_redirects_configured
+#
+# ICMP redirect messages are packets that convey routing information and tell your host
+# (acting as a router) to send packets via an alternate path. It is a way of allowing an
+# outside routing device to update your system routing tables.
+# net.ipv6.conf.default.accept_redirects controls accepting of all IPv6 ICMP
+
+- name: "net_ipv6_conf_default_accept_redirects_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv6.conf.default.accept_redirects 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv6[.]conf[.]default[.]accept_redirects\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "0" ] && [ "$persisted" = "0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv6_conf_default_accept_redirects_status
+  when: not is_ipv6_disabled
+
+# Extract audit result
+- set_fact:
+    net_ipv6_conf_default_accept_redirects_check:
+      remediation_status: "{{ true if (is_ipv6_disabled or (net_ipv6_conf_default_accept_redirects_status.stdout | default('')) == 'configured') else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv6_conf_default_accept_redirects_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.default.accept_redirects
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv6_conf_default_accept_redirects_check.remediation_status and not is_ipv6_disabled
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv6_conf_default_accept_redirects_check.remediation_status }}"

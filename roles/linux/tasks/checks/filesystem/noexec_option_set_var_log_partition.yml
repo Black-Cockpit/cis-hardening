@@ -1,0 +1,27 @@
+# noexec_option_set_var_log_partition
+#
+# The noexec mount option specifies that the filesystem cannot contain executable binaries.
+
+- name: "noexec_option_set_var_log_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/var\/log\s' | grep -q noexec && echo compliant || echo not_compliant
+  changed_when: false
+  register: var_log_noexec_status
+
+# Extract audit result
+- set_fact:
+    var_log_noexec:
+      remediation_status: "{{ true if var_log_noexec_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /var/log partition with noexec option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "noexec_option_set_var_log_partition | Remediation"
+  debug:
+    msg: "Consider to mount /var/log partition with noexec option by modifing /etc/fstab"
+  when: not audit_only and not var_log_noexec.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ var_log_noexec.remediation_status }}"

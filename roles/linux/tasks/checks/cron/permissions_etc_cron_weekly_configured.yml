@@ -1,0 +1,45 @@
+# permissions_etc_cron_weekly_configured
+#
+# The /etc/cron.weekly directory contains system cron jobs that need to run on a weekly
+# basis. The files in this directory cannot be manipulated by the crontab command, but
+# are instead edited by system administrators using a text editor. The commands below
+# restrict read/write and search access to user and group root, preventing regular users
+# from accessing this directory.
+
+- name: "permissions_etc_cron_weekly_configured | Audit"
+  shell:
+    cmd: 'find /etc/cron.weekly -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: crontab_weekly_stat_check
+
+# Extract audit result
+- set_fact:
+    crontab_weekly_permission_check:
+      remediation_status: "{{ true if crontab_weekly_stat_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_cron_weekly_configured | Remediation"
+  find:
+    paths: "/etc/cron.weekly"
+    file_type: file
+    recurse: true
+  register: crontab_weekly_files_list
+  when: not audit_only and not crontab_weekly_permission_check.remediation_status
+
+# permissions_etc_cron_weekly_configured | Remediation
+- name: "permissions_etc_cron_weekly_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0700"
+    owner: root
+    group: root
+  with_items:
+  - "{{ crontab_weekly_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not crontab_weekly_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crontab_weekly_permission_check.remediation_status }}"

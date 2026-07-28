@@ -1,0 +1,22 @@
+# logging_configured
+#
+# The /etc/rsyslog.conf and /etc/rsyslog.d/*.conf files specifies rules for logging and
+# which files are to be used to log certain classes of messages.
+
+- set_fact:
+    logging_config_check:
+      name: "logging_configured"
+      scored: false
+      automated: false
+      remediation: |
+        Condider to review the contents of /etc/rsyslog.conf and /etc/rsyslog.d/*.conf files to ensure
+        appropriate logging is set.
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

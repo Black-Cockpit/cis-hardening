@@ -1,0 +1,100 @@
+# gdm_autorun_never_not_overridden
+#
+# The autorun-never setting allows the GNOME Desktop Display Manager to disable
+# autorun through GDM.
+# By using the lockdown mode in dconf, you can prevent users from changing specific
+# settings.
+# To lock down a dconf key or subpath, create a locks subdirectory in the keyfile directory.
+# The files inside this directory contain a list of keys or subpaths to lock. Just as with the
+# keyfiles, you may add any number of files to this directory.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_autorun_never_not_overridden | Audit"
+  shell:
+    cmd: |
+      l_kfd="/etc/dconf/db/$(grep -Psril '^\h*autorun-never\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}').d" && \
+      echo $l_kfd || echo ''
+  changed_when: false
+  register: autorun_never_dconf_file_check
+
+# Define compliace status
+- set_fact:
+    gdm_autorun_never_protection_rule_status: "{{ true if autorun_never_dconf_file_check.stdout != '' else false }}"
+  changed_when: false
+
+# Check if autorun-never is locked
+- name: "gdm_autorun_never_not_overridden | Audit"
+  shell:
+    cmd: 'grep -Prilq "/org/gnome/desktop/media-handling/autorun-never\b" {{ autorun_never_dconf_file_check.stdout }} && echo locked || echo not_locked'
+  changed_when: false
+  register: gdm_autorun_never_protection_status
+  when: gdm_autorun_never_protection_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_autorun_never_protection_rule_status: "{{ true if (gdm_autorun_never_protection_rule_status and gdm_autorun_never_protection_status.stdout == 'locked') else false }}"
+  changed_when: false
+  when: gdm_autorun_never_protection_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_autorun_never_protection_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_autorun_never_protection_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_autorun_never_not_overridden | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+# gdm_autorun_never_not_overridden | Remediation
+- name: "gdm_autorun_never_not_overridden | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/00-media-autorun
+    src: rhel/etc/gdm.d/00-media-autorun.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+# gdm_autorun_never_not_overridden | Remediation
+- name: "gdm_autorun_never_not_overridden | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/locks/media-autorun
+    src: rhel/etc/gdm.d/locks/media-autorun.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+# gdm_autorun_never_not_overridden | Remediation
+- name: "gdm_autorun_never_not_overridden | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_autorun_never_protection_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_autorun_never_protection_check.remediation_status }}"

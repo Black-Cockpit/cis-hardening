@@ -1,0 +1,46 @@
+# access_etc_motd_configured
+#
+# The contents of the /etc/motd file are displayed to users after login and function as a
+# message of the day for authenticated users.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Stat if /etc/motd exists
+  stat:
+    path: "/etc/motd"
+  changed_when: false
+  register: modt_file_stat
+
+# Extract audit result
+- set_fact:
+    modt_permission_check:
+      name: "access_etc_motd_configured"
+      scored: true
+      automated: true
+  changed_when: false
+
+# Define compliace status
+- set_fact:
+    modt_permission_remediation_status: 
+      remediation_status: "{{ true if (modt_file_stat.stat.mode == '0644' and modt_file_stat.stat.pw_name == 'root' and modt_file_stat.stat.gr_name == 'root') else false }}"
+  changed_when: false
+  when: modt_file_stat.stat.exists
+
+# Append remediation status to audit result
+- set_fact:
+    modt_permission_check: "{{ modt_permission_check | combine(modt_permission_remediation_status) }}"
+  changed_when: false
+  when: modt_file_stat.stat.exists
+
+# Appending audit result
+- name: "access_etc_motd_configured | Remediation"
+  template:
+    src: rhel/etc/motd.j2
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"
+  when: modt_file_stat.stat.exists and not audit_only and not modt_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ modt_permission_check.remediation_status | default(true) }}"

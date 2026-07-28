@@ -1,0 +1,30 @@
+# access_etc_issue_configured
+#
+# The contents of the /etc/issue file are displayed to users prior to login for local
+# terminals.
+
+- name: "access_etc_issue_configured | Audit"
+  stat: 
+    path: /etc/issue
+  changed_when: false
+  register: issue_file_stat
+
+# Extract audit result
+- set_fact:
+    issue_file_permission_check:
+      remediation_status: "{{ true if (issue_file_stat.stat.mode == '0644' and issue_file_stat.stat.pw_name == 'root' and issue_file_stat.stat.gr_name == 'root') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "access_etc_issue_configured | Remediation"
+  template:
+    src: rhel/etc/issue.j2
+    dest: /etc/issue
+    owner: root
+    group: root
+    mode: "0644"
+  when: not audit_only and not issue_file_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ issue_file_permission_check.remediation_status }}"

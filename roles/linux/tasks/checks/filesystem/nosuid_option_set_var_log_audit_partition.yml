@@ -1,0 +1,27 @@
+# nosuid_option_set_var_log_audit_partition
+#
+# The noexec mount option specifies that the filesystem cannot contain executable binaries.
+
+- name: "nosuid_option_set_var_log_audit_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/var\/log\/audit\s' | grep -q nosuid && echo compliant || echo not_compliant
+  changed_when: false
+  register: audit_log_nosuid_status
+
+# Extract audit result
+- set_fact:
+    audit_log_nosuid:
+      remediation_status: "{{ true if audit_log_nosuid_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /var/log/audit partition with nosuid option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "nosuid_option_set_var_log_audit_partition | Remediation"
+  debug:
+    msg: "Consider to mount /var/log/audit partition with nosuid option by modifing /etc/fstab"
+  when: not audit_only and not audit_log_nosuid.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_log_nosuid.remediation_status }}"

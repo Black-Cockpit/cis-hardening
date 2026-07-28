@@ -1,0 +1,47 @@
+# sudo_commands_use_pty
+#
+# sudo can be configured to run only from a pseudo terminal ( pseudo-pty ).
+
+- name: "sudo_commands_use_pty | Audit"
+  shell:
+    cmd: |
+      grep -Piq '^\h*Defaults\h+([^#\n\r]+,)?use_pty(,\h*\h+\h*)*\h*(#.*)?$' {{ item }} && echo 'configured' \
+      || echo 'not_configured'
+  changed_when: false
+  loop: "{{ sudoers_files }}"
+  failed_when: sudoers_files is not defined
+  register: pseudo_terminal_status_check
+
+# Define remediation status
+- set_fact:
+    pseudo_terminal_remediation_status: true
+  changed_when: false
+
+# Check if pseudo terminal is configured in all the listed sudoers files
+- set_fact:
+    pseudo_terminal_remediation_status: "{{ true if (pseudo_terminal_remediation_status and item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ pseudo_terminal_status_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    pseudo_terminal_check:
+      remediation_status: "{{ true if pseudo_terminal_remediation_status else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "sudo_commands_use_pty | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults[\s]{1,}use_pty'
+    line: "Defaults use_pty"
+    state: present
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not pseudo_terminal_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ pseudo_terminal_check.remediation_status }}"

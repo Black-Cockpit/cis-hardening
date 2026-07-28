@@ -1,0 +1,40 @@
+# permissions_etc_group_configured
+#
+# The /etc/group file contains a list of all the valid groups defined in the system. The
+# command below allows read/write access for root and read access for everyone else.
+
+- name: "permissions_etc_group_configured | Audit"
+  stat:
+    path: /etc/group
+  changed_when: false
+  register: group_file_status
+
+# permissions_etc_group_configured | Audit
+- name: "permissions_etc_group_configured | Audit"
+  shell:
+    cmd: |
+      [ $(({{ group_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: group_permission_status
+  vars:
+    expected_file_mask: "0133"
+
+# Extract audit result
+- set_fact:
+    group_permission_check:
+      remediation_status: "{{ true if ( group_file_status.stat.pw_name == 'root' and group_file_status.stat.gr_name == 'root' and group_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_group_configured | Remediation"
+  file:
+    path: /etc/group
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not group_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ group_permission_check.remediation_status }}"

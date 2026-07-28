@@ -1,0 +1,46 @@
+# journald_not_configured_send_logs_rsyslog
+#
+# The system includes the capability of rotating log files regularly to avoid filling up the
+# system with logs or making the logs unmanageably large. The file
+# /etc/logrotate.d/syslog is the configuration file used to rotate log files created by
+# syslog or rsyslog .
+
+- name: "journald_not_configured_send_logs_rsyslog | Audit"
+  shell:
+    cmd: grep -q ^\s*ForwardToSyslog /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: systemd_journal_remote_log_forward_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_log_forward_check:
+      remediation_status: "{{ true if systemd_journal_remote_log_forward_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "journald_not_configured_send_logs_rsyslog | Remediation"
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^[#]{0,}[\s]{0,}ForwardToSyslog.*'
+    state: absent
+  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+# journald_not_configured_send_logs_rsyslog | Remediation
+- name: "journald_not_configured_send_logs_rsyslog | Remediation"
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^[\s]{0,}ForwardToSyslog=yes'
+    line: "ForwardToSyslog=yes"
+    state: present
+  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+# journald_not_configured_send_logs_rsyslog | Remediation
+- name: "journald_not_configured_send_logs_rsyslog | Remediation"
+  systemd:
+    name: systemd-journald
+    state: restarted
+  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ systemd_journal_remote_log_forward_check.remediation_status }}"

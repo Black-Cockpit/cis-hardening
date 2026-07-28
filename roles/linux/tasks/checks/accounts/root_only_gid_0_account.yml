@@ -1,0 +1,39 @@
+# root_only_gid_0_account
+#
+# The root user's primary group must be GID 0, and no other user (except the
+# excluded system users sync, shutdown, halt and operator) may have GID 0 as
+# their primary group.
+
+- name: "root_only_gid_0_account | Audit"
+  shell:
+    cmd: |
+      gid_zero_users="$(awk -F: '($1 !~ /^(sync|shutdown|halt|operator)/ && $4=="0") {print $1":"$4}' /etc/passwd)"
+      [ "$gid_zero_users" = "root:0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: root_gid_account_status
+
+# Extract audit result
+- set_fact:
+    root_gid_account_check:
+      remediation_status: "{{ true if root_gid_account_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Set the root user's primary group to GID 0; other users with GID 0 need a
+# site policy decision and are only reported
+- name: "root_only_gid_0_account | Remediation"
+  shell:
+    cmd: |
+      root_gid="$(awk -F: '$1=="root" {print $4}' /etc/passwd)"
+      [ "$root_gid" != "0" ] && usermod -g 0 root
+      exit 0
+  when: not audit_only and not root_gid_account_check.remediation_status
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Users other than root with primary GID 0 require a site policy decision (assign a new GID or remove the account)'} }}"
+  changed_when: false
+  when: not root_gid_account_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_gid_account_check.remediation_status }}"

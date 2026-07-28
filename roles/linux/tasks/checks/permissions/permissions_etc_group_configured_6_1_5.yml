@@ -1,0 +1,39 @@
+# permissions_etc_group_configured_6_1_5
+#
+# The /etc/group- file contains a backup list of all the valid groups defined in the system.
+
+- name: "permissions_etc_group_configured_6_1_5 | Audit"
+  stat:
+    path: "/etc/group-"
+  changed_when: false
+  register: group_backup_file_status
+
+# permissions_etc_group_configured_6_1_5 | Audit
+- name: "permissions_etc_group_configured_6_1_5 | Audit"
+  shell:
+    cmd: |
+      [ $(({{ group_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: group_backup_permission_status
+  vars:
+    expected_file_mask: "0133"
+
+# Extract audit result
+- set_fact:
+    group_backup_permission_check:
+      remediation_status: "{{ true if ( group_backup_file_status.stat.pw_name == 'root' and group_backup_file_status.stat.gr_name == 'root' and group_backup_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_group_configured_6_1_5 | Remediation"
+  file:
+    path: "/etc/group-"
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not group_backup_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ group_backup_permission_check.remediation_status }}"

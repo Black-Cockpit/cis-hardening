@@ -1,0 +1,54 @@
+# pam_unix_does_not_include_remember
+#
+# The remember=n argument saves the last n passwords for each user in
+# /etc/security/opasswd in order to force password change history and keep the user
+# from alternating between the same password too frequently. The MD5 password hash
+# algorithm is used for storing the old passwords. Instead of this option the pam_pwhistory
+# module should be used. The pam_pwhistory module saves the last n passwords for
+# each user in /etc/security/opasswd using the password hash algorithm set on the
+# pam_unix module. This allows for the sha512 hash algorithm to be used.
+
+- name: "pam_unix_does_not_include_remember | Audit"
+  shell:
+    cmd: |
+      # Extract remember configuration
+      remember=$(grep -P -- '^\h*password\h+([^#\n\r]+\h+)?pam_unix\.so\b' /etc/pam.d/{password,system}-auth)
+
+      # Check if remember configuration has nullok and return audit result
+      echo "$remember" | grep -Pq -- '\bremember=\d\b' && echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: pam_unix_remember_status_check
+
+# Extract audit result
+- set_fact:
+    pam_unix_remember_check:
+      remediation_status: "{{ true if pam_unix_remember_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_unix_does_not_include_remember | Remediation"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          pam_profile="$(head -1 /etc/authselect/authselect.conf)"
+
+          if grep -Pq -- '^custom\/' <<<"$pam_profile"; then
+              pam_profile_path="/etc/authselect/$pam_profile"
+          else
+              pam_profile_path="/usr/share/authselect/default/$pam_profile"
+          fi
+
+          remember=$(grep -P -- '^\h*password\h+([^#\n\r]+\h+)pam_unix\.so\b' "$l_pam_profile_path"/{password,system}-auth)
+
+          if echo "$remember" | grep -Pq -- '\bremember=\d\b'; then
+              for authselect_file in "$pam_profile_path"/password-auth" $pam_profile_path"/system-auth; do
+                  sed -ri 's/(^\s*password\s+(requisite|required|sufficient)\s+pam_unix\.so\s+.*)(remember=[1-9][0-9]*)(\s*.*)$/\1\4/g' "$authselect_file"
+              done
+               authselect apply-changes
+          fi
+      fi
+  when: not audit_only and not pam_unix_remember_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ pam_unix_remember_check.remediation_status }}"

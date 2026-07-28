@@ -1,0 +1,33 @@
+# kernel_dmesg_restrict_configured
+#
+# kernel.dmesg_restrict can be used to configure the Linux kernel and prevent
+# unprivileged users access to information from the kernel's log buffer.
+
+- name: "kernel_dmesg_restrict_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n kernel.dmesg_restrict 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*kernel[.]dmesg_restrict\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "1" ] && [ "$persisted" = "1" ] && echo configured || echo not_configured
+  changed_when: false
+  register: kernel_dmesg_restrict_status
+
+# Extract audit result
+- set_fact:
+    kernel_dmesg_restrict_check:
+      remediation_status: "{{ true if kernel_dmesg_restrict_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "kernel_dmesg_restrict_configured | Remediation"
+  ansible.posix.sysctl:
+    name: kernel.dmesg_restrict
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not kernel_dmesg_restrict_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ kernel_dmesg_restrict_check.remediation_status }}"

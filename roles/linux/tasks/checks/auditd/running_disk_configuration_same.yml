@@ -1,0 +1,29 @@
+# running_disk_configuration_same
+#
+# The Audit system have both on disk and running configuration. It is possible for these
+# configuration settings to differ.
+# Note: Due to the limitations of augenrules and auditctl , it is not absolutely guaranteed
+# that loading the rule sets via augenrules --load will result in all rules being loaded or
+# even that the user will be informed if there was a problem loading the rules.
+
+- name: "running_disk_configuration_same | Audit"
+  shell:
+    cmd: augenrules --check | grep -qi 'no change' && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: audit_all_rules_loaded_status_check
+
+# Extract audit result
+- set_fact:
+    audit_all_rules_loaded_check:
+      remediation_status: "{{ true if audit_all_rules_loaded_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "running_disk_configuration_same | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_all_rules_loaded_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_all_rules_loaded_check.remediation_status }}"

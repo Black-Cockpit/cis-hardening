@@ -1,0 +1,27 @@
+# nftables_installed
+#
+# nftables provides a new in-kernel packet classification framework that is based on a
+# network-specific Virtual Machine (VM) and a new nft userspace command line tool.
+
+- name: "nftables_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -qE "^nftables" && echo installed || echo not_installed
+  changed_when: false
+  register: nftables_status_check
+
+# Extract audit result
+- set_fact:
+    nftables_check:
+      remediation_status: "{{ true if nftables_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "nftables_installed | Remediation"
+  package:
+    name: nftables
+    state: present
+  when: not audit_only and not nftables_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ nftables_check.remediation_status }}"

@@ -1,0 +1,73 @@
+# avahi_daemon_services_not_use
+#
+# Avahi is a free zeroconf implementation, including a system for multicast DNS/DNS-SD
+# service discovery. Avahi allows programs to publish and discover services and hosts
+# running on a local network with no specific configuration. For example, a user can plug
+# a computer into a network and Avahi automatically finds printers to print to, files to look
+# at and people to talk to, as well as network services running on the machine.
+
+- name: "avahi_daemon_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q avahi && echo installed || echo not_installed
+  changed_when: false
+  register: avahi_status_check
+
+# avahi_daemon_services_not_use | Audit
+- name: "avahi_daemon_services_not_use | Audit"
+  systemd:
+    name: avahi
+  ignore_errors: yes
+  changed_when: false
+  register: avahi_service_status_check
+  when: avahi_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    avahi_remediation_status: "{{ true if (avahi_status_check.stdout == 'not_installed' or (avahi_service_status_check.status.ActiveState == 'inactive' and (avahi_service_status_check.status.UnitFileState is not defined or avahi_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+
+# avahi_daemon_services_not_use | Audit
+- name: "avahi_daemon_services_not_use | Audit"
+  systemd:
+    name: avahi-daemon.socket
+  ignore_errors: yes
+  changed_when: false
+  register: avahi_socket_status_check
+  when: avahi_status_check.stdout == 'installed'
+
+# Append to remediation status
+- set_fact:
+    avahi_remediation_status: "{{ true if (avahi_remediation_status and (avahi_socket_status_check.status.ActiveState == 'inactive' and (avahi_socket_status_check.status.UnitFileState is not defined or avahi_socket_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: avahi_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    avahi_check:
+      remediation_status: "{{ true if avahi_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "avahi_daemon_services_not_use | Remediation"
+  systemd:
+    name: avahi
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not avahi_check.remediation_status
+
+# avahi_daemon_services_not_use | Remediation
+- name: "avahi_daemon_services_not_use | Remediation"
+  systemd:
+    name: avahi-daemon.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not avahi_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ avahi_check.remediation_status }}"

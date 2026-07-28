@@ -1,0 +1,60 @@
+# cramfs_kernel_module_not_available
+#
+# The cramfs filesystem type is a compressed read-only Linux filesystem embedded in
+# small footprint systems. A cramfs image can be used without having to first decompress
+# the image.
+
+- name: "cramfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv cramfs && echo loaded || echo not_loaded
+  changed_when: false
+  register: cramfs_check_loaded_result
+# Check if module is disabled
+- name: "cramfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install cramfs /bin/(true|false)" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: cramfs_check_disabled_result
+# Check if module is blacklisted
+- name: "cramfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist cramfs" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: cramfs_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    cramfs_check:
+      remediation_status: "{{ true if (cramfs_check_loaded_result.stdout == 'not_loaded' or (cramfs_check_disabled_result.stdout == 'disabled' and cramfs_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "cramfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/cramfs.conf"
+    regexp: "^(#)?install cramfs(\\s|$)"
+    line: "install cramfs /bin/true"
+    create: true
+    mode: "0600"
+  when: not audit_only and not cramfs_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "cramfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist cramfs(\\s|$)"
+    line: "blacklist cramfs"
+    create: true
+    mode: "0600"
+  when: not audit_only and not cramfs_check.remediation_status
+
+# Disable cramfs filesystems
+- name: Disabling cramfs filesystems
+  modprobe:
+    name: cramfs
+    state: absent
+  when: not audit_only and not cramfs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cramfs_check.remediation_status }}"

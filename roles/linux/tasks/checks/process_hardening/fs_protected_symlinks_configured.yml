@@ -1,0 +1,35 @@
+# fs_protected_symlinks_configured
+#
+# fs.protected_symlinks Controls how the kernel handles symbolic links
+# By enabling the fs.protected_symlinks kernel parameter, symbolic links are
+# permitted to be followed only when outside a sticky world-writable directory, or when the
+# user identifier (UID) of the link and follower match, or when the directory owner matches
+
+- name: "fs_protected_symlinks_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n fs.protected_symlinks 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*fs[.]protected_symlinks\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "1" ] && [ "$persisted" = "1" ] && echo configured || echo not_configured
+  changed_when: false
+  register: fs_protected_symlinks_status
+
+# Extract audit result
+- set_fact:
+    fs_protected_symlinks_check:
+      remediation_status: "{{ true if fs_protected_symlinks_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "fs_protected_symlinks_configured | Remediation"
+  ansible.posix.sysctl:
+    name: fs.protected_symlinks
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not fs_protected_symlinks_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ fs_protected_symlinks_check.remediation_status }}"

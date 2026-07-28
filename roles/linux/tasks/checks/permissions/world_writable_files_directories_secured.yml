@@ -1,0 +1,123 @@
+# world_writable_files_directories_secured
+#
+# World writable files are the least secure. Data in world-writable files can be modified and
+# compromised by any user on the system. World writable files may also indicate an
+# incorrectly written script or program that could potentially be the cause of a larger
+# compromise to the system's integrity. See the chmod(2) man page for more information.
+# Setting the sticky bit on world writable directories prevents users from deleting or
+# renaming files in that directory that are not owned by them.
+
+- name: "world_writable_files_directories_secured | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      l_output="" l_output2=""
+      l_smask='01000'
+      a_path=()
+      a_arr=()
+      a_file=()
+      a_dir=() # Initialize arrays
+
+      # List all system paths
+      a_path=(! -path "/run/user/*" -a ! -path "/proc/*" -a ! -path "*/containerd/*" -a ! -path
+          "*/kubelet/pods/*" -a ! -path "/sys/kernel/security/apparmor/*" -a ! -path "/snap/*" -a ! -path
+          "/sys/fs/cgroup/memory/*" -a ! -path "/sys/fs/selinux/*")
+
+      while read -r l_bfs; do
+          a_path+=(-a ! -path ""$l_bfs"/*")
+      done < <(findmnt -Dkerno fstype,target | awk '$1 ~ /^\s*(nfs|proc|smb)/ {print $2}')
+
+      # Populate array with files that will possibly fail one of the audits
+      while IFS= read -r -d $'\0' l_file; do
+          [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+      done < <(find / \( "${a_path[@]}" \) \( -type f -o -type d \) -perm -0002 -print0 2>/dev/null)
+
+      while IFS="^" read -r l_fname l_mode; do
+          # Test files in the array
+          [ -f "$l_fname" ] && a_file+=("$l_fname")
+
+          if [ -d "$l_fname" ]; then
+              [ ! $(($l_mode & $l_smask)) -gt 0 ] && a_dir+=("$l_fname")
+          fi
+      done < <(printf '%s\n' "${a_arr[@]}")
+
+      # Check files
+      if ! ((${#a_file[@]} > 0)); then
+          l_output="SUCCESS"
+      else
+          l_output2="FAIL"
+      fi
+
+      # Check directories
+      if ! ((${#a_dir[@]} > 0)); then
+          l_output="SUCCESS"
+      else
+          l_output2="FAIL"
+      fi
+
+      unset a_path
+      unset a_arr
+      unset a_file
+      unset a_dir # Remove arrays
+
+      # If l_output2 is empty, we pass
+      if [ -z "$l_output2" ]; then
+          echo 'configured'
+      else
+          echo 'not_configured'
+      fi
+      {% endraw %}
+  changed_when: false
+  register: world_writable_files_status
+
+# Extract audit result
+- set_fact:
+    world_writable_files_check:
+      remediation_status: "{{ true if world_writable_files_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "world_writable_files_directories_secured | Remediation"
+  shell:
+    cmd: |
+      {% raw %}
+      l_smask='01000'
+      a_path=()
+      a_arr=() # Initialize array
+      a_path=(! -path "/run/user/*" -a ! -path "/proc/*" -a ! -path
+          "*/containerd/*" -a ! -path "*/kubelet/pods/*" -a ! -path
+          "/sys/kernel/security/apparmor/*" -a ! -path "/snap/*" -a ! -path
+          "/sys/fs/cgroup/memory/*" -a ! -path "/sys/fs/selinux/*")
+      while read -r l_bfs; do
+          a_path+=(-a ! -path ""$l_bfs"/*")
+      done < <(findmnt -Dkerno fstype,target | awk '$1 ~ /^\s*(nfs|proc|smb)/ {print $2}')
+
+      # Populate array with files
+      while IFS= read -r -d $'\0' l_file; do
+          [ -e "$l_file" ] && a_arr+=("$(stat -Lc '%n^%#a' "$l_file")")
+      done < <(
+          find / \( "${a_path[@]}" \) \( -type f -o -type d \) -perm -0002
+          -print0 2>/dev/null
+      )
+
+      # Update files permissions
+      while IFS="^" read -r l_fname l_mode; do # Test files in the array
+          if [ -f "$l_fname" ]; then           # Remove excess permissions from WW files
+              # Update file access
+              chmod o-w "$l_fname"
+          fi
+          if [ -d "$l_fname" ]; then
+              if [ ! $(($l_mode & $l_smask)) -gt 0 ]; then # Add sticky bit
+                  # Update directory access
+                  chmod a+t "$l_fname"
+              fi
+          fi
+      done < <(printf '%s\n' "${a_arr[@]}")
+      unset a_path
+      unset a_arr # Remove array
+      {% endraw %}
+  when: not audit_only and not world_writable_files_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ world_writable_files_check.remediation_status }}"

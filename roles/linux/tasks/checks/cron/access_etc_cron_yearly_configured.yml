@@ -1,0 +1,52 @@
+# access_etc_cron_yearly_configured
+#
+# The /etc/cron.yearly directory contains system cron jobs that need to run on
+# a yearly basis. Restricting read/write and search access to user and group
+# root prevents regular users from accessing or modifying these jobs.
+
+- name: "access_etc_cron_yearly_configured | Audit"
+  shell:
+    cmd: '[ ! -d /etc/cron.yearly ] && echo 0 || find /etc/cron.yearly \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: crontab_yearly_stat_check
+
+# Extract audit result
+- set_fact:
+    crontab_yearly_permission_check:
+      remediation_status: "{{ true if crontab_yearly_stat_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Remediation | Enforce ownership and permissions
+- name: "access_etc_cron_yearly_configured | Remediation"
+  file:
+    name: "/etc/cron.yearly"
+    mode: "0700"
+    owner: root
+    group: root
+  when: not audit_only and not crontab_yearly_permission_check.remediation_status
+
+# Remediation | List the files to correct
+- name: "access_etc_cron_yearly_configured | Remediation"
+  find:
+    paths: "/etc/cron.yearly"
+    file_type: file
+    recurse: true
+  register: crontab_yearly_files_list
+  when: not audit_only and not crontab_yearly_permission_check.remediation_status
+
+# Remediation | Enforce ownership and permissions
+- name: "access_etc_cron_yearly_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0700"
+    owner: root
+    group: root
+  with_items:
+  - "{{ crontab_yearly_files_list.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not crontab_yearly_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crontab_yearly_permission_check.remediation_status }}"

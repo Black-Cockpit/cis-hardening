@@ -1,0 +1,60 @@
+# atm_kernel_module_not_available
+#
+# The Asynchronous Transfer Mode (ATM) is a protocol operating on network, data link,
+# and physical layers, based on virtual circuits and virtual paths. Disabling ATM protects
+# the system against exploitation of any laws in its implementation.
+
+- name: "atm_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv atm && echo loaded || echo not_loaded
+  changed_when: false
+  register: atm_check_loaded_result
+# Check if module is disabled
+- name: "atm_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install atm /bin/(true|false)" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: atm_check_disabled_result
+# Check if module is blacklisted
+- name: "atm_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist atm" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: atm_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    atm_check:
+      remediation_status: "{{ true if (atm_check_loaded_result.stdout == 'not_loaded' or (atm_check_disabled_result.stdout == 'disabled' and atm_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "atm_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/atm.conf"
+    regexp: "^(#)?install atm(\\s|$)"
+    line: "install atm /bin/false"
+    create: true
+    mode: "0600"
+  when: not audit_only and not atm_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "atm_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist atm(\\s|$)"
+    line: "blacklist atm"
+    create: true
+    mode: "0600"
+  when: not audit_only and not atm_check.remediation_status
+
+# Unload the atm module
+- name: "atm_kernel_module_not_available | Remediation"
+  modprobe:
+    name: atm
+    state: absent
+  when: not audit_only and not atm_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ atm_check.remediation_status }}"

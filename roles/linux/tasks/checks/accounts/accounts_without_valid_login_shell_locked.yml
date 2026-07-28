@@ -1,0 +1,38 @@
+# accounts_without_valid_login_shell_locked
+#
+# Non root accounts whose shell is not a valid login shell must be locked so
+# they cannot be used for interactive or remote authentication.
+
+- name: "accounts_without_valid_login_shell_locked | Audit"
+  shell:
+    cmd: |
+      valid_shells="^($(awk -F/ '$NF != "nologin" {print}' /etc/shells | sed -rn '/^\//{s,/,\\\\/,g;p}' | paste -s -d '|' - ))$"
+      awk -v pat="$valid_shells" -F: '($1 != "root" && $(NF) !~ pat) {print $1}' /etc/passwd | while read -r user_name; do
+        passwd -S "$user_name" | awk '$2 !~ /^L/ {print $1}'
+      done
+      exit 0
+  changed_when: false
+  register: unlocked_shell_accounts_status
+
+# Extract audit result
+- set_fact:
+    unlocked_shell_accounts_check:
+      remediation_status: "{{ true if unlocked_shell_accounts_status.stdout == '' else false }}"
+  changed_when: false
+
+# Remediation | Apply the remediation commands
+- name: "accounts_without_valid_login_shell_locked | Remediation"
+  shell:
+    cmd: |
+      valid_shells="^($(awk -F/ '$NF != "nologin" {print}' /etc/shells | sed -rn '/^\//{s,/,\\\\/,g;p}' | paste -s -d '|' - ))$"
+      awk -v pat="$valid_shells" -F: '($1 != "root" && $(NF) !~ pat) {print $1}' /etc/passwd | while read -r user_name; do
+        passwd -S "$user_name" | awk '$2 !~ /^L/ {print $1}' | while read -r unlocked_user; do
+          usermod -L "$unlocked_user"
+        done
+      done
+      exit 0
+  when: not audit_only and not unlocked_shell_accounts_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ unlocked_shell_accounts_check.remediation_status }}"

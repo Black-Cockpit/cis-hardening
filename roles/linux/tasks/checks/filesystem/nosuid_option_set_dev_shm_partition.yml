@@ -1,0 +1,27 @@
+# nosuid_option_set_dev_shm_partition
+#
+# The nosuid mount option specifies that the filesystem cannot contain setuid files.
+
+- name: "nosuid_option_set_dev_shm_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/dev/shm\s' | grep -q nosuid && echo compliant || echo not_compliant
+  changed_when: false
+  register: shm_nosuid_status
+
+# Extract audit result
+- set_fact:
+    shm_nosuid:
+      remediation_status: "{{ true if shm_nosuid_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /dev/shm partition with nosuid option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "nosuid_option_set_dev_shm_partition | Remediation"
+  debug:
+    msg: "Consider to mount /dev/shm partition with nosuid option by modifing /etc/fstab"
+  when: not audit_only and not shm_nosuid.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ shm_nosuid.remediation_status }}"

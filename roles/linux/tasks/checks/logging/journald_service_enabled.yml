@@ -1,0 +1,29 @@
+# journald_service_enabled
+#
+# Ensure that the systemd-journald service is enabled to allow capturing of logging
+# events.
+
+- name: "journald_service_enabled | Audit"
+  shell:
+    cmd: systemctl is-enabled systemd-journald.service | grep -q static && echo 'enabled' || echo 'not_enabled'
+  changed_when: false
+  register: systemd_journal_remote_service_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_service_check:
+      remediation_status: "{{ true if systemd_journal_remote_service_status_check.stdout == 'enabled' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "journald_service_enabled | Remediation"
+  systemd:
+    name: systemd-journald
+    state: started
+    enabled: true
+    masked: false
+  when: not audit_only and not systemd_journal_remote_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ systemd_journal_remote_service_check.remediation_status }}"

@@ -1,0 +1,28 @@
+# auditd_service_enabled
+#
+# Turn on the auditd daemon to record system events.
+
+- name: "auditd_service_enabled | Audit"
+  systemd:
+    name: auditd
+  changed_when: false
+  register: auditd_service_status_check
+
+# Extract audit result
+- set_fact:
+    auditd_service_check:
+      remediation_status: "{{ true if (auditd_service_status_check.status.ActiveState == 'active' and auditd_service_status_check.status.UnitFileState == 'enabled') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "auditd_service_enabled | Remediation"
+  systemd:
+    name: auditd
+    state: started
+    enabled: true
+    masked: false
+  when: not audit_only and not auditd_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ auditd_service_check.remediation_status }}"

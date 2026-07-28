@@ -1,0 +1,28 @@
+# time_synchronization_use
+#
+# System time should be synchronized between all systems in an environment. This is
+# typically done by establishing an authoritative time server or set of servers and having
+# all systems synchronize their clocks to them.
+
+- name: "time_synchronization_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q chrony && echo installed || echo not_installed
+  changed_when: false
+  register: chrony_status_check
+
+# Extract audit result
+- set_fact:
+    chrony_check:
+      remediation_status: "{{ true if chrony_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "time_synchronization_use | Remediation"
+  package:
+    name: gdm
+    state: present
+  when: not audit_only and not chrony_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ chrony_check.remediation_status }}"

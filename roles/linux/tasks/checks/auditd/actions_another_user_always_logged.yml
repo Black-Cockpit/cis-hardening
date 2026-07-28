@@ -1,0 +1,98 @@
+# actions_another_user_always_logged
+#
+# sudo provides users with temporary elevated privileges to perform operations, either as
+# the superuser or another user.
+
+- name: "actions_another_user_always_logged | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&(/ -C *euid!=uid/||/ -C *uid!=euid/) \
+      &&/ -S *execve/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_action_as_other_user_rule_status_check
+
+# actions_another_user_always_logged | Audit
+- name: "actions_another_user_always_logged | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&(/ -C *euid!=uid/||/ -C *uid!=euid/) \
+      &&/ -S *execve/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_action_as_other_user_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all sudo log files rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_action_as_other_user_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all sudo log files rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_action_as_other_user_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_action_as_other_user_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "actions_another_user_always_logged | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-user-emulation.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_action_as_other_user_rule_check.remediation_status
+
+# actions_another_user_always_logged | Remediation
+- name: "actions_another_user_always_logged | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&(/ -C *euid!=uid/||/ -C *uid!=euid/) \
+      &&/ -S *execve/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo "-a always,exit -F arch=b{{ item }} -C euid!=uid -F auid!=unset -S execve -k user_emulation" >> /etc/audit/rules.d/00-cis-user-emulation.rules
+  loop:
+  - "32"
+  - "64"
+  when: not audit_only and not audit_action_as_other_user_rule_check.remediation_status
+
+ # actions_another_user_always_logged | Remediation
+- name: "actions_another_user_always_logged | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_action_as_other_user_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_action_as_other_user_rule_check.remediation_status }}"

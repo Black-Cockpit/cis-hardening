@@ -1,0 +1,30 @@
+# updates_patches_additional_security_software_installed
+#
+# Periodically patches are released for included software either due to security flaws or to
+# include additional functiona
+
+- name: "updates_patches_additional_security_software_installed | Audit"
+  shell:
+    cmd: dnf updateinfo list security -y | grep -E "(Moderate|Important|Low)\/Sec" | wc -l
+  changed_when: false
+  register: system_update_check_status
+
+# Extract audit result
+- set_fact:
+    system_update_check:
+      remediation_status: "{{ true if (system_update_check_status.stdout | int ) <= 1 else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "updates_patches_additional_security_software_installed | Remediation"
+  yum:
+    name: "*"
+    security: true
+    update_cache: true
+    state: latest
+  when: not audit_only and not system_update_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ system_update_check.remediation_status }}"

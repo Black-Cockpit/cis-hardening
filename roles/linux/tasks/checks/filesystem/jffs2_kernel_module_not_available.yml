@@ -1,0 +1,58 @@
+# jffs2_kernel_module_not_available
+#
+# The jffs2 (journaling flash filesystem 2) filesystem type is a log-structured filesystem
+# used in flash memory devices.
+
+- name: "jffs2_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv jffs2 && echo loaded || echo not_loaded
+  changed_when: false
+  register: jffs2_check_loaded_result
+# Check if module is disabled
+- name: "jffs2_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install jffs2 /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: jffs2_check_disabled_result
+# Check if module is blacklisted
+- name: "jffs2_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist jffs2" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: jffs2_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    jffs2_check:
+      remediation_status: "{{ true if (jffs2_check_loaded_result.stdout == 'not_loaded' or (jffs2_check_disabled_result.stdout == 'disabled' and jffs2_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "jffs2_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/jffs2.conf"
+    regexp: "^(#)?install jffs2(\\s|$)"
+    line: "install jffs2 /bin/true"
+    create: true
+  when: not audit_only and not jffs2_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "jffs2_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist jffs2(\\s|$)"
+    line: "blacklist jffs2"
+    create: true
+    mode: "0600"
+  when: not audit_only and not jffs2_check.remediation_status
+
+# Disable jffs2 filesystems
+- name: Disabling jffs2 filesystems
+  modprobe:
+    name: jffs2
+    state: absent
+  when: not audit_only and not jffs2_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ jffs2_check.remediation_status }}"

@@ -1,0 +1,37 @@
+# latest_version_authselect_installed
+#
+# Authselect is a utility that simplifies the configuration of user authentication. Authselect
+# offers ready-made profiles that can be universally used with all modern identity
+# management systems
+#
+# You can create and deploy a custom profile by customizing one of the default profiles,
+# the sssd, winbind, or the nis profile. This is particularly useful if Modifying a ready-made
+# authselect profile is not enough for your needs. When you deploy a custom profile, the
+# profile is applied to every user logging into the given host. This would be the
+# recommended method, so that the existing profiles can remain unmodified.
+# Updated versions of authselect include additional functionality
+
+- name: "latest_version_authselect_installed | Audit"
+  set_fact:
+    authselect_version: "{{ ansible_facts.packages['authselect'][0].version | regex_search('[0-9.]*') }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    authselect_version_check:
+      remediation_status: "{{ true if authselect_version is version('1.2.6', '>=') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "latest_version_authselect_installed | Remediation"
+  # latest_version_authselect_installed | Remediation
+  yum:
+    name: authselect
+    bugfix: true
+    security: true
+    state: latest
+  when: not audit_only and not authselect_version_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_version_check.remediation_status }}"

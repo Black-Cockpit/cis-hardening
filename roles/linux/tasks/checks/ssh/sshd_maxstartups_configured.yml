@@ -1,0 +1,80 @@
+# sshd_maxstartups_configured
+#
+# The MaxStartups parameter specifies the maximum number of concurrent
+# unauthenticated connections to the SSH daemon.
+
+- name: "sshd_maxstartups_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Get ssh max startups value
+          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i maxstartups | awk '{print $2}'  || echo "11:31:101")
+
+          # Extract start
+          start=$(awk -F':' '{print $1}' <<< "$audit_out")
+
+          # Extract rate
+          rate=$(awk -F':' '{print $2}' <<< "$audit_out")
+
+          # Extract full
+          full=$(awk -F':' '{print $3}' <<< "$audit_out")
+
+          # Audit
+          [[ "$start" -lt 11 ]] && [[ "$rate" -lt 31 ]] && [[ "$full" -lt 61 ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_max_startups_status_check
+
+# sshd_maxstartups_configured | Audit
+- name: "sshd_maxstartups_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          grep -Pis '^\h*maxstartups\h+"?(((1[1-9]|[1-9][0-9][0-9]+):([0-9]+):([0-9]+))|(([0-9]+):(3[1-9]|[4-9][0-9]|[1-9][0-9][0-9]+):([0-9]+))|(([0-9]+):([0-9]+):(6[1-9]|[7-9][0-9]|[1-9][0-9][0-9]+)))\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_max_startups_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_max_startups_config_check:
+      remediation_status: "{{ true if (ssh_max_startups_status_check.stdout == 'configured' and ssh_max_startups_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- set_fact:
+    max_startups_value: "{{ rhel8.sshd.max_startups.start | default(cis_defaults.sshd.max_startups.start) }}:{{ rhel8.sshd.max_startups.rate | default(cis_defaults.sshd.max_startups.rate) }}:{{ rhel8.sshd.max_startups.full | default(cis_defaults.sshd.max_startups.full) }}"
+  changed_when: false
+  when: not audit_only and not ssh_max_startups_config_check.remediation_status
+
+# sshd_maxstartups_configured | Remediation
+- name: "sshd_maxstartups_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MaxStartups|#MaxStartups)"
+    state: absent
+  when: not audit_only and not ssh_max_startups_config_check.remediation_status
+
+# sshd_maxstartups_configured | Remediation
+- name: "sshd_maxstartups_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MaxStartups)"
+    line: 'MaxStartups {{ max_startups_value }}'
+    state: present
+  when: not audit_only and not ssh_max_startups_config_check.remediation_status
+
+# sshd_maxstartups_configured | Remediation
+- name: "sshd_maxstartups_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_max_startups_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_max_startups_config_check.remediation_status }}"

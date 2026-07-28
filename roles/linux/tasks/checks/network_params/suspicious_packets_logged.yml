@@ -1,0 +1,190 @@
+# suspicious_packets_logged
+#
+# When enabled, this feature logs packets with un-routable source addresses to the
+# kernel log.
+
+- name: "suspicious_packets_logged | Audit"
+  block:
+  # Check current net.ipv4.conf.all.log_martians status
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.all.log_martians" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_suspicious_log_all_current_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if ipv4_suspicious_log_all_current_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.conf.all.log_martians is disabled on sysctl.conf file
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.all.log_martians\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_suspicious_log_all_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_all_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_suspicious_log_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.all.log_martians configuration
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.all.log_martians\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_suspicious_log_all_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_suspicious_log_all_conf_check.results | list }}"
+    when: ipv4_suspicious_log_remediation_status
+
+  # Check if net.ipv4.conf.all.log_martians is configured in one of the UFW sysctl configuration files
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.all.log_martians\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_suspicious_log_all_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_suspicious_log_remediation_status
+
+# Audit net.ipv4.conf.default.log_martians status
+- name: "suspicious_packets_logged | Audit"
+  block:
+  # Check current net.ipv4.conf.default.log_martians status
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.default.log_martians" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_suspicious_log_default_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_suspicious_log_remediation_status
+
+  # Check net.ipv4.conf.default.log_martians is disabled on sysctl.conf file
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_suspicious_log_default_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_suspicious_log_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.default.log_martians configuration
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: ipv4_suspicious_log_default_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_suspicious_log_default_conf_check.results | list }}"
+    when: ipv4_suspicious_log_remediation_status
+
+  # Check if net.ipv4.conf.default.log_martians is configured in one of the UFW sysctl configuration files
+  - name: "suspicious_packets_logged | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.log_martians\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_suspicious_log_default_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_suspicious_log_remediation_status: "{{ true if (ipv4_suspicious_log_remediation_status and ipv4_suspicious_log_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_suspicious_log_remediation_status
+
+# Extract audit result
+- set_fact:
+    ipv4_suspicious_log_check:
+      remediation_status: "{{ true if ipv4_suspicious_log_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "suspicious_packets_logged | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.log_martians
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not ipv4_suspicious_log_check.remediation_status
+
+# suspicious_packets_logged | Remediation
+- name: "suspicious_packets_logged | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.log_martians
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not ipv4_suspicious_log_check.remediation_status
+
+# suspicious_packets_logged | Remediation
+- name: "suspicious_packets_logged | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not ipv4_suspicious_log_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ipv4_suspicious_log_check.remediation_status }}"

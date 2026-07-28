@@ -1,0 +1,28 @@
+# ftp_client_not_installed
+#
+# FTP (File Transfer Protocol) is a traditional and widely used standard tool for
+# transferring files between a server and clients over a network, especially where no
+# authentication is necessary (permits anonymous users to connect to a server).
+
+- name: "ftp_client_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -qE "^ftp" && echo installed || echo not_installed
+  changed_when: false
+  register: ftp_status_check
+
+# Extract audit result
+- set_fact:
+    ftp_server_check:
+      remediation_status: "{{ true if ftp_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "ftp_client_not_installed | Remediation"
+  package:
+    name: ftp
+    state: absent
+  when: not audit_only and not ftp_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ftp_server_check.remediation_status }}"

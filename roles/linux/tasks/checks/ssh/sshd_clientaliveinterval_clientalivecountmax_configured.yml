@@ -1,0 +1,127 @@
+# sshd_clientaliveinterval_clientalivecountmax_configured
+#
+# Note: To clarify, the two settings described below are only meant for idle connections
+# from a protocol perspective and are not meant to check if the user is active or not. An
+# idle user does not mean an idle connection. SSH does not and never had, intentionally,
+# the capability to drop idle users. In SSH versions before 8.2p1 there was a bug that
+# caused these values to behave in such a manner that they were abused to disconnect
+# idle users. This bug has been resolved in 8.2p1 and thus it can no longer be abused
+# disconnect idle users.
+#
+# The two options ClientAliveInterval and ClientAliveCountMax control the timeout of
+# SSH sessions. Taken directly from man 5 sshd_config :
+#
+#   - ClientAliveInterval:  Sets a timeout interval in seconds after which if no data
+#                           has been received from the client, sshd(8) will send a message through the
+#                           encrypted channel to request a response from the client. The default is 0,
+#                           indicating that these messages will not be sent to the client.
+#
+#   - ClientAliveCountMax:  Sets the number of client alive messages which may be
+#                           sent without sshd(8) receiving any messages back from the client. If this
+#                           threshold is reached while client alive messages are being sent, sshd will
+#                           disconnect the client, terminating the session. It is important to note that the use
+#                           of client alive messages is very different from TCPKeepAlive. The client alive
+#                           messages are sent through the encrypted channel and therefore will not be
+#                           spoofable. The TCP keepalive option en‐abled by TCPKeepAlive is spoofable.
+#                           The client alive mechanism is valuable when the client or server depend on
+#                           knowing when a connection has become unresponsive. The default value is 3. If
+#                           ClientAliveInterval is set to 15, and ClientAliveCountMax is left at the default,
+#                           unresponsive SSH clients will be disconnected after approximately 45 seconds.
+#                           Setting a zero ClientAliveCountMax disables connection termination.
+
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Extract ssh client alive count max
+          client_alive_count_max=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep clientalivecountmax | awk '{print $2}' || echo '0')
+
+          [[ "$client_alive_count_max" -gt 0 ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_client_alive_count_max_check
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Audit
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Extract ssh client alive interval
+          client_alive_interval=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep clientaliveinterval | awk '{print $2}' || echo '0')
+
+          [[ "$client_alive_interval" -gt 0 ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_client_alive_interval_check
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Audit
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          grep -Pis '^\h*ClientAliveCountMax\h+"?0\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_client_alive_count_max_conf_check
+
+# Set ssh client alive count max remediation status
+- set_fact:
+    ssh_client_alive_count_max_remediation_status: "{{ true if (ssh_client_alive_count_max_check.stdout == 'configured' and ssh_client_alive_count_max_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    ssh_client_intervals_config_check:
+      remediation_status: "{{ true if (ssh_client_alive_interval_check.stdout == 'configured' and ssh_client_alive_count_max_remediation_status) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(ClientAliveInterval|#ClientAliveInterval)"
+    state: absent
+  when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not (ssh_client_alive_interval_check.stdout == 'configured')
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Remediation
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(ClientAliveInterval)"
+    line: 'ClientAliveInterval {{ rhel8.sshd.client_alive_interval | default(cis_defaults.sshd.client_alive_interval) }}'
+    state: present
+  when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not (ssh_client_alive_interval_check.stdout == 'configured')
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Remediation
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(ClientAliveCountMax|#ClientAliveCountMax)"
+    state: absent
+  when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remediation_status
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Remediation
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(ClientAliveCountMax)"
+    line: 'ClientAliveCountMax {{ rhel8.sshd.client_alive_count_max | default(cis_defaults.sshd.client_alive_count_max) }}'
+    state: present
+  when: not audit_only and not ssh_client_intervals_config_check.remediation_status and not ssh_client_alive_count_max_remediation_status
+
+# sshd_clientaliveinterval_clientalivecountmax_configured | Remediation
+- name: "sshd_clientaliveinterval_clientalivecountmax_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_client_intervals_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_client_intervals_config_check.remediation_status }}"

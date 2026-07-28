@@ -1,0 +1,144 @@
+# events_modify_date_time_information_collected
+#
+# Capture events where the system date and/or time has been modified. The parameters
+# in this section are set to determine if the;
+#
+# - adjtimex      : tune kernel clock
+# - settimeofday  : set time using timeval and timezone structures
+# - stime         : using seconds since 1/1/1970
+# - clock_settime : allows for the setting of several internal clocks and timers
+#
+# system calls have been executed. Further, ensure to write an audit record to the
+# configured audit log file upon exit, tagging the records with a unique identifier such as
+# "time-change".
+
+- name: "events_modify_date_time_information_collected | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/adjtimex/ \
+      ||/settimeofday/ \
+      ||/clock_settime/ ) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_adjust_time_rule_status_check
+
+# events_modify_date_time_information_collected | Audit
+- name: "events_modify_date_time_information_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/adjtimex/ \
+      ||/settimeofday/ \
+      ||/clock_settime/ ) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_adjust_time_running_rule_status_check
+
+# events_modify_date_time_information_collected | Audit
+- name: "events_modify_date_time_information_collected | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-w/ \
+      &&/\/etc\/localtime/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  register: audit_write_time_conf_rule_status_check
+
+# events_modify_date_time_information_collected | Audit
+- name: "events_modify_date_time_information_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-w/ \
+      &&/\/etc\/localtime/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  register: audit_write_time_conf_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if (audit_write_time_conf_rule_status_check.stdout | int) > 0 and (audit_write_time_conf_running_rule_status_check.stdout | int) > 0 else false  }}"
+  changed_when: false
+
+# Check if all time ajustement rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_adjust_time_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all time ajustement rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_adjust_time_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_adjust_time_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "events_modify_date_time_information_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-time-change.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_adjust_time_rule_check.remediation_status
+
+# events_modify_date_time_information_collected | Remediation
+- name: "events_modify_date_time_information_collected | Remediation"
+  lineinfile:
+    line: "-w /etc/localtime -p wa -k time-change"
+    regexp: '^[\s]*(-w)[\s]*(\/etc\/localtime)[\s]*(-p)[\s]*(wa)[\s]*(-k)[\s]*[!-~]*$'
+    path: "/etc/audit/rules.d/00-cis-time-change.rules"
+    state: present
+    create: true
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_adjust_time_rule_check.remediation_status and not ((audit_write_time_conf_rule_status_check.stdout | int ) > 0)
+
+# events_modify_date_time_information_collected | Remediation
+- name: "events_modify_date_time_information_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/adjtimex/ \
+      ||/settimeofday/ \
+      ||/clock_settime/ ) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo "-a always,exit -F arch=b{{ item }} -S adjtimex,settimeofday,clock_settime -F key=time-change" >> /etc/audit/rules.d/00-cis-time-change.rules
+  loop:
+  - "32"
+  - "64"
+  when: not audit_only and not audit_adjust_time_rule_check.remediation_status
+
+ # events_modify_date_time_information_collected | Remediation
+- name: "events_modify_date_time_information_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_adjust_time_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_adjust_time_rule_check.remediation_status }}"

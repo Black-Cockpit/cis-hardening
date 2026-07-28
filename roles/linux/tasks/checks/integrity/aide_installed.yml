@@ -1,0 +1,38 @@
+# aide_installed
+#
+# Advanced Intrusion Detection Environment (AIDE) is an intrusion detection tool that
+# uses predefined rules to check the integrity of files and directories in the Linux operating
+# system. AIDE has its own database to check the integrity of files and directories.
+#
+# aide takes a snapshot of files and directories including modification times, permissions,
+# and file hashes which can then be used to compare against the current state of the
+# filesystem to detect modifications to the system.
+
+- name: "aide_installed | Audit"
+  shell:
+    cmd: rpm -q aide | grep -Eq 'aide[\-][0-9]' && echo 'installed' || echo 'not_installed'
+  changed_when: false
+  register: aide_status_check
+
+# Extract audit result
+- set_fact:
+    aide_check:
+      remediation_status: "{{ true if aide_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "aide_installed | Remediation"
+  package:
+    name: aide
+    state: present
+  when: not audit_only and not aide_check.remediation_status
+
+ # aide_installed | Remediation
+- name: "aide_installed | Remediation"
+  shell:
+    cmd: aide --init && mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+  when: not audit_only and not aide_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ aide_check.remediation_status }}"

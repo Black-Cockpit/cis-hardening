@@ -1,0 +1,48 @@
+# sudo_log_file_exists
+#
+# The Defaults logfile entry sets the path to the sudo log file. Setting a path turns on
+# logging to a file; negating this option turns it off. By default, sudo logs via syslog.
+
+- name: "sudo_log_file_exists | Audit"
+  shell:
+    cmd: |
+      grep -Piq "^\h*Defaults\h+([^#]+,\h*)?logfile\h*=\h*(\"|\')?\H+(\"|\')?(,\h*\H+\h*)*\h*(#.*)?$" {{ item }} && echo 'configured' \
+      || echo 'not_configured'
+  changed_when: false
+  loop: "{{ sudoers_files }}"
+  failed_when: sudoers_files is not defined
+  register: sudo_log_file_status_check
+
+# Define remediation status
+- set_fact:
+    sudo_log_file_remediation_status: true
+  changed_when: false
+
+# Check if pseudo terminal is configured in all the listed sudoers files
+- set_fact:
+    sudo_log_file_remediation_status: "{{ true if (sudo_log_file_remediation_status and item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ sudo_log_file_status_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    sudo_log_file_check:
+      remediation_status: "{{ true if sudo_log_file_remediation_status else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "sudo_log_file_exists | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults logfile='
+    line: 'Defaults logfile="/var/log/sudo.log"'
+    state: present
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_log_file_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sudo_log_file_check.remediation_status }}"

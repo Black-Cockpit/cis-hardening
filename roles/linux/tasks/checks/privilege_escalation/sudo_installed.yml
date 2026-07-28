@@ -1,0 +1,29 @@
+# sudo_installed
+#
+# sudo allows a permitted user to execute a command as the superuser or another user,
+# as specified by the security policy. The invoking user's real (not effective) user ID is
+# used to determine the user name with which to query the security policy.
+
+- name: "sudo_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -Eq '^sudo[-][0-9]' && echo installed || not_installed
+  changed_when: false
+  register: sudo_status_check
+
+# Extract audit result
+- set_fact:
+    sudo_check:
+      remediation_status: "{{ true if sudo_status_check.stdout == 'installed' else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "sudo_installed | Remediation"
+  package:
+    name: sudo
+    state: present
+  when: not audit_only and not sudo_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sudo_check.remediation_status }}"

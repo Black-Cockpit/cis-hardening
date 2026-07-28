@@ -1,0 +1,28 @@
+# cron_daemon_enabled_active
+#
+# The cron daemon is used to execute batch jobs on the system.
+
+- name: "cron_daemon_enabled_active | Audit"
+  systemd:
+    name: crond
+  changed_when: false
+  register: cron_status_check
+
+# Extract audit result
+- set_fact:
+    cron_check:
+      remediation_status: "{{ true if (cron_status_check.status.ActiveState == 'active' and cron_status_check.status.UnitFileState == 'enabled') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "cron_daemon_enabled_active | Remediation"
+  systemd:
+    name: crond
+    state: started
+    enabled: true
+    force: true
+  when: not audit_only and not cron_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cron_check.remediation_status }}"

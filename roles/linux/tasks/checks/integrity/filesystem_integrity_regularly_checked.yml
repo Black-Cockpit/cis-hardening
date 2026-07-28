@@ -1,0 +1,72 @@
+# filesystem_integrity_regularly_checked
+#
+# Periodic checking of the filesystem integrity is needed to detect changes to the
+# filesystem.
+
+- name: "filesystem_integrity_regularly_checked | Audit"
+  systemd:
+    name: aidecheck.service
+  changed_when: false
+  register: aidecheck_service_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if (aidecheck_service_check.status.UnitFileState is defined and aidecheck_service_check.status.UnitFileState == 'enabled') else false}}"
+  changed_when: false
+
+# filesystem_integrity_regularly_checked | Audit
+- name: "filesystem_integrity_regularly_checked | Audit"
+  systemd:
+    name: aidecheck.timer
+  changed_when: false
+  register: aidecheck_timer_service_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and aidecheck_timer_service_check.status.ActiveState == 'active' and aidecheck_timer_service_check.status.UnitFileState == 'enabled') else false}}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    aidecheck_service_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "filesystem_integrity_regularly_checked | Remediation"
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+    force: true
+  loop:
+  - src: "rhel/lib/systemd/system/aidecheck.service.j2"
+    dest: "/lib/systemd/system/aidecheck.service"
+  - src: "rhel/lib/systemd/system/aidecheck.timer.j2"
+    dest: "/lib/systemd/system/aidecheck.timer"
+  when: not audit_only and not aidecheck_service_check.remediation_status
+
+# filesystem_integrity_regularly_checked | Remediation
+- name: "filesystem_integrity_regularly_checked | Remediation"
+  systemd:
+    daemon_reload: true
+  changed_when: false
+  when: not audit_only and not aidecheck_service_check.remediation_status
+
+# filesystem_integrity_regularly_checked | Remediation
+- name: "filesystem_integrity_regularly_checked | Remediation"
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  changed_when: false
+  loop:
+  - "aidecheck.service"
+  - "aidecheck.timer"
+  when: not audit_only and not aidecheck_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ aidecheck_service_check.remediation_status }}"

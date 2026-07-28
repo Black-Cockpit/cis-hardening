@@ -1,0 +1,29 @@
+# gpg_keys_configured
+#
+# The RPM Package Manager implements GPG key signing to verify package integrity
+# during and after installation.
+
+- name: "gpg_keys_configured | Audit"
+  shell:
+    cmd: "PKG=`rpm -qf {{ rpm_gpg_key }}` && rpm -q --queryformat \"%{PACKAGER} %{SIGPGP:pgpsig}\\n\" \"${PKG}\" | grep \"^{{ rpm_packager }}.*Key.ID.{{ rpm_key }}\""
+  changed_when: false
+  ignore_errors: true
+  register: gpg_key_check_status
+
+# Extract audit result
+- set_fact:
+    gpg_key_check:
+      remediation_status: "{{ true if gpg_key_check_status.rc == 0 else false }}"
+      remediation: "Consider to verify that GPG keys are configured correctly for your system"
+  changed_when: false
+
+# Appending audit result
+- name: "gpg_keys_configured | Remediation"
+  debug:
+    msg: "Consider to verify that GPG keys are configured correctly for your system"
+  when: not audit_only and not gpg_key_check.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gpg_key_check.remediation_status }}"

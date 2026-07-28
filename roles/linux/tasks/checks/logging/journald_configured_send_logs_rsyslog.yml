@@ -1,0 +1,67 @@
+# journald_configured_send_logs_rsyslog
+#
+# Data from systemd-journald may be stored in volatile memory or persisted locally on
+# the server. Utilities exist to accept remote export of systemd-journald logs, however,
+# use of the rsyslog service provides a consistent means of log collection and export.
+
+- name: "journald_configured_send_logs_rsyslog | Audit"
+  shell:
+    cmd: |
+      while IFS= read -r file_name; do
+          echo "${file_name//# /}"
+      done <<<$(/usr/bin/systemd-analyze cat-config "/etc/systemd/journald.conf" | grep -E '[#]{0,}\/.*conf')
+  changed_when: false
+  register: journald_conf_files_list
+
+# journald_configured_send_logs_rsyslog | Audit
+- name: "journald_configured_send_logs_rsyslog | Audit"
+  shell:
+    cmd: |
+      grep -E '^ForwardToSyslog' "{{ item }}" | awk -F '=' '{print $2}' | grep -q 'yes' && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  loop: "{{ journald_conf_files_list.stdout_lines | default([]) }}"
+  register: journald_forward_log_status_check
+
+# Define remediation status
+- set_fact:
+    journald_forward_log_remediation_status: "{{ true if ((journald_forward_log_remediation_status | default(false)) or item.stdout == 'configured' ) else false }}"
+  loop: "{{ journald_forward_log_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    journald_forward_log_check:
+      remediation_status: "{{ true if journald_forward_log_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "journald_configured_send_logs_rsyslog | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^[#]{0,}(ForwardToSyslog).*'
+    state: absent
+  loop: "{{ journald_conf_files_list.stdout_lines | default([]) }}"
+  when: not audit_only and not journald_forward_log_check.remediation_status
+
+# journald_configured_send_logs_rsyslog | Remediation
+- name: "journald_configured_send_logs_rsyslog | Remediation"
+  file:
+    path: "/etc/systemd/journald.conf.d"
+    state: directory
+  when: not audit_only and not journald_forward_log_check.remediation_status
+
+# journald_configured_send_logs_rsyslog | Remediation
+- name: "journald_configured_send_logs_rsyslog | Remediation"
+  copy:
+    dest: "/etc/systemd/journald.conf.d/cis_journald_forward.conf"
+    content: "ForwardToSyslog=yes"
+    mode: "0644"
+    owner: root 
+  when: not audit_only and not journald_forward_log_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ journald_forward_log_check.remediation_status }}"

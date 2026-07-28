@@ -1,0 +1,43 @@
+# no_duplicate_gids_exist
+#
+# Although the groupadd program will not let you create a duplicate Group ID (GID), it is
+# possible for an administrator to manually edit the /etc/group file and change the GID
+# field.
+
+- name: "no_duplicate_gids_exist | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      while read -r l_count l_gid; do
+          if [ "$l_count" -gt 1 ]; then
+              echo -e "Duplicate GID: \"$l_gid\" Groups: \"$(awk -F: '($3 == n) { print $1 }' n=$l_gid /etc/group | xargs)\""
+          fi
+      done < <(cut -f3 -d":" /etc/group | sort -n | uniq -c)
+      {% endraw %}
+  changed_when: false
+  register: groups_id_status
+
+# Extract audit result
+- set_fact:
+    groups_id_check:
+      remediation_status: "{{ true if groups_id_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add duplicated group id list
+- set_fact:
+    duplicated_id_description:
+      remediation: "Consider to review the GIDs bellow: \n {% for item in groups_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not groups_id_check.remediation_status
+
+# Append duplicated group id list to audit result
+- set_fact:
+    groups_id_check: "{{ groups_id_check | combine(duplicated_id_description) }}"
+  changed_when: false
+  when: not groups_id_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ groups_id_check.remediation_status }}"

@@ -1,0 +1,35 @@
+# net_ipv4_conf_all_rp_filter_configured
+#
+# net.ipv4.conf.all.rp_filter controls reverse path filtering for IPv4 traffic on all
+# network interfaces.
+# Reverse path filtering is a security mechanism in Linux that helps prevent IP spoofing
+# and other network attacks. When enabled, it checks if the source IP address of an
+
+- name: "net_ipv4_conf_all_rp_filter_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv4[.]conf[.]all[.]rp_filter\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "1" ] && [ "$persisted" = "1" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv4_conf_all_rp_filter_status
+
+# Extract audit result
+- set_fact:
+    net_ipv4_conf_all_rp_filter_check:
+      remediation_status: "{{ true if net_ipv4_conf_all_rp_filter_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv4_conf_all_rp_filter_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.rp_filter
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv4_conf_all_rp_filter_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv4_conf_all_rp_filter_check.remediation_status }}"

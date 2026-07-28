@@ -1,0 +1,35 @@
+# net_ipv4_tcp_syncookies_configured
+#
+# When tcp_syncookies is set, the kernel will handle TCP SYN packets normally until
+# the half-open connection queue is full, at which time, the SYN cookie functionality kicks
+# in. SYN cookies work by not using the SYN queue at all. Instead, the kernel simply
+# replies to the SYN with a SYN/ACK, but will include a specially crafted TCP sequence
+
+- name: "net_ipv4_tcp_syncookies_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv4.tcp_syncookies 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv4[.]tcp_syncookies\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "1" ] && [ "$persisted" = "1" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv4_tcp_syncookies_status
+
+# Extract audit result
+- set_fact:
+    net_ipv4_tcp_syncookies_check:
+      remediation_status: "{{ true if net_ipv4_tcp_syncookies_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv4_tcp_syncookies_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_syncookies
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv4_tcp_syncookies_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv4_tcp_syncookies_check.remediation_status }}"

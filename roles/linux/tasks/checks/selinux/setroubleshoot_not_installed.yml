@@ -1,0 +1,28 @@
+# setroubleshoot_not_installed
+#
+# The SETroubleshoot service notifies desktop users of SELinux denials through a user-
+# friendly interface. The service provides important information around configuration
+# errors, unauthorized intrusions, and other potential errors.
+
+- name: "setroubleshoot_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -q setroubleshoot && echo installed || echo not_installed
+  changed_when: false
+  register: setroubleshoot_status_check
+
+# Extract audit result
+- set_fact:
+    setroubleshoot_check:
+      remediation_status: "{{ true if setroubleshoot_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "setroubleshoot_not_installed | Remediation"
+  package:
+    name: setroubleshoot
+    state: absent
+  when: not audit_only and not setroubleshoot_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ setroubleshoot_check.remediation_status }}"

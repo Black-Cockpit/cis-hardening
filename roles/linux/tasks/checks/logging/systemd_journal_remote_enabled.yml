@@ -1,0 +1,30 @@
+# systemd_journal_remote_enabled
+#
+# Journald (via systemd-journal-remote) supports the ability to send log events
+# to a remote log host. The systemd-journal-upload service must be enabled for
+# the forwarding to take place.
+
+- name: "systemd_journal_remote_enabled | Audit"
+  shell:
+    cmd: systemctl is-enabled systemd-journal-upload.service 2>/dev/null | grep -q '^enabled' && echo enabled || echo not_enabled
+  changed_when: false
+  register: journal_upload_enabled_status
+
+# Extract audit result
+- set_fact:
+    journal_upload_enabled_check:
+      remediation_status: "{{ true if journal_upload_enabled_status.stdout == 'enabled' else false }}"
+  changed_when: false
+
+# The service is only enabled, not started: starting it without the remote
+# URL configured would fail; the URL is handled by the journal-remote
+# configuration check
+- name: "systemd_journal_remote_enabled | Remediation"
+  systemd:
+    name: systemd-journal-upload.service
+    enabled: true
+  when: not audit_only and not journal_upload_enabled_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ journal_upload_enabled_check.remediation_status }}"

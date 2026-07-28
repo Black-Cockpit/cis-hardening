@@ -1,0 +1,38 @@
+# web_proxy_server_services_not_use
+#
+# Squid is a standard proxy server used in many distributions and environments.
+
+- name: "web_proxy_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q squid && echo installed || echo not_installed
+  changed_when: false
+  register: squid_server_status_check
+
+# web_proxy_server_services_not_use | Audit
+- name: "web_proxy_server_services_not_use | Audit"
+  systemd:
+    name: squid
+  ignore_errors: yes
+  changed_when: false
+  register: squid_service_status_check
+  when: squid_server_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    squid_server_check:
+      remediation_status: "{{ true if (squid_server_status_check.stdout == 'not_installed' or (squid_service_status_check.status.ActiveState == 'inactive' and (squid_service_status_check.status.UnitFileState is not defined or squid_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "web_proxy_server_services_not_use | Remediation"
+  systemd:
+    name: squid
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not squid_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ squid_server_check.remediation_status }}"

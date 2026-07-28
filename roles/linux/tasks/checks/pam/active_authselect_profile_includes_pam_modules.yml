@@ -1,0 +1,37 @@
+# active_authselect_profile_includes_pam_modules
+#
+# The active authselect profile must include the pam_pwquality, pam_pwhistory,
+# pam_faillock and pam_unix modules so that the password quality, history,
+# lockout and unix settings configured by the benchmark take effect.
+
+- name: "active_authselect_profile_includes_pam_modules | Audit"
+  shell:
+    cmd: |
+      profile_dir="/etc/authselect/$(head -1 /etc/authselect/authselect.conf 2>/dev/null)"
+      grep -Poh -- '\b(pam_pwquality\.so|pam_pwhistory\.so|pam_faillock\.so|pam_unix\.so)\b' \
+      "$profile_dir/system-auth" "$profile_dir/password-auth" 2>/dev/null | sort -u | wc -l
+  changed_when: false
+  register: authselect_pam_modules_count
+
+# Extract audit result
+- set_fact:
+    authselect_pam_modules_check:
+      remediation_status: "{{ true if (authselect_pam_modules_count.stdout | int) == 4 else false }}"
+  changed_when: false
+
+# Create a custom authselect profile based on sssd and select it with the
+# faillock and pwhistory features. This also initializes authselect, which
+# the subsequent per-module rules rely on when they enable their features.
+# without-nullok is safe because the benchmark requires accounts to have a
+# password.
+- name: "active_authselect_profile_includes_pam_modules | Remediation"
+  shell:
+    cmd: |
+      authselect create-profile 00-cis-profile -b sssd || true
+      authselect select custom/00-cis-profile with-pwhistory with-faillock without-nullok --backup=PAM_CONFIG_BACKUP --force
+      authselect apply-changes
+  when: not audit_only and not authselect_pam_modules_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_pam_modules_check.remediation_status }}"

@@ -1,0 +1,76 @@
+# sshd_access_configured
+#
+# There are several options available to limit which users and group can access the
+# system via SSH. It is recommended that at least one of the following options be
+# leveraged:
+#
+#   - AllowUsers:   The AllowUsers variable gives the system administrator the option of
+#                   allowing specific users to ssh into the system. The list consists of space
+#                   separated user names. Numeric user IDs are not recognized with this
+#                   variable. If a system administrator wants to restrict user access further by
+#                   only allowing the allowed users to log in from a particular host, the entry
+#                   can be specified in the form of user@host.
+#
+#   - AllowGroups:  The AllowGroups variable gives the system administrator the option of
+#                   allowing specific groups of users to ssh into the system. The list consists
+#                   of space separated group names. Numeric group IDs are not recognized
+#                   with this variable.
+#
+#   - DenyUsers:    The DenyUsers variable gives the system administrator the option of
+#                   denying specific users to ssh into the system. The list consists of space
+#                   separated user names. Numeric user IDs are not recognized with this
+#                   variable. If a system administrator wants to restrict user access further by
+#                   specifically denying a user's access from a particular host, the entry can
+#                   be specified in the form of user@host.
+#
+#   - DenyGroups:   The DenyGroups variable gives the system administrator the option of
+#                   denying specific groups of users to ssh into the system. The list consists of
+#                   space separated group names. Numeric group IDs are not recognized
+#                   with this variable.
+
+- name: "sshd_access_configured | Audit"
+  shell:
+    cmd: |
+      sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts \
+      | awk '{print $1}')" | grep -Pi '^\h*(allow|deny)(users|groups)\h+\H+(\h+.*)?$' | wc -l
+  changed_when: false
+  register: ssh_allow_users_list_check
+
+# sshd_access_configured | Audit
+- name: "sshd_access_configured | Audit"
+  shell:
+    cmd: |
+      grep -Pis '^\h*(allow|deny)(users|groups)\h+\H+(\h+.*)?$' \
+      /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf | wc -l
+  changed_when: false
+  register: ssh_allow_users_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_access_check:
+      remediation_status: "{{ true if (ssh_allow_users_list_check.stdout != '0' and ssh_allow_users_conf_check.stdout != '0' ) else false }}"
+  changed_when: false
+
+# Set remediation description
+- set_fact:
+    remediation_description:
+      remediation: "Consider to set allowed or denied users and groups on /etc/ssh/sshd_config"
+  changed_when: false
+
+# Append remediation description
+- set_fact:
+    ssh_access_check: "{{ ssh_access_check | combine(remediation_description) }}"
+  changed_when: false
+  when: not audit_only and not ssh_access_check.remediation_status
+
+# Append remediation description to audit result
+- set_fact:
+    ssh_access_check: "{{ ssh_access_check | combine(remediation_description) }}"
+  changed_when: false
+  when: not audit_only and not ssh_access_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_access_check.remediation_status }}"

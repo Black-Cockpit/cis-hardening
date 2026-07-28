@@ -1,0 +1,43 @@
+# all_groups_etc_passwd_exist_etc_group
+#
+# Over time, system administration errors and changes can lead to groups being defined
+# in /etc/passwd but not in /etc/group .
+
+- name: "all_groups_etc_passwd_exist_etc_group | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      for i in $(cut -s -d: -f4 /etc/passwd | sort -u); do
+          grep -q -P "^.*?:[^:]*:$i:" /etc/group
+          if [ $? -ne 0 ]; then
+              echo "Group $i is referenced by /etc/passwd but does not exist in /etc/group"
+          fi
+      done
+      {% endraw %}
+  changed_when: false
+  register: groups_list_status
+
+# Extract audit result
+- set_fact:
+    groups_list_check:
+      remediation_status: "{{ true if groups_list_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add not matched group list
+- set_fact:
+    not_matched_groups_description:
+      remediation: "Consider to review the groups bellow: \n {% for item in groups_list_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not groups_list_check.remediation_status
+
+# Append not matched group list to audit result
+- set_fact:
+    groups_list_check: "{{ groups_list_check | combine(not_matched_groups_description) }}"
+  changed_when: false
+  when: not groups_list_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ groups_list_check.remediation_status }}"

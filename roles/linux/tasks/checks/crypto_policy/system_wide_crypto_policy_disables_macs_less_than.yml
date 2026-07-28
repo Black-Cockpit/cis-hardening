@@ -1,0 +1,46 @@
+# system_wide_crypto_policy_disables_macs_less_than
+#
+# Message Authentication Code (MAC) algorithm is a family of cryptographic functions
+# that is parameterized by a symmetric key. Each of the functions can act on input data
+# (called a “message”) of variable length to produce an output value of a specified length.
+# The output value is called the MAC of the input message.
+# A MAC algorithm can be used to provide data-origin authentication and data-integrity
+# protection
+
+- name: "system_wide_crypto_policy_disables_macs_less_than | Audit"
+  shell:
+    cmd: |
+      grep -Piq -- '^\h*mac\h*=\h*([^#\n\r]+)?-64\b' /etc/crypto-policies/state/CURRENT.pol \
+      && echo not_compliant || echo compliant
+  changed_when: false
+  register: crypto_policy_mac_status_check
+
+# Extract audit result
+- set_fact:
+    crypto_policy_mac_check:
+      remediation_status: "{{ true if crypto_policy_mac_status_check.stdout == 'compliant' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "system_wide_crypto_policy_disables_macs_less_than | Remediation"
+  blockinfile:
+    path: /etc/crypto-policies/policies/modules/NO-WEAKMAC.pmod
+    mode: "0644"
+    owner: root
+    group: root
+    block: |
+      # This is a subpolicy to disable weak macs
+      mac = -*-64*
+    state: present
+    create: true
+  when: not audit_only and not crypto_policy_mac_check.remediation_status
+
+# system_wide_crypto_policy_disables_macs_less_than | Remediation
+- name: "system_wide_crypto_policy_disables_macs_less_than | Remediation"
+  shell:
+    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC:NO-WEAKMAC"
+  when: not audit_only and not crypto_policy_mac_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crypto_policy_mac_check.remediation_status }}"

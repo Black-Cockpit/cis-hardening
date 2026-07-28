@@ -1,0 +1,49 @@
+# cockpit_web_services_not_use
+#
+# The cockpit web console provides browser based system management. Unless
+# required, the cockpit-ws package should be removed, or its socket and
+# service stopped and masked when the package is needed as a dependency.
+
+- name: "cockpit_web_services_not_use | Audit"
+  shell:
+    cmd: rpm -q cockpit-ws > /dev/null && echo installed || echo not_installed
+  changed_when: false
+  register: cockpit_package_status
+
+# Audit | Collect the current configuration state
+- name: "cockpit_web_services_not_use | Audit"
+  shell:
+    cmd: |
+      systemctl is-enabled cockpit.socket cockpit.service 2>/dev/null | grep -q '^enabled' && { echo not_configured; exit 0; }
+      systemctl is-active cockpit.socket cockpit.service 2>/dev/null | grep -q '^active' && { echo not_configured; exit 0; }
+      echo configured
+  changed_when: false
+  register: cockpit_units_status
+  when: cockpit_package_status.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    cockpit_check:
+      remediation_status: "{{ true if (cockpit_package_status.stdout == 'not_installed' or (cockpit_units_status.stdout | default('')) == 'configured') else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required service state
+- name: "cockpit_web_services_not_use | Remediation"
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+  - cockpit.socket
+  - cockpit.service
+  when: not audit_only and not cockpit_check.remediation_status
+
+# Remediation | Enforce the required package state
+- name: "cockpit_web_services_not_use | Remediation"
+  package:
+    name: cockpit-ws
+    state: absent
+  when: not audit_only and not cockpit_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cockpit_check.remediation_status }}"

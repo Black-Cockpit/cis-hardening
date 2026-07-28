@@ -1,0 +1,27 @@
+# noexec_option_set_tmp_partition
+#
+# The noexec mount option specifies that the filesystem cannot contain executable binaries.
+
+- name: "noexec_option_set_tmp_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/tmp\s' | grep -q noexec && echo compliant || echo not_compliant
+  changed_when: false
+  register: tmp_noexec_status
+
+# Extract audit result
+- set_fact:
+    tmp_noexec:
+      remediation_status: "{{ true if tmp_noexec_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /tmp partition with noexec option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "noexec_option_set_tmp_partition | Remediation"
+  debug:
+    msg: "Consider to mount /tmp partition with noexec option by modifing /etc/fstab"
+  when: not audit_only and not tmp_noexec.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tmp_noexec.remediation_status }}"

@@ -1,0 +1,40 @@
+# journald_log_file_access_configured
+#
+# Journald log file access is defined through tmpfiles.d. When an override
+# file /etc/tmpfiles.d/systemd.conf exists it replaces the packaged default
+# /usr/lib/tmpfiles.d/systemd.conf; the effective entries for journal files
+# must grant mode 0640 or more restrictive.
+
+- name: "journald_log_file_access_configured | Audit"
+  shell:
+    cmd: |
+      tmpfiles_conf="/usr/lib/tmpfiles.d/systemd.conf"
+      [ -f /etc/tmpfiles.d/systemd.conf ] && tmpfiles_conf="/etc/tmpfiles.d/systemd.conf"
+      [ -f "$tmpfiles_conf" ] || { echo not_configured; exit 0; }
+      grep -Piq '^\s*[a-z]+\s+[^\s]+\s+0*([6-7][4-7][1-7]|7[0-7][0-7])\s+' "$tmpfiles_conf" && echo not_configured || echo configured
+  changed_when: false
+  register: journald_tmpfiles_status
+
+# Extract audit result
+- set_fact:
+    journald_tmpfiles_check:
+      remediation_status: "{{ true if journald_tmpfiles_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# The override file content is a site specific decision: the benchmark
+# instructs copying the default and adjusting it per site requirements
+- name: "journald_log_file_access_configured | Remediation"
+  debug:
+    msg: "Copy /usr/lib/tmpfiles.d/systemd.conf to /etc/tmpfiles.d/systemd.conf and restrict journal file entries to mode 0640 or stricter per site policy"
+  when: not audit_only and not journald_tmpfiles_check.remediation_status
+  changed_when: false
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Review the effective tmpfiles.d systemd.conf and restrict journal file entries to 0640 or stricter'} }}"
+  changed_when: false
+  when: not journald_tmpfiles_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ journald_tmpfiles_check.remediation_status }}"

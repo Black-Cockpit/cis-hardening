@@ -1,0 +1,37 @@
+# mail_transfer_agents_configured_local_only_mode
+#
+# Mail Transfer Agents (MTA), such as sendmail and Postfix, are used to listen for
+# incoming mail and transfer the messages to the appropriate user or mail server. If the
+# system is not intended to be a mail server, it is recommended that the MTA be
+# configured to only process local mail.
+
+- name: "mail_transfer_agents_configured_local_only_mode | Audit"
+  shell:
+    cmd: |
+      ss -plntu | grep -P -- ':25\b' | grep -Pv -- '\h+(127\.0\.0\.1|\[?::1\]?):25\b' || \
+      ss -plntu | grep -P -- ':465\b' | grep -Pv -- '\h+(127\.0\.0\.1|\[?::1\]?):465\b' || \
+      ss -plntu | grep -P -- ':587\b' | grep -Pv -- '\h+(127\.0\.0\.1|\[?::1\]?):587\b' | wc -l || echo "1"
+  changed_when: false
+  register: mail_transfer_agents_status_check
+
+# Extract audit result
+- set_fact:
+    mail_transfer_agents_check:
+      remediation_status: "{{ true if (mail_transfer_agents_status_check | int ) == 0 else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "mail_transfer_agents_configured_local_only_mode | Remediation"
+  ansible.builtin.lineinfile:
+    path: /etc/postfix/main.cf
+    regexp: '^\s{0,}inet_interfaces\s{0,}=\s{0,}loopback-only'
+    line: "inet_interfaces = loopback-only"
+    mode: "0644"
+    owner: root
+    group: root
+    create: true
+  when: not audit_only and not mail_transfer_agents_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ mail_transfer_agents_check.remediation_status }}"

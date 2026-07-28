@@ -1,0 +1,45 @@
+# permissions_etc_cron_daily_configured
+#
+# The /etc/cron.daily directory contains system cron jobs that need to run on a daily
+# basis. The files in this directory cannot be manipulated by the crontab command, but
+# are instead edited by system administrators using a text editor. The commands below
+# restrict read/write and search access to user and group root, preventing regular users
+# from accessing this directory.
+
+- name: "permissions_etc_cron_daily_configured | Audit"
+  shell:
+    cmd: 'find /etc/cron.daily -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: crontab_daily_stat_check
+
+# Extract audit result
+- set_fact:
+    crontab_daily_permission_check:
+      remediation_status: "{{ true if crontab_daily_stat_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_cron_daily_configured | Remediation"
+  find:
+    paths: "/etc/cron.daily"
+    file_type: file
+    recurse: true
+  register: crontab_daily_files_list
+  when: not audit_only and not crontab_daily_permission_check.remediation_status
+
+# permissions_etc_cron_daily_configured | Remediation
+- name: "permissions_etc_cron_daily_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0700"
+    owner: root
+    group: root
+  with_items:
+  - "{{ crontab_daily_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not crontab_daily_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crontab_daily_permission_check.remediation_status }}"

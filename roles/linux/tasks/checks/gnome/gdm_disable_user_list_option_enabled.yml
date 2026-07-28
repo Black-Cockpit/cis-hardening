@@ -1,0 +1,111 @@
+# gdm_disable_user_list_option_enabled
+#
+# GDM is the GNOME Display Manager which handles graphical login for GNOME based
+# systems.
+# The disable-user-list option controls if a list of users is displayed on the login screen
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_disable_user_list_option_enabled | Audit"
+  shell:
+    cmd: l_gdmfile="$(grep -Prils '^\h*disable-user-list\b' /etc/dconf/db/*.d)" && echo $l_gdmfile || echo ''
+  changed_when: false
+  register: banner_key_file_status_check
+
+# Define compliace status
+- set_fact:
+    gdm_display_user_rule_status: "{{ true if banner_key_file_status_check.stdout != '' else false }}"
+  changed_when: false
+
+# Extract profile name for existing key file
+- name: "gdm_disable_user_list_option_enabled | Audit"
+  shell:
+    cmd: grep -Prils '^\h*disable-user-list\b' /etc/dconf/db/*.d | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+  changed_when: false
+  register: banner_profile_status_check
+  when: gdm_display_user_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_key_file_status_check.stdout != '') else false }}"
+  changed_when: false
+  when: gdm_display_user_rule_status
+
+# Check if disable-user-list is set to true
+- name: "gdm_disable_user_list_option_enabled | Audit"
+  shell:
+    cmd: "grep -Pisq '^\\h*disable-user-list=true\\b' {{ banner_key_file_status_check.stdout }} && echo configured || echo not_configured "
+  changed_when: false
+  register: banner_display_user_status_check
+  when: gdm_display_user_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_display_user_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: gdm_display_user_rule_status
+
+# Check profile exists
+- name: "gdm_disable_user_list_option_enabled | Audit"
+  shell:
+    cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+  changed_when: false
+  register: banner_profile_exist_status_check
+  when: gdm_display_user_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_display_user_rule_status: "{{ true if (gdm_display_user_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: gdm_display_user_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_display_user_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_display_user_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_disable_user_list_option_enabled | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_display_user_check.remediation_status
+
+# gdm_disable_user_list_option_enabled | Remediation
+- name: "gdm_disable_user_list_option_enabled | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/01-banner-message
+    src: rhel/etc/gdm.d/01-banner-message.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_display_user_check.remediation_status
+
+# gdm_disable_user_list_option_enabled | Remediation
+- name: "gdm_disable_user_list_option_enabled | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_display_user_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_display_user_check.remediation_status }}"

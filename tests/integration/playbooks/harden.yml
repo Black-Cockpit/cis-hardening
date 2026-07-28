@@ -1,0 +1,18 @@
+# Remediation: run the role with remediation enabled.
+#
+# This mutates the target. The harness always follows it with a reboot
+# (run.sh calls `vagrant reload`) because kernel parameters, SELinux mode,
+# GRUB and mount changes only take full effect after a restart.
+#
+# Expected extra-vars (supplied by run.sh from the platforms.yml entry):
+#   entry_name         matrix entry name (used only for play naming)
+#   benchmark_mapping  benchmark mapping the role should load
+#   levels             CIS levels to request
+- name: "Harden {{ entry_name }}"
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    audit_only: false
+  roles:
+    - linux

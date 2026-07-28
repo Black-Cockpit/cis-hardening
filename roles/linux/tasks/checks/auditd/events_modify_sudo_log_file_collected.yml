@@ -1,0 +1,103 @@
+# events_modify_sudo_log_file_collected
+#
+# Monitor the sudo log file. If the system has been properly configured to disable the use
+# of the su command and force all administrators to have to log in first and then use sudo
+# to execute privileged commands, then all administrator commands will be logged to
+# /var/log/sudo.log . Any time a command is executed, an audit event will be triggered
+# as the /var/log/sudo.log file will be opened for write and the executed administration
+# command will be written to the log.
+
+- name: "events_modify_sudo_log_file_collected | Audit"
+  shell:
+    cmd: grep -r logfile /etc/sudoers* | awk -F '=' '{print $2}' | sed -e 's/"//g'
+  changed_when: false
+  register: sudo_log_files_list
+
+# events_modify_sudo_log_file_collected | Audit
+- name: "events_modify_sudo_log_file_collected | Audit"
+  shell:
+    cmd: |
+      SUDO_LOG_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      [ -n "${SUDO_LOG_FILE_ESCAPED}" ] && awk "/^ *-w/ \
+      && /"${SUDO_LOG_FILE_ESCAPED}"/ \
+      && / +-p *wa/ \
+      && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop: "{{ sudo_log_files_list.stdout_lines | default([]) | list | unique}}"
+  register: audit_sudo_events_rule_status_check
+
+# events_modify_sudo_log_file_collected | Audit
+- name: "events_modify_sudo_log_file_collected | Audit"
+  shell:
+    cmd: |
+      SUDO_LOG_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      [ -n "${SUDO_LOG_FILE_ESCAPED}" ] && auditctl -l | awk "/^ *-w/ \
+      && /"${SUDO_LOG_FILE_ESCAPED}"/ \
+      && / +-p *wa/ \
+      && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop: "{{ sudo_log_files_list.stdout_lines | default([]) | list | unique}}"
+  register: audit_sudo_events_running_rule_status_check
+
+# Define remedition status
+- set_fact:
+    remediation_status: "{{ true if (sudo_log_files_list.stdout | length) > 0 else false }}"
+  changed_when: false
+
+# Check if all sudo events rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_sudo_events_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all sudo events rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_sudo_events_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_sudo_events_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "events_modify_sudo_log_file_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-sudo.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_sudo_events_rule_check.remediation_status
+
+# events_modify_sudo_log_file_collected | Remediation
+- name: "events_modify_sudo_log_file_collected | Remediation"
+  shell:
+    cmd: |
+      SUDO_LOG_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      rule_count=$([ -n "${SUDO_LOG_FILE_ESCAPED}" ] && awk "/^ *-w/ \
+      && /"${SUDO_LOG_FILE_ESCAPED}"/ \
+      && / +-p *wa/ \
+      && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo "-w {{ item }} -p wa -k sudo_log_file" >> /etc/audit/rules.d/00-cis-sudo.rules
+  loop: "{{ sudo_log_files_list.stdout_lines | default([]) | list | unique}}"
+  when: not audit_only and not audit_sudo_events_rule_check.remediation_status
+
+ # events_modify_sudo_log_file_collected | Remediation
+- name: "events_modify_sudo_log_file_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_sudo_events_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_sudo_events_rule_check.remediation_status }}"

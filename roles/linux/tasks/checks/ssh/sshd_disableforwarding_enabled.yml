@@ -1,0 +1,78 @@
+# sshd_disableforwarding_enabled
+#
+# The DisableForwarding parameter disables all forwarding features, including X11, ssh-
+# agent(1), TCP and StreamLocal. This option overrides all other forwarding-related
+# options and may simplify restricted configurations.
+#
+#   - X11Forwarding provides the ability to tunnel X11 traffic through the connection to
+#     enable remote graphic connections.
+#
+#   - ssh-agent is a program to hold private keys used for public key authentication.
+#     Through use of environment variables the agent can be located and
+#     automatically used for authentication when logging in to other machines using
+#     ssh.
+#   - SSH port forwarding is a mechanism in SSH for tunneling application ports from
+#     the client to the server, or servers to clients. It can be used for adding encryption
+#     to legacy applications, going through firewalls, and some system administrators
+#     and IT professionals use it for opening backdoors into the internal network from
+#     their home machines.
+
+- name: "sshd_disableforwarding_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Get ssh disable forwarding value
+          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i disableforwarding | awk '{print $2}')
+
+          [[ "$audit_out" == "yes" ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_disable_forwarding_status_check
+
+# sshd_disableforwarding_enabled | Audit
+- name: "sshd_disableforwarding_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          grep -Pis '^\h*DisableForwarding\h+\"?no\"?\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_disable_forwarding_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_disable_forwarding_config_check:
+      remediation_status: "{{ true if (ssh_disable_forwarding_status_check.stdout == 'configured' and ssh_disable_forwarding_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_disableforwarding_enabled | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(DisableForwarding|#DisableForwarding)"
+    state: absent
+  when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
+
+# sshd_disableforwarding_enabled | Remediation
+- name: "sshd_disableforwarding_enabled | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(DisableForwarding)"
+    line: 'DisableForwarding yes'
+    state: present
+  when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
+
+# sshd_disableforwarding_enabled | Remediation
+- name: "sshd_disableforwarding_enabled | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_disable_forwarding_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_disable_forwarding_config_check.remediation_status }}"

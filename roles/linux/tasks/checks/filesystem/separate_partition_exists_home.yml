@@ -1,0 +1,27 @@
+# separate_partition_exists_home
+#
+# The /home directory is used to support disk storage needs of local users.
+
+- name: "separate_partition_exists_home | Audit"
+  shell:
+    cmd: mount | grep -Eq '\s\/home\s' && echo compliant || echo not_compliant
+  changed_when: false
+  register: home_partition_status
+
+# Extract audit result
+- set_fact:
+    home_partition:
+      remediation_status: "{{ true if home_partition_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to create a separate partition for /home and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "separate_partition_exists_home | Remediation"
+  debug:
+    msg: "Consider to create a separate partition for /home and update /etc/fstab"
+  when: not audit_only and not home_partition.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ home_partition.remediation_status }}"

@@ -1,0 +1,39 @@
+# dns_server_services_not_use
+#
+# The Domain Name System (DNS) is a hierarchical naming system that maps names to
+# IP addresses for computers, services and other resources connected to a network.
+
+- name: "dns_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q bind && echo installed || echo not_installed
+  changed_when: false
+  register: bind_status_check
+
+# dns_server_services_not_use | Audit
+- name: "dns_server_services_not_use | Audit"
+  systemd:
+    name: named
+  ignore_errors: yes
+  changed_when: false
+  register: named_service_status_check
+  when: bind_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    bind_check:
+      remediation_status: "{{ true if (bind_status_check.stdout == 'not_installed' or (named_service_status_check.status.ActiveState == 'inactive' and (named_service_status_check.status.UnitFileState is not defined or named_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "dns_server_services_not_use | Remediation"
+  systemd:
+    name: named
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not bind_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ bind_check.remediation_status }}"

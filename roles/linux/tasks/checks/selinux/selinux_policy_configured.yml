@@ -1,0 +1,43 @@
+# selinux_policy_configured
+#
+# Configure SELinux to meet or exceed the default targeted policy, which constrains
+# daemons and system software only.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check SELinux configuration type
+  shell:
+    cmd: grep -Eq '^\s*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config && echo configured || echo not_configured
+  changed_when: false
+  register: selinux_config_check
+
+# Audit | Collect the current configuration state
+- name: "selinux_policy_configured | Audit"
+  shell:
+    cmd: "sestatus | grep Loaded | awk -F: '{print $2}' | grep -Eq '(targeted|mls)' && echo configured || echo not_configured"
+  changed_when: false
+  register: selinux_status_config_check
+
+# Extract audit result
+- set_fact:
+    selinux_status_check:
+      remediation_status: "{{ true if (selinux_config_check.stdout == 'configured' and selinux_status_config_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- assert:
+    that:
+    - '{{ rhel8.selinux_policy is defined and (rhel8.selinux_policy == "targeted" or rhel8.selinux_policy == "mls")}}'
+    fail_msg: "SELinux policy should be either `targeted` or `mls`"
+  when: not audit_only and not selinux_status_check.remediation_status
+
+# selinux_policy_configured | Remediation
+- name: "selinux_policy_configured | Remediation"
+  ansible.posix.selinux:
+    conf: /etc/selinux/config
+    policy: "{{ rhel8.selinux_policy  if rhel8.selinux_policy is defined else 'targeted' }}"
+    state: "{{ rhel8.selinux_policy_mode  if rhel8.selinux_policy_mode is defined else 'enforcing' }}"
+  when: not audit_only and not selinux_status_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ selinux_status_check.remediation_status }}"

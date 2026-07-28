@@ -1,0 +1,55 @@
+# local_interactive_user_home_directories_configured
+#
+# Local interactive user home directories must exist, be owned by the user and
+# be mode 750 or more restrictive so users cannot access or modify each
+# other's files.
+
+- name: "local_interactive_user_home_directories_configured | Audit"
+  shell:
+    cmd: |
+      valid_shells="^($(awk -F/ '$NF != "nologin" {print}' /etc/shells | sed -rn '/^\//{s,/,\\\\/,g;p}' | paste -s -d '|' - ))$"
+      awk -v pat="$valid_shells" -F: '$(NF) ~ pat { print $1 " " $(NF-1) }' /etc/passwd | while read -r user home; do
+        if [ ! -d "$home" ]; then
+          echo "missing:$user:$home"
+        else
+          owner="$(stat -Lc '%U' "$home")"
+          [ "$owner" != "$user" ] && echo "owner:$user:$home"
+          [ $(( 0$(stat -Lc '%a' "$home") & 027 )) -gt 0 ] && echo "mode:$user:$home"
+        fi
+      done
+      exit 0
+  changed_when: false
+  register: user_home_dirs_status
+
+# Extract audit result
+- set_fact:
+    user_home_dirs_check:
+      remediation_status: "{{ true if user_home_dirs_status.stdout == '' else false }}"
+  changed_when: false
+
+# Fix ownership and excessive permissions on existing home directories.
+# Missing home directories are a site policy decision (lock the account,
+# remove the user or create the directory) and are only reported.
+- name: "local_interactive_user_home_directories_configured | Remediation"
+  shell:
+    cmd: |
+      valid_shells="^($(awk -F/ '$NF != "nologin" {print}' /etc/shells | sed -rn '/^\//{s,/,\\\\/,g;p}' | paste -s -d '|' - ))$"
+      awk -v pat="$valid_shells" -F: '$(NF) ~ pat { print $1 " " $(NF-1) }' /etc/passwd | while read -r user home; do
+        if [ -d "$home" ]; then
+          owner="$(stat -Lc '%U' "$home")"
+          [ "$owner" != "$user" ] && chown "$user" "$home"
+          chmod g-w,o-rwx "$home"
+        fi
+      done
+      exit 0
+  when: not audit_only and not user_home_dirs_check.remediation_status
+
+# Expose the unresolved findings to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Home directory findings (missing directories require a site policy decision): ' ~ (user_home_dirs_status.stdout_lines | join(', '))} }}"
+  changed_when: false
+  when: not user_home_dirs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ user_home_dirs_check.remediation_status }}"

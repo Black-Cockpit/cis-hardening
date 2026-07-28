@@ -1,0 +1,35 @@
+# pam_pwhistory_module_enabled
+#
+# The pam_history.so module saves the last passwords for each user in order to force
+# password change history and keep the user from alternating between the same
+# password too frequently.
+
+- name: "pam_pwhistory_module_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          # Check if pam_pwhistory module is configured
+          grep -Pq -- '\bpam_pwhistory\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+      else
+          echo 'not_configured'
+      fi
+  changed_when: false
+  register: authselect_pam_pwhistory_module_status_check
+
+ # Extract audit result
+- set_fact:
+    authselect_pam_pwhistory_module_check:
+      remediation_status: "{{ true if authselect_pam_pwhistory_module_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_pwhistory_module_enabled | Remediation"
+  shell:
+    cmd: |
+      authselect enable-feature with-pwhistory
+      authselect apply-changes
+  when: not audit_only and not authselect_pam_pwhistory_module_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_pam_pwhistory_module_check.remediation_status }}"

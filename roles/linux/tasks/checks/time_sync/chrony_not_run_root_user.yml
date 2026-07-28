@@ -1,0 +1,38 @@
+# chrony_not_run_root_user
+#
+# The file /etc/sysconfig/chronyd allows configuration of options for chrony to include
+# the user chrony is run as. By default this is set to the user chrony
+
+- name: "chrony_not_run_root_user | Audit"
+  shell:
+    cmd: grep -Psi -- '^\h*OPTIONS=\"?\h+-u\h+root\b' /etc/sysconfig/chronyd && echo not_configured || echo configured
+  changed_when: false
+  register: chrony_root_status_check
+
+# Extract audit result
+- set_fact:
+    chrony_root_check:
+      remediation_status: "{{ true if chrony_root_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "chrony_not_run_root_user | Remediation"
+  lineinfile:
+    path: /etc/sysconfig/chronyd
+    regexp: "^(#)?OPTIONS"
+    line: "OPTIONS=\"-u chrony\""
+    create: true
+    mode: "0644"
+  when: not audit_only and not chrony_root_check.remediation_status
+
+# chrony_not_run_root_user | Remediation
+- name: "chrony_not_run_root_user | Remediation"
+  systemd:
+    name: chronyd
+    state: restarted
+    force: yes
+  when: not audit_only and not chrony_root_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ chrony_root_check.remediation_status }}"

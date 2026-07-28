@@ -1,0 +1,31 @@
+# Run a single benchmark rule: reset the verdict, include the check
+# implementation, then record the rule result from the mapping metadata.
+# check_extra lets a check attach additional report fields (for example
+# a remediation hint) to its audit_result entry.
+- set_fact:
+    check_compliant: null
+    check_extra: {}
+
+# Execute the check implementation for this rule
+- name: "{{ benchmark_rule.number }} {{ benchmark_rule.title }}"
+  include_tasks:
+    file: "checks/{{ check_topics[benchmark_rule.id] }}/{{ benchmark_rule.id }}.yml"
+
+# A check that ends without recording a verdict is a defect: fail loudly
+# instead of silently reporting an empty status.
+- name: "Verify the check recorded a verdict"
+  assert:
+    that: check_compliant is not none
+    quiet: true
+    fail_msg: "check '{{ benchmark_rule.id }}' did not set check_compliant"
+
+# Record the rule result built from mapping metadata and the verdict
+- set_fact:
+    audit_result: "{{ (audit_result | default([])) + [ {
+        'id': benchmark_rule.id,
+        'name': benchmark_rule.number ~ ' ' ~ benchmark_rule.title,
+        'benchmark': benchmark,
+        'benchmark_version': benchmark_version,
+        'scored': benchmark_rule.automated,
+        'automated': benchmark_rule.automated,
+        'remediation_status': check_compliant } | combine(check_extra) ] }}"

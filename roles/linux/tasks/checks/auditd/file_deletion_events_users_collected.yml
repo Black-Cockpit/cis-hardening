@@ -1,0 +1,120 @@
+# file_deletion_events_users_collected
+#
+# Monitor the use of system calls associated with the deletion or renaming of files and file
+# attributes. This configuration statement sets up monitoring for:
+#
+# - unlink    : remove a file
+# - unlinkat  : remove a file attribute
+# - fchmodat  : rename a file
+# - rename    : rename a file attribute system calls and tags them with the identifier "delete".
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Get system min UID
+  shell:
+    cmd: awk '/^\s*UID_MIN/{print $2}' /etc/login.defs
+  changed_when: false
+  register: system_min_uid
+
+# Audit | Collect the current configuration state
+- name: "file_deletion_events_users_collected | Audit"
+  shell:
+    cmd: |
+      awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&/{{ item.syscall }}/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - arch: "32"
+    syscall: "unlink,rename,unlinkat,renameat"
+  - arch: "64"
+    syscall: "rename,unlink,unlinkat,renameat"
+  register: audit_delete_file_rule_status_check
+
+# file_deletion_events_users_collected | Audit
+- name: "file_deletion_events_users_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&/{{ item.syscall }}/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - arch: "32"
+    syscall: "unlink,rename,unlinkat,renameat"
+  - arch: "64"
+    syscall: "rename,unlink,unlinkat,renameat"
+  register: audit_delete_file_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if system_min_uid.stdout != '' else false }}"
+  changed_when: false
+
+# Check if all file deletion events rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_delete_file_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all file deletion events rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_delete_file_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_delete_file_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "file_deletion_events_users_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-delete.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_delete_file_rule_check.remediation_status
+
+# file_deletion_events_users_collected | Remediation
+- name: "file_deletion_events_users_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&/{{ item.syscall }}/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F arch=b{{ item.arch }} -S {{ item.syscall }} -F auid>={{ system_min_uid.stdout }} -F auid!=-1 -F key=delete' >> /etc/audit/rules.d/00-cis-delete.rules
+  loop:
+  - arch: "32"
+    syscall: "unlink,rename,unlinkat,renameat"
+  - arch: "64"
+    syscall: "rename,unlink,unlinkat,renameat"
+  when: not audit_only and not audit_delete_file_rule_check.remediation_status
+
+ # file_deletion_events_users_collected | Remediation
+- name: "file_deletion_events_users_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_delete_file_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_delete_file_rule_check.remediation_status }}"

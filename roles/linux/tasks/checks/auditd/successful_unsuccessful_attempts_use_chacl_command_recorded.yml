@@ -1,0 +1,76 @@
+# successful_unsuccessful_attempts_use_chacl_command_recorded
+#
+# The operating system must generate audit records for successful/unsuccessful uses of
+# the chacl command
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Get system min UID
+  shell:
+    cmd: awk '/^\s*UID_MIN/{print $2}' /etc/login.defs
+  changed_when: false
+  register: system_min_uid
+
+# Audit | Collect the current configuration state
+- name: "successful_unsuccessful_attempts_use_chacl_command_recorded | Audit"
+  shell:
+    cmd: |
+      awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/chacl/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  register: audit_chacl_rule_status_check
+
+# successful_unsuccessful_attempts_use_chacl_command_recorded | Audit
+- name: "successful_unsuccessful_attempts_use_chacl_command_recorded | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/chacl/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  register: audit_chacl_running_rule_status_check
+
+# Extract audit result
+- set_fact:
+    audit_chacl_rule_check:
+      remediation_status: "{{ true if ( system_min_uid.stdout != '' and (audit_chacl_rule_status_check.stdout | int) > 0 and (audit_chacl_running_rule_status_check.stdout | int) > 0) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "successful_unsuccessful_attempts_use_chacl_command_recorded | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-chacl-perm-chng.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_chacl_rule_check.remediation_status
+
+# successful_unsuccessful_attempts_use_chacl_command_recorded | Remediation
+- name: "successful_unsuccessful_attempts_use_chacl_command_recorded | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/chacl/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k perm_chng' >> /etc/audit/rules.d/00-cis-chacl-perm-chng.rules
+  when: not audit_only and not audit_chacl_rule_check.remediation_status
+
+ # successful_unsuccessful_attempts_use_chacl_command_recorded | Remediation
+- name: "successful_unsuccessful_attempts_use_chacl_command_recorded | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_chacl_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_chacl_rule_check.remediation_status }}"

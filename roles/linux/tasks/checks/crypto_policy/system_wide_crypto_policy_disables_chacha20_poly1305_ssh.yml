@@ -1,0 +1,39 @@
+# system_wide_crypto_policy_disables_chacha20_poly1305_ssh
+#
+# The chacha20-poly1305 cipher used with SSH is affected by CVE-2023-48795
+# (Terrapin attack). The system wide crypto policy should exclude it for SSH
+# unless the CVE has been addressed and site policy allows it.
+
+- name: "system_wide_crypto_policy_disables_chacha20_poly1305_ssh | Audit"
+  shell:
+    cmd: |
+      ssh_cipher_lines="$(grep -Pi -- '^\h*cipher@(lib|open)ssh(-server|-client)?\h*=' /etc/crypto-policies/state/CURRENT.pol 2>/dev/null)"
+      [ -z "$ssh_cipher_lines" ] && { echo not_configured; exit 0; }
+      echo "$ssh_cipher_lines" | grep -qi 'chacha20-poly1305' && echo not_configured || echo configured
+  changed_when: false
+  register: crypto_chacha20_status
+
+# Extract audit result
+- set_fact:
+    crypto_chacha20_check:
+      remediation_status: "{{ true if crypto_chacha20_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Changing the system wide crypto policy affects every service on the host
+# and the rule may be skipped when CVE-2023-48795 has been addressed, so
+# the change is left to site policy
+- name: "system_wide_crypto_policy_disables_chacha20_poly1305_ssh | Remediation"
+  debug:
+    msg: "Create a crypto policy module excluding chacha20-poly1305 for SSH (cipher@SSH = -CHACHA20-POLY1305) and apply it with update-crypto-policies per site policy"
+  when: not audit_only and not crypto_chacha20_check.remediation_status
+  changed_when: false
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Create a crypto policy module with cipher@SSH = -CHACHA20-POLY1305 and apply it with update-crypto-policies, or record CVE-2023-48795 as addressed'} }}"
+  changed_when: false
+  when: not crypto_chacha20_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crypto_chacha20_check.remediation_status }}"

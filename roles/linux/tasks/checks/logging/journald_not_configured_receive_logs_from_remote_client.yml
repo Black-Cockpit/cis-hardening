@@ -1,0 +1,29 @@
+# journald_not_configured_receive_logs_from_remote_client
+#
+# Journald supports the ability to receive messages from remote hosts, thus acting as a
+# log server. Clients should not receive data from other hosts.
+
+- name: "journald_not_configured_receive_logs_from_remote_client | Audit"
+  systemd:
+    name: systemd-journal-remote.socket
+  changed_when: false
+  register: systemd_journal_remote_socket_service_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_socket_service_check:
+      remediation_status: "{{ true if (systemd_journal_remote_socket_service_status_check.status.ActiveState != 'active' and (systemd_journal_remote_socket_service_status_check.status.UnitFileState | default('masked')) == 'masked') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "journald_not_configured_receive_logs_from_remote_client | Remediation"
+  systemd:
+    name: systemd-journal-remote.socket
+    state: stopped
+    enabled: false
+    masked: true
+  when: not audit_only and not systemd_journal_remote_socket_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ systemd_journal_remote_socket_service_check.remediation_status }}"

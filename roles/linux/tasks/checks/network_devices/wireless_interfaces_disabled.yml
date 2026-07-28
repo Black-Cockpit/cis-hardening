@@ -1,0 +1,42 @@
+# wireless_interfaces_disabled
+#
+# Wireless networking is used when wired networks are unavailable.
+
+- name: "wireless_interfaces_disabled | Audit"
+  shell:
+    cmd: |
+      if [ -n "$(find /sys/class/net/*/ -type d -name wireless)" ]; then
+        l_dname=$(for driverdir in $(find /sys/class/net/*/ -type d -name wireless | xargs -0 dirname); do basename "$(readlink -f "$driverdir"/device/driver/module)"; done | sort -u)
+        for l_mname in $l_dname; do
+          echo $l_dname
+        done
+      fi
+  changed_when: false
+  register: wireless_modules_result
+
+# Define remediation status
+- set_fact:
+    wireless_remediation_status: true
+
+# Audit | Evaluate the rule condition
+- name: "wireless_interfaces_disabled | Audit"
+  include_tasks:
+    file: "../../utils/wirless_modules_check.yml"
+  with_items: "{{ wireless_modules_result.stdout_lines | list }}"
+
+# Extract audit result
+- set_fact:
+    wireless_modules_check:
+      remediation_status: "{{ true if wireless_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "wireless_interfaces_disabled | Remediation"
+  include_tasks:
+    file: "../../utils/wirless_modules_remediation.yml"
+  with_items: "{{ wireless_modules_result.stdout_lines | list }}"
+  when: not audit_only and not wireless_modules_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ wireless_modules_check.remediation_status }}"

@@ -1,0 +1,47 @@
+# unused_filesystems_kernel_modules_not_available
+#
+# Filesystem kernel modules that are not needed on the system widen the
+# attack surface. This manual rule reviews the available filesystem modules
+# that are neither in use nor deny listed so they can be assessed against
+# site policy.
+
+- name: "unused_filesystems_kernel_modules_not_available | Audit"
+  shell:
+    cmd: |
+      mounted_types="$(findmnt -knD | awk '{print $2}' | sort -u | tr '\n' '|' | sed 's/|$//')"
+      module_dirs="/lib/modules/$(uname -r)/kernel/fs"
+      [ -d "$module_dirs" ] || { exit 0; }
+      for module_path in "$module_dirs"/*; do
+        module_name="$(basename "$module_path" | sed 's/\.ko.*//')"
+        [ -d "$module_path" ] && module_name="$(basename "$module_path")"
+        echo "$module_name" | grep -qE "^($mounted_types)$" && continue
+        grep -rqsE "^\s*(install\s+$module_name\s+/bin/(true|false)|blacklist\s+$module_name)\b" /etc/modprobe.d/ && continue
+        echo "$module_name"
+      done | sort -u
+      exit 0
+  changed_when: false
+  register: unused_fs_modules_status
+
+# Extract audit result: findings are reported for review, the rule is
+# manual and site policy decides which modules are needed
+- set_fact:
+    unused_fs_modules_check:
+      remediation_status: "{{ true if unused_fs_modules_status.stdout == '' else false }}"
+  changed_when: false
+
+# Remediation | Report the site policy action to take
+- name: "unused_filesystems_kernel_modules_not_available | Remediation"
+  debug:
+    msg: "Review the reported filesystem modules and deny list the ones not required by site policy"
+  when: not audit_only and not unused_fs_modules_check.remediation_status
+  changed_when: false
+
+# Expose the findings to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Filesystem modules available but neither in use nor deny listed: ' ~ (unused_fs_modules_status.stdout_lines | join(', '))} }}"
+  changed_when: false
+  when: not unused_fs_modules_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ unused_fs_modules_check.remediation_status }}"

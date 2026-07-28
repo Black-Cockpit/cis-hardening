@@ -1,0 +1,28 @@
+# separate_partition_exists_var
+#
+# The /var directory is used by daemons and other system services to temporarily store
+# dynamic data. Some directories created by these processes may be world-writable.
+
+- name: "separate_partition_exists_var | Audit"
+  shell:
+    cmd: mount | grep -Eq '\s\/var\s' && echo compliant || echo not_compliant
+  changed_when: false
+  register: var_partition_status
+
+# Extract audit result
+- set_fact:
+    var_partition:
+      remediation_status: "{{ true if var_partition_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to create a separate partition for /var and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "separate_partition_exists_var | Remediation"
+  debug:
+    msg: "Consider to create a separate partition for /var and update /etc/fstab"
+  when: not audit_only and not var_partition.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ var_partition.remediation_status }}"

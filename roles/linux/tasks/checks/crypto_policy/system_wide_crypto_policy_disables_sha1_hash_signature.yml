@@ -1,0 +1,53 @@
+# system_wide_crypto_policy_disables_sha1_hash_signature
+#
+# SHA-1 (Secure Hash Algorithm) is a cryptographic hash function that produces a 160 bit
+# hash value.
+
+- name: "system_wide_crypto_policy_disables_sha1_hash_signature | Audit"
+  shell:
+    cmd: |
+      grep -Piq -- '^\h*(hash|sign)\h*=\h*([^\n\r#]+)?-sha1\b' /etc/crypto-policies/state/CURRENT.pol \
+      && echo not_compliant || echo compliant
+  changed_when: false
+  register: sha1_sign_status_check
+
+# system_wide_crypto_policy_disables_sha1_hash_signature | Audit
+- name: "system_wide_crypto_policy_disables_sha1_hash_signature | Audit"
+  shell:
+    cmd: |
+      grep -Pi -- '^\h*sha1_in_certs\h*=\h*' /etc/crypto-policies/state/CURRENT.pol \
+      | grep -Eq '(^\s{0,}sha1_in_certs\s{0,}=\s{0,}0)' && echo compliant || echo not_compliant
+  changed_when: false
+  register: sha1_certs_status_check
+
+# Extract audit result
+- set_fact:
+    sha1_check:
+      remediation_status: "{{ true if (sha1_sign_status_check.stdout == 'compliant' and sha1_certs_status_check.stdout == 'compliant') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "system_wide_crypto_policy_disables_sha1_hash_signature | Remediation"
+  blockinfile:
+    path: /etc/crypto-policies/policies/modules/NO-SHA1.pmod
+    mode: "0644"
+    owner: root
+    group: root
+    block: |
+      # This is a subpolicy dropping the SHA1 hash and signature support
+      hash = -SHA1
+      sign = -*-SHA1
+      sha1_in_certs = 0
+    state: present
+    create: true
+  when: not audit_only and not sha1_check.remediation_status
+
+# system_wide_crypto_policy_disables_sha1_hash_signature | Remediation
+- name: "system_wide_crypto_policy_disables_sha1_hash_signature | Remediation"
+  shell:
+    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1"
+  when: not audit_only and not sha1_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sha1_check.remediation_status }}"

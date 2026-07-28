@@ -1,0 +1,27 @@
+# firewalld_installed
+#
+# firewalld is the default host based firewall management tool. It must be
+# installed for the firewall rules of this benchmark to be applied.
+
+- name: "firewalld_installed | Audit"
+  shell:
+    cmd: rpm -q firewalld > /dev/null && echo installed || echo not_installed
+  changed_when: false
+  register: firewalld_installed_status
+
+# Extract audit result
+- set_fact:
+    firewalld_installed_check:
+      remediation_status: "{{ true if firewalld_installed_status.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required package state
+- name: "firewalld_installed | Remediation"
+  package:
+    name: firewalld
+    state: present
+  when: not audit_only and not firewalld_installed_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ firewalld_installed_check.remediation_status }}"

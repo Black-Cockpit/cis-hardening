@@ -1,0 +1,50 @@
+# firewalld_loopback_source_address_traffic_configured
+#
+# Traffic arriving on non loopback interfaces with a loopback source address
+# can only be spoofed. Rich rules must drop IPv4 (and IPv6 when enabled)
+# traffic whose source address is a loopback address.
+
+- name: "firewalld_loopback_source_address_traffic_configured | Audit"
+  shell:
+    cmd: |
+      loopback_zone="$(firewall-cmd --get-zone-of-interface=lo 2>/dev/null)"
+      [ -z "$loopback_zone" ] && loopback_zone="$(firewall-cmd --get-default-zone 2>/dev/null)"
+      [ -z "$loopback_zone" ] && { echo not_configured; exit 0; }
+      rich_rules="$(firewall-cmd --zone="$loopback_zone" --list-rich-rules 2>/dev/null)"
+      echo "$rich_rules" | grep -q '127\.0\.0\.1' || { echo not_configured; exit 0; }
+      if [ "{{ 'true' if is_ipv6_disabled else 'false' }}" = "false" ]; then
+        echo "$rich_rules" | grep -q '::1' || { echo not_configured; exit 0; }
+      fi
+      echo configured
+  changed_when: false
+  register: firewalld_loopback_source_status
+
+# Extract audit result
+- set_fact:
+    firewalld_loopback_source_check:
+      remediation_status: "{{ true if firewalld_loopback_source_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Apply the remediation commands
+- name: "firewalld_loopback_source_address_traffic_configured | Remediation"
+  shell:
+    cmd: |
+      loopback_zone="$(firewall-cmd --get-zone-of-interface=lo 2>/dev/null)"
+      [ -z "$loopback_zone" ] && loopback_zone="$(firewall-cmd --get-default-zone)"
+      firewall-cmd --permanent --zone="$loopback_zone" --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
+      firewall-cmd --reload
+  when: not audit_only and not firewalld_loopback_source_check.remediation_status
+
+# Remediation | Apply the remediation commands
+- name: "firewalld_loopback_source_address_traffic_configured | Remediation"
+  shell:
+    cmd: |
+      loopback_zone="$(firewall-cmd --get-zone-of-interface=lo 2>/dev/null)"
+      [ -z "$loopback_zone" ] && loopback_zone="$(firewall-cmd --get-default-zone)"
+      firewall-cmd --permanent --zone="$loopback_zone" --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+      firewall-cmd --reload
+  when: not audit_only and not firewalld_loopback_source_check.remediation_status and not is_ipv6_disabled
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ firewalld_loopback_source_check.remediation_status }}"

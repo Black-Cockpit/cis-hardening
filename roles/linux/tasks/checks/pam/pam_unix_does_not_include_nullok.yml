@@ -1,0 +1,50 @@
+# pam_unix_does_not_include_nullok
+#
+# The nullok argument overrides the default action of pam_unix.so to not permit the user
+# access to a service if their official password is blank.
+
+- name: "pam_unix_does_not_include_nullok | Audit"
+  shell:
+    cmd: |
+      # Extract pam_unix configuration
+      pam_unix=$(grep -P -- '^\h*(auth|account|password|session)\h+(requisite|required|sufficient)\h+pam_unix\.so\b' /etc/pam.d/{password,system}-auth)
+
+      # Check if pam_unix configuration has nullok and return audit result
+      echo "$pam_unix" | grep -Pq -- '\bnullok\b' && echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: pam_unix_nullok_status_check
+
+# Extract audit result
+- set_fact:
+    pam_unix_nullok_check:
+      remediation_status: "{{ true if pam_unix_nullok_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_unix_does_not_include_nullok | Remediation"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          module_name="unix"
+          profile_name="$(head -1 /etc/authselect/authselect.conf)"
+
+          if [[ "$profile_name" =~ ^custom\/ ]]; then
+              unix_pam=$(grep -P -- "\bpam_$module_name\.so\b" /etc/authselect/$profile_name/{password,system}-auth)
+
+              if echo "$unix_pam" | grep -Pq -- ".+(if)[\s]{1,}(not)[\s]{1,}(\"without-nullok\":nullok)+."; then
+                  authselect enable-feature without-nullok
+                  authselect apply-changes
+              elif echo "$unix_pam" | grep -Pq -- "nullok"; then
+                  for pam_file in system-auth password-auth; do
+                      authselect_file="/etc/authselect/$(head -1 /etc/authselect/authselect.conf | grep 'custom/')/$pam_file"
+                      sed -ri 's/(^\s*password\s+(requisite|required|sufficient)\s+pam_unix\.so\s+.*)(nullok)(\s*.*)$/\1\2\4/g' $authselect_file
+                  done
+                  authselect apply-changes
+              fi
+          fi
+      fi
+  when: not audit_only and not pam_unix_nullok_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ pam_unix_nullok_check.remediation_status }}"

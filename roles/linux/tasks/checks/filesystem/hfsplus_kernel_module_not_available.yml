@@ -1,0 +1,58 @@
+# hfsplus_kernel_module_not_available
+#
+# The hfsplus filesystem type is a hierarchical filesystem designed to replace hfs that
+# allows you to mount Mac OS filesystems
+
+- name: "hfsplus_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv hfsplus && echo loaded || echo not_loaded
+  changed_when: false
+  register: hfsplus_check_loaded_result
+# Check if module is disabled
+- name: "hfsplus_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install hfsplus /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: hfsplus_check_disabled_result
+# Check if module is blacklisted
+- name: "hfsplus_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist hfsplus" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: hfsplus_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    hfsplus_check:
+      remediation_status: "{{ true if (hfsplus_check_loaded_result.stdout == 'not_loaded' or (hfsplus_check_disabled_result.stdout == 'disabled' and hfsplus_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "hfsplus_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/hfsplus.conf"
+    regexp: "^(#)?install hfsplus(\\s|$)"
+    line: "install hfsplus /bin/true"
+    create: true
+  when: not audit_only and not hfsplus_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "hfsplus_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist hfsplus(\\s|$)"
+    line: "blacklist hfsplus"
+    create: true
+    mode: "0600"
+  when: not audit_only and not hfsplus_check.remediation_status
+
+# Disable hfsplus filesystems
+- name: Disabling hfsplus filesystems
+  modprobe:
+    name: hfsplus
+    state: absent
+  when: not audit_only and not hfsplus_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ hfsplus_check.remediation_status }}"

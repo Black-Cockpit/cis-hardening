@@ -1,0 +1,44 @@
+# journald_configured_compress_large_log_files
+#
+# The journald system includes the capability of compressing overly large files to avoid
+# filling up the system with logs or making the logs unmanageably large.
+
+- name: "journald_configured_compress_large_log_files | Audit"
+  shell:
+    cmd: grep -q ^\s*Compress /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: systemd_journal_remote_log_compress_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_log_compress_check:
+      remediation_status: "{{ true if systemd_journal_remote_log_compress_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "journald_configured_compress_large_log_files | Remediation"
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^[#]{0,}[\s]{0,}Compress.*'
+    state: absent
+  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+
+# journald_configured_compress_large_log_files | Remediation
+- name: "journald_configured_compress_large_log_files | Remediation"
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^[\s]{0,}Compress=yes'
+    line: "Compress=yes"
+    state: present
+  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+
+# journald_configured_compress_large_log_files | Remediation
+- name: "journald_configured_compress_large_log_files | Remediation"
+  systemd:
+    name: systemd-journald
+    state: restarted
+  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ systemd_journal_remote_log_compress_check.remediation_status }}"

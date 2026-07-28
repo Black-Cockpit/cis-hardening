@@ -1,0 +1,170 @@
+# events_modify_system_s_network_environment_collected
+#
+# Record changes to network environment files or system calls. The below parameters
+# monitors the following system calls, and write an audit event on system call exit:
+#
+# - sethostname    : set the systems host name
+# - setdomainname  : set the systems domain name
+#
+# The files being monitored are:
+#
+# - /etc/issue                        : messages displayed pre-login
+# - /etc/hosts                        : file containing host names and associated IP addresses
+# - /etc/sysconfig/network            : additional information that is valid to all network interfaces
+# - /etc/sysconfig/network-scripts/   : directory containing network interface scripts and configurations files
+
+- name: "events_modify_system_s_network_environment_collected | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/sethostname,setdomainname/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_network_environment_rule_status_check
+
+# events_modify_system_s_network_environment_collected | Audit
+- name: "events_modify_system_s_network_environment_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/sethostname,setdomainname/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_network_environment_running_rule_status_check
+
+# events_modify_system_s_network_environment_collected | Audit
+- name: "events_modify_system_s_network_environment_collected | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-w/ \
+      &&(/{{ item }}/) \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - '\/etc\/issue[\/]{0,1}'
+  - '\/etc\/issue.net[\/]{0,1}'
+  - '\/etc\/hosts[\/]{0,1}'
+  - '\/etc\/sysconfig\/network[\/]{0,1}'
+  register: audit_network_conf_files_rule_status_check
+
+# events_modify_system_s_network_environment_collected | Audit
+- name: "events_modify_system_s_network_environment_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-w/ \
+      &&(/{{ item }}/) \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  loop:
+  - '\/etc\/issue[\/]{0,1}'
+  - '\/etc\/issue.net[\/]{0,1}'
+  - '\/etc\/hosts[\/]{0,1}'
+  - '\/etc\/sysconfig\/network[\/]{0,1}'
+  register: audit_network_conf_files_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all network environment rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_network_environment_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all network environment rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_network_environment_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all network configuration files rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_network_conf_files_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all network configuration files rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_network_conf_files_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_network_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "events_modify_system_s_network_environment_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-system-local.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_network_rule_check.remediation_status
+
+# events_modify_system_s_network_environment_collected | Remediation
+- name: "events_modify_system_s_network_environment_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b({{ item }})/ \
+      &&/ -S/ \
+      &&(/sethostname,setdomainname/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo "-a always,exit -F arch=b{{ item }} -S sethostname,setdomainname -k system-locale" >> /etc/audit/rules.d/00-cis-system-local.rules
+  loop:
+  - "32"
+  - "64"
+  when: not audit_only and not audit_network_rule_check.remediation_status
+
+# events_modify_system_s_network_environment_collected | Remediation
+- name: "events_modify_system_s_network_environment_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk '/^ *-w/ \
+      &&(/{{ item }}/) \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo "-w {{ item }} -p wa -k system-locale" >> /etc/audit/rules.d/00-cis-system-local.rules
+  loop:
+  - '/etc/issue'
+  - '/etc/issue.net'
+  - '/etc/hosts'
+  - '/etc/sysconfig/network'
+  when: not audit_only and not audit_network_rule_check.remediation_status
+
+ # events_modify_system_s_network_environment_collected | Remediation
+- name: "events_modify_system_s_network_environment_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_network_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_network_rule_check.remediation_status }}"

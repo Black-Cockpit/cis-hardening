@@ -1,0 +1,52 @@
+# chrony_configured
+#
+# chrony is a daemon which implements the Network Time Protocol (NTP) and is
+# designed to synchronize system clocks across a variety of systems and use a source
+# that is highly accurate. More information on chrony can be found at
+# http://chrony.tuxfamily.org/. chrony can be configured to be a client and/or a server.
+
+- name: "chrony_configured | Audit"
+  shell:
+    cmd: grep -Prsq -- '^\h*(server|pool)\h+[^#\n\r]+' /etc/chrony.conf /etc/chrony.d/ && echo configured || echo not_configured
+  changed_when: false
+  register: chrony_configuration_status_check
+
+# Extract audit result
+- set_fact:
+    chrony_configuration_check:
+      remediation_status: "{{ true if chrony_configuration_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "chrony_configured | Remediation"
+  blockinfile:
+    dest: /etc/chrony.conf
+    mode: "0644"
+    owner: root
+    group: root
+    state: present
+    block: |
+
+      # See www.pool.ntp.org for an explanation of these servers.  Please
+      # consider joining the project if possible.  If you can't or don't want to
+      # use these servers I suggest that you try your ISP's nameservers.  We mark
+      # the servers 'offline' so that chronyd won't try to connect when the link
+      # is down.  Scripts in /etc/ppp/ip-up.d and /etc/ppp/ip-down.d use chronyc
+      # commands to switch it on when a dialup link comes up and off when it goes
+      # down.  Code in /etc/init.d/chrony attempts to determine whether or not
+      # the link is up at boot time and set the online status accordingly.  If
+      # you have an always-on connection such as cable omit the 'offline'
+      # directive and chronyd will default to online.
+      #
+      # Note that if Chrony tries to go "online" and dns lookup of the servers
+      # fails they will be discarded.  Thus under some circumstances it is
+      # better to use IP numbers than host names.
+
+      {% for server in (time_synchronization_servers | default(cis_defaults.time_synchronization_servers)) -%}
+      server {{ server }} iburst {{ chrony_server_options | default(cis_defaults.chrony_server_options) }}
+      {% endfor %}
+  when: not audit_only and not chrony_configuration_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ chrony_configuration_check.remediation_status }}"

@@ -1,0 +1,46 @@
+# re_authentication_privilege_escalation_not_disabled_globally
+#
+# The operating system must be configured so that users must re-authenticate for
+# privilege escalation.
+
+- name: "re_authentication_privilege_escalation_not_disabled_globally | Audit"
+  shell:
+    cmd: |
+      grep -Piq "^[^#].*\!authenticate" {{ item }} && echo 'not_configured' || echo 'configured'
+  changed_when: false
+  loop: "{{ sudoers_files }}"
+  failed_when: sudoers_files is not defined
+  register: sudo_re_authentication_status_check
+
+# Define remediation status
+- set_fact:
+    sudo_re_authentication_status: true
+  changed_when: false
+
+# Check if pseudo terminal is configured in all the listed sudoers files
+- set_fact:
+    sudo_re_authentication_status: "{{ true if (sudo_re_authentication_status and item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ sudo_re_authentication_status_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    sudo_re_authentication_status_check:
+      remediation_status: "{{ true if sudo_re_authentication_status else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "re_authentication_privilege_escalation_not_disabled_globally | Remediation"
+  replace:
+    path: "{{ item }}"
+    regexp: '^[^#].*\!authenticate:'
+    replace: ''
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_re_authentication_status_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sudo_re_authentication_status_check.remediation_status }}"
