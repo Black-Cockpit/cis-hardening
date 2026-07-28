@@ -81,8 +81,10 @@ run_entry() {
     echo "=== [$entry_name] harden"
     run_playbook "$entry_name" harden.yml || { echo "=== [$entry_name] FAIL (harden)"; return 1; }
 
+    # Reboot through Ansible, not `vagrant reload`: the hardening role
+    # removes passwordless sudo, which Vagrant's graceful shutdown needs.
     echo "=== [$entry_name] reboot"
-    vagrant reload "$entry_name" || { echo "=== [$entry_name] FAIL (reload)"; return 1; }
+    run_playbook "$entry_name" reboot.yml || { echo "=== [$entry_name] FAIL (reboot)"; return 1; }
 
     echo "=== [$entry_name] verify"
     local verify_status
