@@ -3,43 +3,79 @@
 # Data from journald may be stored in volatile memory or persisted locally on the server.
 # Logs in memory will be lost upon a system reboot. By persisting logs to local disk on the
 # server they are protected from loss due to a reboot.
+#
+# The setting is written to a drop-in under /etc/systemd/journald.conf.d/ with a
+# [Journal] section, which the benchmark allows and which works when the main
+# /etc/systemd/journald.conf file is absent (as on EL10).
 
+# Enumerate the effective journald config files (main file plus any drop-ins)
 - name: "journald_configured_write_logfiles_persistent_disk | Audit"
   shell:
-    cmd: grep -q ^\s*Storage /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+    cmd: |
+      while IFS= read -r file_name; do
+          echo "${file_name//# /}"
+      done <<<$(/usr/bin/systemd-analyze cat-config "/etc/systemd/journald.conf" | grep -E '[#]{0,}\/.*conf')
   changed_when: false
-  register: systemd_journal_remote_log_stotage_status_check
+  register: journald_conf_files_list
+
+# Determine whether Storage=persistent is set in any effective config file
+- name: "journald_configured_write_logfiles_persistent_disk | Audit"
+  shell:
+    cmd: |
+      grep -E '^\s*Storage' "{{ item }}" | awk -F '=' '{print $2}' | grep -q 'persistent' && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  loop: "{{ journald_conf_files_list.stdout_lines | default([]) }}"
+  register: journald_storage_status_check
+
+# Reset the accumulator before evaluating the per-file results
+- set_fact:
+    journald_storage_configured: false
+  changed_when: false
+
+# Storage is configured when any effective config file sets it to persistent
+- set_fact:
+    journald_storage_configured: "{{ true if (journald_storage_configured or item.stdout == 'configured') else false }}"
+  loop: "{{ journald_storage_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
 
 # Extract audit result
 - set_fact:
-    systemd_journal_remote_log_stotage_check:
-      remediation_status: "{{ true if systemd_journal_remote_log_stotage_status_check.stdout == 'configured' else false }}"
+    journald_storage_check:
+      remediation_status: "{{ true if journald_storage_configured else false }}"
   changed_when: false
 
-# Appending audit result
+# Ensure the journald drop-in directory exists
 - name: "journald_configured_write_logfiles_persistent_disk | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[#]{0,}[\s]{0,}Storage.*'
-    state: absent
-  when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+  file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  when: not audit_only and not journald_storage_check.remediation_status
 
-# journald_configured_write_logfiles_persistent_disk | Remediation
+# Write the setting to a drop-in with a [Journal] section
 - name: "journald_configured_write_logfiles_persistent_disk | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[\s]{0,}Storage=persistent'
-    line: "Storage=persistent"
-    state: present
-  when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+  copy:
+    dest: /etc/systemd/journald.conf.d/60-cis-storage.conf
+    content: |
+      [Journal]
+      Storage=persistent
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not journald_storage_check.remediation_status
 
-# journald_configured_write_logfiles_persistent_disk | Remediation
+# Restart journald to apply the change
 - name: "journald_configured_write_logfiles_persistent_disk | Remediation"
   systemd:
     name: systemd-journald
     state: restarted
-  when: not audit_only and not systemd_journal_remote_log_stotage_check.remediation_status
+  when: not audit_only and not journald_storage_check.remediation_status
 
 # Record the verdict for this check
 - set_fact:
-    check_compliant: "{{ systemd_journal_remote_log_stotage_check.remediation_status }}"
+    check_compliant: "{{ journald_storage_check.remediation_status }}"

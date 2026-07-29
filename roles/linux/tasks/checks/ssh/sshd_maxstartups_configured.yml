@@ -7,8 +7,12 @@
   shell:
     cmd: |
       if [ -d /etc/ssh ]; then
-          # Get ssh max startups value
-          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i maxstartups | awk '{print $2}'  || echo "11:31:101")
+          # Get ssh max startups value; the field match must be exact because
+          # newer sshd -T output also contains persourcemaxstartups
+          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}' | head -1)" | awk '$1 == "maxstartups" {print $2}')
+
+          # Force the conservative verdict when the effective value could not be read
+          [ -z "$audit_out" ] && audit_out="11:31:101"
 
           # Extract start
           start=$(awk -F':' '{print $1}' <<< "$audit_out")

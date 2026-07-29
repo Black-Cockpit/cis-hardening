@@ -1,0 +1,16 @@
+---
+# AlmaLinux package-signing key material, selected by major version. AlmaLinux 8
+# and AlmaLinux 10 use different signing keys; the shared key file glob
+# (RPM-GPG-KEY-AlmaLinux*) matches both the plain and -10 suffixed files, so
+# only the key id needs to be resolved per major version.
+
+rpm_gpg_key: /etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux
+rpm_packager: "AlmaLinux Packaging Team"
+
+# GPG key id reported by rpm SIGPGP, per major version (lower case)
+rpm_keys:
+  "8": "51d6647ec21ad6ea"
+  "10": "dee5c11cc2a1e572"
+
+# Resolve the key id for the running major version
+rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"

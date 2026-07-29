@@ -35,7 +35,7 @@
     regexp: "^(#)?install squashfs(\\s|$)"
     line: "install squashfs /bin/true"
     create: true
-  when: not audit_only and not squashfs_check.remediation_status
+  when: not audit_only and squashfs_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "squashfs_kernel_module_not_available | Remediation"
@@ -45,7 +45,7 @@
     line: "blacklist squashfs"
     create: true
     mode: "0600"
-  when: not audit_only and not squashfs_check.remediation_status
+  when: not audit_only and squashfs_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable squashfs filesystems
 - name: Disabling squashfs filesystems

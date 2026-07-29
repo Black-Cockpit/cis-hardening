@@ -65,15 +65,16 @@
     loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
     register: audit_tools_status
 
-# Audit | Collect the current configuration state
+# Audit | Collect the current configuration state; tools absent on the
+# platform are skipped (autrace does not ship with audit 4 on EL10)
 - name: "audit_tools_755_more_restrictive | Audit"
   shell:
     cmd: |
-      [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] &&
       echo 'not_configured' || echo 'configured'
   changed_when: false
   register: audit_tools_permission_status
-  loop: "{{ audit_tools_status.results | default([]) | list }}"
+  loop: "{{ audit_tools_status.results | default([]) | selectattr('stat.exists') | list }}"
   no_log: yes
   vars:
     expected_file_mask: "0022"
@@ -97,12 +98,12 @@
       remediation_status: "{{ true if remediation_status else false }}"
   changed_when: false
 
-# Appending audit result
+# Remediation | Restrict the mode of every audit tool present on the host
 - name: "audit_tools_755_more_restrictive | Remediation"
   file:
     path: "{{ item }}"
     mode: "0755"
-  loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+  loop: "{{ audit_tools_status.results | default([]) | selectattr('stat.exists') | map(attribute='item') | list }}"
   when: not audit_only and not audit_tools_permission_check.remediation_status
 
 # Record the verdict for this check

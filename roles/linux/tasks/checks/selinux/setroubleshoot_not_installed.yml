@@ -16,10 +16,12 @@
       remediation_status: "{{ true if setroubleshoot_status_check.stdout == 'not_installed' else false }}"
   changed_when: false
 
-# Appending audit result
+# Remediation | Remove every setroubleshoot package; the audit matches any
+# setroubleshoot* package, so subpackages installed without the main package
+# (setroubleshoot-server, setroubleshoot-plugins) must be removed as well
 - name: "setroubleshoot_not_installed | Remediation"
   package:
-    name: setroubleshoot
+    name: "setroubleshoot*"
     state: absent
   when: not audit_only and not setroubleshoot_check.remediation_status
 

@@ -37,7 +37,7 @@
     cmd: |
       USER_GROUP_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
 
-      auditctl -l | awk "/^ *-w/ \
+      /sbin/auditctl -l | awk "/^ *-w/ \
       &&/"${USER_GROUP_FILE_ESCAPED}"/ \
       &&/ +-p *wa/ \
       &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
@@ -109,7 +109,9 @@
  # events_modify_user_group_information_collected | Remediation
 - name: "events_modify_user_group_information_collected | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_user_group_files_rule_check.remediation_status
 
 # Record the verdict for this check

@@ -98,12 +98,13 @@
       echo 'configured' || echo '/sbin/{{ item }} p+i+n+u+g+s+b+acl+xattrs+sha512' >> /etc/aide.conf.d/00-cis-cryptographic-mechanisms.conf
   changed_when: false
   loop:
-  - "auditctl" 
-  - "auditd" 
-  - "ausearch" 
-  - "aureport" 
-  - "autrace" 
+  - "auditctl"
+  - "auditd"
+  - "ausearch"
+  - "aureport"
+  - "autrace"
   - "augenrules"
+  when: not audit_only and not aide_cryptographic_mechanisms_check.remediation_status
 
 # Record the verdict for this check
 - set_fact:

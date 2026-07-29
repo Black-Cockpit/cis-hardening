@@ -1,15 +1,15 @@
-# permissions_etc_passwd_configured_6_1_2
+# permissions_etc_passwd_backup_configured
 #
 # The /etc/passwd- file contains backup user account information.
 
-- name: "permissions_etc_passwd_configured_6_1_2 | Audit"
+- name: "permissions_etc_passwd_backup_configured | Audit"
   stat:
     path: "/etc/passwd-"
   changed_when: false
   register: passwd_backup_file_status
 
-# permissions_etc_passwd_configured_6_1_2 | Audit
-- name: "permissions_etc_passwd_configured_6_1_2 | Audit"
+# permissions_etc_passwd_backup_configured | Audit
+- name: "permissions_etc_passwd_backup_configured | Audit"
   shell:
     cmd: |
       [ $(({{ passwd_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
@@ -26,7 +26,7 @@
   changed_when: false
 
 # Appending audit result
-- name: "permissions_etc_passwd_configured_6_1_2 | Remediation"
+- name: "permissions_etc_passwd_backup_configured | Remediation"
   file:
     path: "/etc/passwd-"
     mode: "0644"

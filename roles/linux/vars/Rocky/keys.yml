@@ -1,0 +1,23 @@
+---
+# Rocky Linux package-signing key material, selected by major version. Rocky 8
+# and Rocky 10 use different signing keys installed under different file names,
+# so both the key file path and the key id are resolved per major version.
+
+# GPG key file path per major version (the audit globs this to find the
+# package that owns it)
+rpm_gpg_keys:
+  "8": /etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+  "10": /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+
+# Resolve the key file path for the running major version
+rpm_gpg_key: "{{ rpm_gpg_keys[ansible_distribution_major_version] | default('/etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial') }}"
+
+rpm_packager: "infrastructure@rockylinux.org"
+
+# GPG key id reported by rpm SIGPGP, per major version (lower case)
+rpm_keys:
+  "8": "15af5dac6d745a60"
+  "10": "5b106c736fedfc85"
+
+# Resolve the key id for the running major version
+rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"

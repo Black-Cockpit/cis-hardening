@@ -1,17 +1,17 @@
-# permissions_etc_gshadow_configured_6_1_9
+# permissions_etc_gshadow_backup_configured
 #
 # The /etc/gshadow- file is used to store backup information about groups that is critical
 # to the security of those accounts, such as the hashed password and other security
 # information.
 
-- name: "permissions_etc_gshadow_configured_6_1_9 | Audit"
+- name: "permissions_etc_gshadow_backup_configured | Audit"
   stat:
     path: "/etc/gshadow-"
   changed_when: false
   register: gshadow_backup_file_status
 
-# permissions_etc_gshadow_configured_6_1_9 | Audit
-- name: "permissions_etc_gshadow_configured_6_1_9 | Audit"
+# permissions_etc_gshadow_backup_configured | Audit
+- name: "permissions_etc_gshadow_backup_configured | Audit"
   shell:
     cmd: |
       [ $(({{ gshadow_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
@@ -28,7 +28,7 @@
   changed_when: false
 
 # Appending audit result
-- name: "permissions_etc_gshadow_configured_6_1_9 | Remediation"
+- name: "permissions_etc_gshadow_backup_configured | Remediation"
   file:
     path: "/etc/gshadow-"
     mode: "0000"

@@ -37,7 +37,7 @@
     line: "install can /bin/false"
     create: true
     mode: "0600"
-  when: not audit_only and not can_check.remediation_status
+  when: not audit_only and can_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "can_kernel_module_not_available | Remediation"
@@ -47,7 +47,7 @@
     line: "blacklist can"
     create: true
     mode: "0600"
-  when: not audit_only and not can_check.remediation_status
+  when: not audit_only and can_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Unload the can module
 - name: "can_kernel_module_not_available | Remediation"

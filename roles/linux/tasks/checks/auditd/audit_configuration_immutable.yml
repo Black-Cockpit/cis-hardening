@@ -1,6 +1,6 @@
 # audit_configuration_immutable
 #
-# Set system audit so that audit rules cannot be modified with auditctl . Setting the flag
+# Set system audit so that audit rules cannot be modified with /sbin/auditctl . Setting the flag
 # "-e 2" forces audit to be put in immutable mode. Audit changes can only be made on
 # system reboot.
 #
@@ -34,7 +34,9 @@
  # audit_configuration_immutable | Remediation
 - name: "audit_configuration_immutable | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_immutable_conf_check.remediation_status
 
 # Record the verdict for this check

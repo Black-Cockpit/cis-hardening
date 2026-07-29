@@ -34,7 +34,7 @@
     regexp: "^(#)?install jffs2(\\s|$)"
     line: "install jffs2 /bin/true"
     create: true
-  when: not audit_only and not jffs2_check.remediation_status
+  when: not audit_only and jffs2_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "jffs2_kernel_module_not_available | Remediation"
@@ -44,7 +44,7 @@
     line: "blacklist jffs2"
     create: true
     mode: "0600"
-  when: not audit_only and not jffs2_check.remediation_status
+  when: not audit_only and jffs2_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable jffs2 filesystems
 - name: Disabling jffs2 filesystems

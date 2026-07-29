@@ -53,13 +53,16 @@
     state: directory
   when: not audit_only and not journald_forward_log_check.remediation_status
 
-# journald_configured_send_logs_rsyslog | Remediation
+# Write the setting to a drop-in with a [Journal] section; without the section
+# header systemd ignores the directive
 - name: "journald_configured_send_logs_rsyslog | Remediation"
   copy:
     dest: "/etc/systemd/journald.conf.d/cis_journald_forward.conf"
-    content: "ForwardToSyslog=yes"
+    content: |
+      [Journal]
+      ForwardToSyslog=yes
     mode: "0644"
-    owner: root 
+    owner: root
   when: not audit_only and not journald_forward_log_check.remediation_status
 
 # Record the verdict for this check

@@ -34,3 +34,45 @@ platforms:
     levels:
       - server_level_1
       - server_level_2
+
+  alma10_l1:
+    box: almalinux/10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    benchmark_mapping: almalinux10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+
+  alma10_l2:
+    box: almalinux/10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    benchmark_mapping: almalinux10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+      - server_level_2
+
+  rocky10_l1:
+    box: cloud-image/rocky-10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    benchmark_mapping: rocky10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+
+  rocky10_l2:
+    box: cloud-image/rocky-10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    benchmark_mapping: rocky10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+      - server_level_2

@@ -1,0 +1,16 @@
+---
+# Red Hat Enterprise Linux package-signing key material, selected by major
+# version. RHEL 8 and 10 are both signed with Red Hat release key 2, installed
+# as RPM-GPG-KEY-redhat-release; a future release with a new key adds a line to
+# rpm_keys rather than editing the resolver.
+
+rpm_gpg_key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+rpm_packager: "Red Hat, Inc"
+
+# GPG key id reported by rpm SIGPGP, per major version (lower case)
+rpm_keys:
+  "8": "199e2f91fd431d51"
+  "10": "199e2f91fd431d51"
+
+# Resolve the key id for the running major version
+rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"

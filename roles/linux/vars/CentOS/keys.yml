@@ -1,0 +1,15 @@
+---
+# CentOS package-signing key material, selected by major version. CentOS uses a
+# single official signing key across Stream releases, so both entries resolve to
+# the same id; a future release with a new key adds a line to rpm_keys.
+
+rpm_gpg_key: /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+rpm_packager: "CentOS"
+
+# GPG key id reported by rpm SIGPGP, per major version (lower case)
+rpm_keys:
+  "8": "05b555b38483c65d"
+  "10": "05b555b38483c65d"
+
+# Resolve the key id for the running major version
+rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"

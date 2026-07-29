@@ -35,7 +35,7 @@
     line: "install firewire-core /bin/false"
     create: true
     mode: "0600"
-  when: not audit_only and not firewire_core_check.remediation_status
+  when: not audit_only and firewire_core_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "firewire_core_kernel_module_not_available | Remediation"
@@ -45,7 +45,7 @@
     line: "blacklist firewire-core"
     create: true
     mode: "0600"
-  when: not audit_only and not firewire_core_check.remediation_status
+  when: not audit_only and firewire_core_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Unload the firewire-core module
 - name: "firewire_core_kernel_module_not_available | Remediation"

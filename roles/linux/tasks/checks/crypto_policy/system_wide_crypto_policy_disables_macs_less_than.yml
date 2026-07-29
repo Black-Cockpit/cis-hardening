@@ -10,7 +10,7 @@
 - name: "system_wide_crypto_policy_disables_macs_less_than | Audit"
   shell:
     cmd: |
-      grep -Piq -- '^\h*mac\h*=\h*([^#\n\r]+)?-64\b' /etc/crypto-policies/state/CURRENT.pol \
+      grep -Piq -- '^\h*mac\h*=\h*([^#\n\r]+)?-128\b' /etc/crypto-policies/state/CURRENT.pol \
       && echo not_compliant || echo compliant
   changed_when: false
   register: crypto_policy_mac_status_check
@@ -21,7 +21,10 @@
       remediation_status: "{{ true if crypto_policy_mac_status_check.stdout == 'compliant' else false }}"
   changed_when: false
 
-# Appending audit result
+# Ensure the NO-WEAKMAC subpolicy module exists whenever remediating. The
+# cbc rule lists NO-WEAKMAC in its update-crypto-policies --set, which fails
+# unless the module file is already present, so it is created even when this
+# rule is already compliant.
 - name: "system_wide_crypto_policy_disables_macs_less_than | Remediation"
   blockinfile:
     path: /etc/crypto-policies/policies/modules/NO-WEAKMAC.pmod
@@ -30,15 +33,16 @@
     group: root
     block: |
       # This is a subpolicy to disable weak macs
-      mac = -*-64*
+      mac = -*-128*
     state: present
     create: true
-  when: not audit_only and not crypto_policy_mac_check.remediation_status
+  when: not audit_only
 
-# system_wide_crypto_policy_disables_macs_less_than | Remediation
+# Apply the cumulative subpolicy list up to and including NO-WEAKMAC; the set
+# references only modules created by this rule or an earlier crypto rule
 - name: "system_wide_crypto_policy_disables_macs_less_than | Remediation"
   shell:
-    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC:NO-WEAKMAC"
+    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-WEAKMAC"
   when: not audit_only and not crypto_policy_mac_check.remediation_status
 
 # Record the verdict for this check

@@ -1,0 +1,1442 @@
+# CIS benchmark mapping: CIS CentOS Linux 8 Benchmark v2.0.0
+# Rule titles are copied verbatim from the benchmark document.
+# This benchmark mirrors the CIS Rocky Linux 8 Benchmark v2.0.0 content: the rule set is
+# identical across these binary-compatible distributions.
+benchmark: 'CIS CentOS Linux 8 Benchmark'
+benchmark_version: '2.0.0'
+benchmark_rules:
+- id: cramfs_kernel_module_not_available
+  number: '1.1.1.1'
+  title: 'Ensure cramfs kernel module is not available'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: freevxfs_kernel_module_not_available
+  number: '1.1.1.2'
+  title: 'Ensure freevxfs kernel module is not available'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: hfs_kernel_module_not_available
+  number: '1.1.1.3'
+  title: 'Ensure hfs kernel module is not available'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: hfsplus_kernel_module_not_available
+  number: '1.1.1.4'
+  title: 'Ensure hfsplus kernel module is not available'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: jffs2_kernel_module_not_available
+  number: '1.1.1.5'
+  title: 'Ensure jffs2 kernel module is not available'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: squashfs_kernel_module_not_available
+  number: '1.1.1.6'
+  title: 'Ensure squashfs kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: udf_kernel_module_not_available
+  number: '1.1.1.7'
+  title: 'Ensure udf kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: usb_storage_kernel_module_not_available
+  number: '1.1.1.8'
+  title: 'Ensure usb-storage kernel module is not available'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: tmp_separate_partition
+  number: '1.1.2.1.1'
+  title: 'Ensure /tmp is a separate partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nodev_option_set_tmp_partition
+  number: '1.1.2.1.2'
+  title: 'Ensure nodev option set on /tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_tmp_partition
+  number: '1.1.2.1.3'
+  title: 'Ensure nosuid option set on /tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: noexec_option_set_tmp_partition
+  number: '1.1.2.1.4'
+  title: 'Ensure noexec option set on /tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: dev_shm_separate_partition
+  number: '1.1.2.2.1'
+  title: 'Ensure /dev/shm is a separate partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nodev_option_set_dev_shm_partition
+  number: '1.1.2.2.2'
+  title: 'Ensure nodev option set on /dev/shm partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_dev_shm_partition
+  number: '1.1.2.2.3'
+  title: 'Ensure nosuid option set on /dev/shm partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: noexec_option_set_dev_shm_partition
+  number: '1.1.2.2.4'
+  title: 'Ensure noexec option set on /dev/shm partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: separate_partition_exists_home
+  number: '1.1.2.3.1'
+  title: 'Ensure separate partition exists for /home'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nodev_option_set_home_partition
+  number: '1.1.2.3.2'
+  title: 'Ensure nodev option set on /home partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_home_partition
+  number: '1.1.2.3.3'
+  title: 'Ensure nosuid option set on /home partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: separate_partition_exists_var
+  number: '1.1.2.4.1'
+  title: 'Ensure separate partition exists for /var'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nodev_option_set_var_partition
+  number: '1.1.2.4.2'
+  title: 'Ensure nodev option set on /var partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_var_partition
+  number: '1.1.2.4.3'
+  title: 'Ensure nosuid option set on /var partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: separate_partition_exists_var_tmp
+  number: '1.1.2.5.1'
+  title: 'Ensure separate partition exists for /var/tmp'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nodev_option_set_var_tmp_partition
+  number: '1.1.2.5.2'
+  title: 'Ensure nodev option set on /var/tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_var_tmp_partition
+  number: '1.1.2.5.3'
+  title: 'Ensure nosuid option set on /var/tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: noexec_option_set_var_tmp_partition
+  number: '1.1.2.5.4'
+  title: 'Ensure noexec option set on /var/tmp partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: separate_partition_exists_var_log
+  number: '1.1.2.6.1'
+  title: 'Ensure separate partition exists for /var/log'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nodev_option_set_var_log_partition
+  number: '1.1.2.6.2'
+  title: 'Ensure nodev option set on /var/log partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_var_log_partition
+  number: '1.1.2.6.3'
+  title: 'Ensure nosuid option set on /var/log partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: noexec_option_set_var_log_partition
+  number: '1.1.2.6.4'
+  title: 'Ensure noexec option set on /var/log partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: separate_partition_exists_var_log_audit
+  number: '1.1.2.7.1'
+  title: 'Ensure separate partition exists for /var/log/audit'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nodev_option_set_var_log_audit_partition
+  number: '1.1.2.7.2'
+  title: 'Ensure nodev option set on /var/log/audit partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nosuid_option_set_var_log_audit_partition
+  number: '1.1.2.7.3'
+  title: 'Ensure nosuid option set on /var/log/audit partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: noexec_option_set_var_log_audit_partition
+  number: '1.1.2.7.4'
+  title: 'Ensure noexec option set on /var/log/audit partition'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gpg_keys_configured
+  number: '1.2.1'
+  title: 'Ensure GPG keys are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: gpgcheck_globally_activated
+  number: '1.2.2'
+  title: 'Ensure gpgcheck is globally activated'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: repo_gpgcheck_globally_activated
+  number: '1.2.3'
+  title: 'Ensure repo_gpgcheck is globally activated'
+  levels: [server_level_2, workstation_level_2]
+  automated: false
+- id: package_manager_repositories_configured
+  number: '1.2.4'
+  title: 'Ensure package manager repositories are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: updates_patches_additional_security_software_installed
+  number: '1.2.5'
+  title: 'Ensure updates, patches, and additional security software are installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: bootloader_password_set
+  number: '1.3.1'
+  title: 'Ensure bootloader password is set'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_bootloader_config_configured
+  number: '1.3.2'
+  title: 'Ensure permissions on bootloader config are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: address_space_layout_randomization_aslr_enabled
+  number: '1.4.1'
+  title: 'Ensure address space layout randomization (ASLR) is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: ptrace_scope_restricted
+  number: '1.4.2'
+  title: 'Ensure ptrace_scope is restricted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: core_dump_backtraces_disabled
+  number: '1.4.3'
+  title: 'Ensure core dump backtraces are disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: core_dump_storage_disabled
+  number: '1.4.4'
+  title: 'Ensure core dump storage is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: selinux_installed
+  number: '1.5.1.1'
+  title: 'Ensure SELinux is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: selinux_not_disabled_bootloader_configuration
+  number: '1.5.1.2'
+  title: 'Ensure SELinux is not disabled in bootloader configuration'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: selinux_policy_configured
+  number: '1.5.1.3'
+  title: 'Ensure SELinux policy is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: selinux_mode_not_disabled
+  number: '1.5.1.4'
+  title: 'Ensure the SELinux mode is not disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: selinux_mode_enforcing
+  number: '1.5.1.5'
+  title: 'Ensure the SELinux mode is enforcing'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: no_unconfined_services_exist
+  number: '1.5.1.6'
+  title: 'Ensure no unconfined services exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: mcs_translation_service_mcstrans_not_installed
+  number: '1.5.1.7'
+  title: 'Ensure the MCS Translation Service (mcstrans) is not installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: setroubleshoot_not_installed
+  number: '1.5.1.8'
+  title: 'Ensure SETroubleshoot is not installed'
+  levels: [server_level_1]
+  automated: true
+- id: system_wide_crypto_policy_not_set_legacy
+  number: '1.6.1'
+  title: 'Ensure system wide crypto policy is not set to legacy'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: system_wide_crypto_policy_disables_sha1_hash_signature
+  number: '1.6.2'
+  title: 'Ensure system wide crypto policy disables sha1 hash and signature support'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: system_wide_crypto_policy_disables_cbc_ssh
+  number: '1.6.3'
+  title: 'Ensure system wide crypto policy disables cbc for ssh'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: system_wide_crypto_policy_disables_macs_less_than
+  number: '1.6.4'
+  title: 'Ensure system wide crypto policy disables macs less than 128 bits'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: message_day_configured_properly
+  number: '1.7.1'
+  title: 'Ensure message of the day is configured properly'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: local_login_warning_banner_configured_properly
+  number: '1.7.2'
+  title: 'Ensure local login warning banner is configured properly'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: remote_login_warning_banner_configured_properly
+  number: '1.7.3'
+  title: 'Ensure remote login warning banner is configured properly'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: access_etc_motd_configured
+  number: '1.7.4'
+  title: 'Ensure access to /etc/motd is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: access_etc_issue_configured
+  number: '1.7.5'
+  title: 'Ensure access to /etc/issue is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: access_etc_issue_net_configured
+  number: '1.7.6'
+  title: 'Ensure access to /etc/issue.net is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gnome_display_manager_removed
+  number: '1.8.1'
+  title: 'Ensure GNOME Display Manager is removed'
+  levels: [server_level_2]
+  automated: true
+- id: gdm_login_banner_configured
+  number: '1.8.2'
+  title: 'Ensure GDM login banner is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gdm_disable_user_list_option_enabled
+  number: '1.8.3'
+  title: 'Ensure GDM disable-user-list option is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gdm_screen_locks_when_user_idle
+  number: '1.8.4'
+  title: 'Ensure GDM screen locks when the user is idle'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gdm_screen_locks_cannot_overridden
+  number: '1.8.5'
+  title: 'Ensure GDM screen locks cannot be overridden'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gdm_automatic_mounting_removable_media_disabled
+  number: '1.8.6'
+  title: 'Ensure GDM automatic mounting of removable media is disabled'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: gdm_disabling_automatic_mounting_removable_media_not_overridden
+  number: '1.8.7'
+  title: 'Ensure GDM disabling automatic mounting of removable media is not overridden'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: gdm_autorun_never_enabled
+  number: '1.8.8'
+  title: 'Ensure GDM autorun-never is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: gdm_autorun_never_not_overridden
+  number: '1.8.9'
+  title: 'Ensure GDM autorun-never is not overridden'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: xdmcp_not_enabled
+  number: '1.8.10'
+  title: 'Ensure XDMCP is not enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: time_synchronization_use
+  number: '2.1.1'
+  title: 'Ensure time synchronization is in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: chrony_configured
+  number: '2.1.2'
+  title: 'Ensure chrony is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: chrony_not_run_root_user
+  number: '2.1.3'
+  title: 'Ensure chrony is not run as the root user'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: autofs_services_not_use
+  number: '2.2.1'
+  title: 'Ensure autofs services are not in use'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: avahi_daemon_services_not_use
+  number: '2.2.2'
+  title: 'Ensure avahi daemon services are not in use'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: dhcp_server_services_not_use
+  number: '2.2.3'
+  title: 'Ensure dhcp server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: dns_server_services_not_use
+  number: '2.2.4'
+  title: 'Ensure dns server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: dnsmasq_services_not_use
+  number: '2.2.5'
+  title: 'Ensure dnsmasq services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: samba_file_server_services_not_use
+  number: '2.2.6'
+  title: 'Ensure samba file server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: ftp_server_services_not_use
+  number: '2.2.7'
+  title: 'Ensure ftp server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: message_access_server_services_not_use
+  number: '2.2.8'
+  title: 'Ensure message access server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: network_file_system_services_not_use
+  number: '2.2.9'
+  title: 'Ensure network file system services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nis_server_services_not_use
+  number: '2.2.10'
+  title: 'Ensure nis server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: print_server_services_not_use
+  number: '2.2.11'
+  title: 'Ensure print server services are not in use'
+  levels: [server_level_1]
+  automated: true
+- id: rpcbind_services_not_use
+  number: '2.2.12'
+  title: 'Ensure rpcbind services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: rsync_services_not_use
+  number: '2.2.13'
+  title: 'Ensure rsync services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: snmp_services_not_use
+  number: '2.2.14'
+  title: 'Ensure snmp services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: telnet_server_services_not_use
+  number: '2.2.15'
+  title: 'Ensure telnet server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: tftp_server_services_not_use
+  number: '2.2.16'
+  title: 'Ensure tftp server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: web_proxy_server_services_not_use
+  number: '2.2.17'
+  title: 'Ensure web proxy server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: web_server_services_not_use
+  number: '2.2.18'
+  title: 'Ensure web server services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: xinetd_services_not_use
+  number: '2.2.19'
+  title: 'Ensure xinetd services are not in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: x_window_server_services_not_use
+  number: '2.2.20'
+  title: 'Ensure X window server services are not in use'
+  levels: [server_level_2]
+  automated: true
+- id: mail_transfer_agents_configured_local_only_mode
+  number: '2.2.21'
+  title: 'Ensure mail transfer agents are configured for local-only mode'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: only_approved_services_listening_network_interface
+  number: '2.2.22'
+  title: 'Ensure only approved services are listening on a network interface'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: ftp_client_not_installed
+  number: '2.3.1'
+  title: 'Ensure ftp client is not installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: ldap_client_not_installed
+  number: '2.3.2'
+  title: 'Ensure ldap client is not installed'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: nis_client_not_installed
+  number: '2.3.3'
+  title: 'Ensure nis client is not installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: telnet_client_not_installed
+  number: '2.3.4'
+  title: 'Ensure telnet client is not installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: tftp_client_not_installed
+  number: '2.3.5'
+  title: 'Ensure tftp client is not installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: ipv6_status_identified
+  number: '3.1.1'
+  title: 'Ensure IPv6 status is identified'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: wireless_interfaces_disabled
+  number: '3.1.2'
+  title: 'Ensure wireless interfaces are disabled'
+  levels: [server_level_1]
+  automated: true
+- id: bluetooth_services_not_use
+  number: '3.1.3'
+  title: 'Ensure bluetooth services are not in use'
+  levels: [server_level_1, workstation_level_2]
+  automated: true
+- id: dccp_kernel_module_not_available
+  number: '3.2.1'
+  title: 'Ensure dccp kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: tipc_kernel_module_not_available
+  number: '3.2.2'
+  title: 'Ensure tipc kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: rds_kernel_module_not_available
+  number: '3.2.3'
+  title: 'Ensure rds kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: sctp_kernel_module_not_available
+  number: '3.2.4'
+  title: 'Ensure sctp kernel module is not available'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: ip_forwarding_disabled
+  number: '3.3.1'
+  title: 'Ensure ip forwarding is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: packet_redirect_sending_disabled
+  number: '3.3.2'
+  title: 'Ensure packet redirect sending is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: bogus_icmp_responses_ignored
+  number: '3.3.3'
+  title: 'Ensure bogus icmp responses are ignored'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: broadcast_icmp_requests_ignored
+  number: '3.3.4'
+  title: 'Ensure broadcast icmp requests are ignored'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: icmp_redirects_not_accepted
+  number: '3.3.5'
+  title: 'Ensure icmp redirects are not accepted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: secure_icmp_redirects_not_accepted
+  number: '3.3.6'
+  title: 'Ensure secure icmp redirects are not accepted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: reverse_path_filtering_enabled
+  number: '3.3.7'
+  title: 'Ensure reverse path filtering is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: source_routed_packets_not_accepted
+  number: '3.3.8'
+  title: 'Ensure source routed packets are not accepted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: suspicious_packets_logged
+  number: '3.3.9'
+  title: 'Ensure suspicious packets are logged'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: tcp_syn_cookies_enabled
+  number: '3.3.10'
+  title: 'Ensure tcp syn cookies is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: ipv6_router_advertisements_not_accepted
+  number: '3.3.11'
+  title: 'Ensure ipv6 router advertisements are not accepted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nftables_installed
+  number: '3.4.1.1'
+  title: 'Ensure nftables is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: single_firewall_configuration_utility_use
+  number: '3.4.1.2'
+  title: 'Ensure a single firewall configuration utility is in use'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nftables_base_chains_exist
+  number: '3.4.2.1'
+  title: 'Ensure nftables base chains exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: host_based_firewall_loopback_traffic_configured
+  number: '3.4.2.2'
+  title: 'Ensure host based firewall loopback traffic is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: firewalld_drops_unnecessary_services_ports
+  number: '3.4.2.3'
+  title: 'Ensure firewalld drops unnecessary services and ports'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: nftables_established_connections_configured
+  number: '3.4.2.4'
+  title: 'Ensure nftables established connections are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: nftables_default_deny_firewall_policy
+  number: '3.4.2.5'
+  title: 'Ensure nftables default deny firewall policy'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: cron_daemon_enabled_active
+  number: '4.1.1.1'
+  title: 'Ensure cron daemon is enabled and active'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_crontab_configured
+  number: '4.1.1.2'
+  title: 'Ensure permissions on /etc/crontab are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_cron_hourly_configured
+  number: '4.1.1.3'
+  title: 'Ensure permissions on /etc/cron.hourly are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_cron_daily_configured
+  number: '4.1.1.4'
+  title: 'Ensure permissions on /etc/cron.daily are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_cron_weekly_configured
+  number: '4.1.1.5'
+  title: 'Ensure permissions on /etc/cron.weekly are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_cron_monthly_configured
+  number: '4.1.1.6'
+  title: 'Ensure permissions on /etc/cron.monthly are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_cron_d_configured
+  number: '4.1.1.7'
+  title: 'Ensure permissions on /etc/cron.d are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: crontab_restricted_authorized_users
+  number: '4.1.1.8'
+  title: 'Ensure crontab is restricted to authorized users'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: at_restricted_authorized_users
+  number: '4.1.2.1'
+  title: 'Ensure at is restricted to authorized users'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_ssh_sshd_config_configured
+  number: '4.2.1'
+  title: 'Ensure permissions on /etc/ssh/sshd_config are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_ssh_private_host_key_files_configured
+  number: '4.2.2'
+  title: 'Ensure permissions on SSH private host key files are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_ssh_public_host_key_files_configured
+  number: '4.2.3'
+  title: 'Ensure permissions on SSH public host key files are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_access_configured
+  number: '4.2.4'
+  title: 'Ensure sshd access is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_banner_configured
+  number: '4.2.5'
+  title: 'Ensure sshd Banner is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_ciphers_configured
+  number: '4.2.6'
+  title: 'Ensure sshd Ciphers are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_clientaliveinterval_clientalivecountmax_configured
+  number: '4.2.7'
+  title: 'Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_disableforwarding_enabled
+  number: '4.2.8'
+  title: 'Ensure sshd DisableForwarding is enabled'
+  levels: [server_level_2, workstation_level_1]
+  automated: true
+- id: sshd_hostbasedauthentication_disabled
+  number: '4.2.9'
+  title: 'Ensure sshd HostbasedAuthentication is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_ignorerhosts_enabled
+  number: '4.2.10'
+  title: 'Ensure sshd IgnoreRhosts is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_kexalgorithms_configured
+  number: '4.2.11'
+  title: 'Ensure sshd KexAlgorithms is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_logingracetime_configured
+  number: '4.2.12'
+  title: 'Ensure sshd LoginGraceTime is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_loglevel_configured
+  number: '4.2.13'
+  title: 'Ensure sshd LogLevel is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_macs_configured
+  number: '4.2.14'
+  title: 'Ensure sshd MACs are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_maxauthtries_configured
+  number: '4.2.15'
+  title: 'Ensure sshd MaxAuthTries is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_maxsessions_configured
+  number: '4.2.16'
+  title: 'Ensure sshd MaxSessions is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_maxstartups_configured
+  number: '4.2.17'
+  title: 'Ensure sshd MaxStartups is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_permitemptypasswords_disabled
+  number: '4.2.18'
+  title: 'Ensure sshd PermitEmptyPasswords is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_permitrootlogin_disabled
+  number: '4.2.19'
+  title: 'Ensure sshd PermitRootLogin is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_permituserenvironment_disabled
+  number: '4.2.20'
+  title: 'Ensure sshd PermitUserEnvironment is disabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_usepam_enabled
+  number: '4.2.21'
+  title: 'Ensure sshd UsePAM is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sshd_crypto_policy_not_set
+  number: '4.2.22'
+  title: 'Ensure sshd crypto_policy is not set'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sudo_installed
+  number: '4.3.1'
+  title: 'Ensure sudo is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sudo_commands_use_pty
+  number: '4.3.2'
+  title: 'Ensure sudo commands use pty'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sudo_log_file_exists
+  number: '4.3.3'
+  title: 'Ensure sudo log file exists'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: users_must_provide_password_escalation
+  number: '4.3.4'
+  title: 'Ensure users must provide password for escalation'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: re_authentication_privilege_escalation_not_disabled_globally
+  number: '4.3.5'
+  title: 'Ensure re-authentication for privilege escalation is not disabled globally'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: sudo_authentication_timeout_configured_correctly
+  number: '4.3.6'
+  title: 'Ensure sudo authentication timeout is configured correctly'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: access_su_command_restricted
+  number: '4.3.7'
+  title: 'Ensure access to the su command is restricted'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: latest_version_pam_installed
+  number: '4.4.1.1'
+  title: 'Ensure latest version of pam is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: latest_version_authselect_installed
+  number: '4.4.1.2'
+  title: 'Ensure latest version of authselect is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: active_authselect_profile_includes_pam_modules
+  number: '4.4.2.1'
+  title: 'Ensure active authselect profile includes pam modules'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_faillock_module_enabled
+  number: '4.4.2.2'
+  title: 'Ensure pam_faillock module is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_pwquality_module_enabled
+  number: '4.4.2.3'
+  title: 'Ensure pam_pwquality module is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_pwhistory_module_enabled
+  number: '4.4.2.4'
+  title: 'Ensure pam_pwhistory module is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_unix_module_enabled
+  number: '4.4.2.5'
+  title: 'Ensure pam_unix module is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_failed_attempts_lockout_configured
+  number: '4.4.3.1.1'
+  title: 'Ensure password failed attempts lockout is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_unlock_time_configured
+  number: '4.4.3.1.2'
+  title: 'Ensure password unlock time is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_failed_attempts_lockout_includes_root_account
+  number: '4.4.3.1.3'
+  title: 'Ensure password failed attempts lockout includes root account'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: password_number_changed_characters_configured
+  number: '4.4.3.2.1'
+  title: 'Ensure password number of changed characters is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_length_configured
+  number: '4.4.3.2.2'
+  title: 'Ensure password length is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_complexity_configured
+  number: '4.4.3.2.3'
+  title: 'Ensure password complexity is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: password_same_consecutive_characters_configured
+  number: '4.4.3.2.4'
+  title: 'Ensure password same consecutive characters is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_maximum_sequential_characters_configured
+  number: '4.4.3.2.5'
+  title: 'Ensure password maximum sequential characters is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_dictionary_check_enabled
+  number: '4.4.3.2.6'
+  title: 'Ensure password dictionary check is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_quality_enforced_root_user
+  number: '4.4.3.2.7'
+  title: 'Ensure password quality is enforced for the root user'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_history_remember_configured
+  number: '4.4.3.3.1'
+  title: 'Ensure password history remember is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_history_enforced_root_user
+  number: '4.4.3.3.2'
+  title: 'Ensure password history is enforced for the root user'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_pwhistory_includes_use_authtok
+  number: '4.4.3.3.3'
+  title: 'Ensure pam_pwhistory includes use_authtok'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_unix_does_not_include_nullok
+  number: '4.4.3.4.1'
+  title: 'Ensure pam_unix does not include nullok'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_unix_does_not_include_remember
+  number: '4.4.3.4.2'
+  title: 'Ensure pam_unix does not include remember'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_unix_includes_strong_password_hashing_algorithm
+  number: '4.4.3.4.3'
+  title: 'Ensure pam_unix includes a strong password hashing algorithm'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: pam_unix_includes_use_authtok
+  number: '4.4.3.4.4'
+  title: 'Ensure pam_unix includes use_authtok'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: strong_password_hashing_algorithm_configured
+  number: '4.5.1.1'
+  title: 'Ensure strong password hashing algorithm is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_expiration_365_days_less
+  number: '4.5.1.2'
+  title: 'Ensure password expiration is 365 days or less'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: password_expiration_warning_days_7_more
+  number: '4.5.1.3'
+  title: 'Ensure password expiration warning days is 7 or more'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: inactive_password_lock_30_days_less
+  number: '4.5.1.4'
+  title: 'Ensure inactive password lock is 30 days or less'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: all_users_last_password_change_date_past
+  number: '4.5.1.5'
+  title: 'Ensure all users last password change date is in the past'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: default_group_root_account_gid_0
+  number: '4.5.2.1'
+  title: 'Ensure default group for the root account is GID 0'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: root_user_umask_configured
+  number: '4.5.2.2'
+  title: 'Ensure root user umask is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: system_accounts_secured
+  number: '4.5.2.3'
+  title: 'Ensure system accounts are secured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: root_password_set
+  number: '4.5.2.4'
+  title: 'Ensure root password is set'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: nologin_not_listed_etc_shells
+  number: '4.5.3.1'
+  title: 'Ensure nologin is not listed in /etc/shells'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: default_user_shell_timeout_configured
+  number: '4.5.3.2'
+  title: 'Ensure default user shell timeout is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: default_user_umask_configured
+  number: '4.5.3.3'
+  title: 'Ensure default user umask is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: rsyslog_installed
+  number: '5.1.1.1'
+  title: 'Ensure rsyslog is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: rsyslog_service_enabled
+  number: '5.1.1.2'
+  title: 'Ensure rsyslog service is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: journald_configured_send_logs_rsyslog
+  number: '5.1.1.3'
+  title: 'Ensure journald is configured to send logs to rsyslog'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: rsyslog_default_file_permissions_configured
+  number: '5.1.1.4'
+  title: 'Ensure rsyslog default file permissions are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: logging_configured
+  number: '5.1.1.5'
+  title: 'Ensure logging is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: rsyslog_configured_send_logs_remote_log_host
+  number: '5.1.1.6'
+  title: 'Ensure rsyslog is configured to send logs to a remote log host'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: rsyslog_not_configured_receive_logs_from_remote_client
+  number: '5.1.1.7'
+  title: 'Ensure rsyslog is not configured to receive logs from a remote client'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: systemd_journal_remote_installed
+  number: '5.1.2.1.1'
+  title: 'Ensure systemd-journal-remote is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: systemd_journal_remote_configured
+  number: '5.1.2.1.2'
+  title: 'Ensure systemd-journal-remote is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: systemd_journal_remote_enabled
+  number: '5.1.2.1.3'
+  title: 'Ensure systemd-journal-remote is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: journald_not_configured_receive_logs_from_remote_client
+  number: '5.1.2.1.4'
+  title: 'Ensure journald is not configured to receive logs from a remote client'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: journald_service_enabled
+  number: '5.1.2.2'
+  title: 'Ensure journald service is enabled'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: journald_configured_compress_large_log_files
+  number: '5.1.2.3'
+  title: 'Ensure journald is configured to compress large log files'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: journald_configured_write_logfiles_persistent_disk
+  number: '5.1.2.4'
+  title: 'Ensure journald is configured to write logfiles to persistent disk'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: journald_not_configured_send_logs_rsyslog
+  number: '5.1.2.5'
+  title: 'Ensure journald is not configured to send logs to rsyslog'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: journald_log_rotation_configured_per_site_policy
+  number: '5.1.2.6'
+  title: 'Ensure journald log rotation is configured per site policy'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: logrotate_configured
+  number: '5.1.3'
+  title: 'Ensure logrotate is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: all_logfiles_have_appropriate_access_configured
+  number: '5.1.4'
+  title: 'Ensure all logfiles have appropriate access configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: audit_installed
+  number: '5.2.1.1'
+  title: 'Ensure audit is installed'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: auditing_processes_start_prior_auditd_enabled
+  number: '5.2.1.2'
+  title: 'Ensure auditing for processes that start prior to auditd is enabled'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_backlog_limit_sufficient
+  number: '5.2.1.3'
+  title: 'Ensure audit_backlog_limit is sufficient'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: auditd_service_enabled
+  number: '5.2.1.4'
+  title: 'Ensure auditd service is enabled'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_log_storage_size_configured
+  number: '5.2.2.1'
+  title: 'Ensure audit log storage size is configured'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_logs_not_automatically_deleted
+  number: '5.2.2.2'
+  title: 'Ensure audit logs are not automatically deleted'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: system_disabled_when_audit_logs_full
+  number: '5.2.2.3'
+  title: 'Ensure system is disabled when audit logs are full'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: system_warns_when_audit_logs_low_space
+  number: '5.2.2.4'
+  title: 'Ensure system warns when audit logs are low on space'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: changes_system_administration_scope_sudoers_collected
+  number: '5.2.3.1'
+  title: 'Ensure changes to system administration scope (sudoers) is collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: actions_another_user_always_logged
+  number: '5.2.3.2'
+  title: 'Ensure actions as another user are always logged'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: events_modify_sudo_log_file_collected
+  number: '5.2.3.3'
+  title: 'Ensure events that modify the sudo log file are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: events_modify_date_time_information_collected
+  number: '5.2.3.4'
+  title: 'Ensure events that modify date and time information are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: events_modify_system_s_network_environment_collected
+  number: '5.2.3.5'
+  title: 'Ensure events that modify the system''s network environment are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: use_privileged_commands_collected
+  number: '5.2.3.6'
+  title: 'Ensure use of privileged commands are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: unsuccessful_file_access_attempts_collected
+  number: '5.2.3.7'
+  title: 'Ensure unsuccessful file access attempts are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: events_modify_user_group_information_collected
+  number: '5.2.3.8'
+  title: 'Ensure events that modify user/group information are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: discretionary_access_control_permission_modification_events_collected
+  number: '5.2.3.9'
+  title: 'Ensure discretionary access control permission modification events are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: successful_file_system_mounts_collected
+  number: '5.2.3.10'
+  title: 'Ensure successful file system mounts are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: session_initiation_information_collected
+  number: '5.2.3.11'
+  title: 'Ensure session initiation information is collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: login_logout_events_collected
+  number: '5.2.3.12'
+  title: 'Ensure login and logout events are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: file_deletion_events_users_collected
+  number: '5.2.3.13'
+  title: 'Ensure file deletion events by users are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: events_modify_system_s_mandatory_access_controls_collected
+  number: '5.2.3.14'
+  title: 'Ensure events that modify the system''s Mandatory Access Controls are collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: successful_unsuccessful_attempts_use_chcon_command_recorded
+  number: '5.2.3.15'
+  title: 'Ensure successful and unsuccessful attempts to use the chcon command are recorded'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: successful_unsuccessful_attempts_use_setfacl_command_recorded
+  number: '5.2.3.16'
+  title: 'Ensure successful and unsuccessful attempts to use the setfacl command are recorded'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: successful_unsuccessful_attempts_use_chacl_command_recorded
+  number: '5.2.3.17'
+  title: 'Ensure successful and unsuccessful attempts to use the chacl command are recorded'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: successful_unsuccessful_attempts_use_usermod_command_recorded
+  number: '5.2.3.18'
+  title: 'Ensure successful and unsuccessful attempts to use the usermod command are recorded'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: kernel_module_loading_unloading_modification_collected
+  number: '5.2.3.19'
+  title: 'Ensure kernel module loading unloading and modification is collected'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_configuration_immutable
+  number: '5.2.3.20'
+  title: 'Ensure the audit configuration is immutable'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: running_disk_configuration_same
+  number: '5.2.3.21'
+  title: 'Ensure the running and on disk configuration is the same'
+  levels: [server_level_2, workstation_level_2]
+  automated: false
+- id: audit_log_directory_0750_more_restrictive
+  number: '5.2.4.1'
+  title: 'Ensure the audit log directory is 0750 or more restrictive'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_log_files_mode_0640_less_permissive
+  number: '5.2.4.2'
+  title: 'Ensure audit log files are mode 0640 or less permissive'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: only_authorized_users_own_audit_log_files
+  number: '5.2.4.3'
+  title: 'Ensure only authorized users own audit log files'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: only_authorized_groups_assigned_ownership_audit_log_files
+  number: '5.2.4.4'
+  title: 'Ensure only authorized groups are assigned ownership of audit log files'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_configuration_files_640_more_restrictive
+  number: '5.2.4.5'
+  title: 'Ensure audit configuration files are 640 or more restrictive'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_configuration_files_owned_root
+  number: '5.2.4.6'
+  title: 'Ensure audit configuration files are owned by root'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_configuration_files_belong_group_root
+  number: '5.2.4.7'
+  title: 'Ensure audit configuration files belong to group root'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_tools_755_more_restrictive
+  number: '5.2.4.8'
+  title: 'Ensure audit tools are 755 or more restrictive'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_tools_owned_root
+  number: '5.2.4.9'
+  title: 'Ensure audit tools are owned by root'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: audit_tools_belong_group_root
+  number: '5.2.4.10'
+  title: 'Ensure audit tools belong to group root'
+  levels: [server_level_2, workstation_level_2]
+  automated: true
+- id: aide_installed
+  number: '5.3.1'
+  title: 'Ensure AIDE is installed'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: filesystem_integrity_regularly_checked
+  number: '5.3.2'
+  title: 'Ensure filesystem integrity is regularly checked'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: cryptographic_mechanisms_used_protect_integrity_audit_tools
+  number: '5.3.3'
+  title: 'Ensure cryptographic mechanisms are used to protect the integrity of audit tools'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_passwd_configured
+  number: '6.1.1'
+  title: 'Ensure permissions on /etc/passwd are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_passwd_backup_configured
+  number: '6.1.2'
+  title: 'Ensure permissions on /etc/passwd- are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_opasswd_configured
+  number: '6.1.3'
+  title: 'Ensure permissions on /etc/opasswd are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_group_configured
+  number: '6.1.4'
+  title: 'Ensure permissions on /etc/group are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_group_backup_configured
+  number: '6.1.5'
+  title: 'Ensure permissions on /etc/group- are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_shadow_configured
+  number: '6.1.6'
+  title: 'Ensure permissions on /etc/shadow are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_shadow_backup_configured
+  number: '6.1.7'
+  title: 'Ensure permissions on /etc/shadow- are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_gshadow_configured
+  number: '6.1.8'
+  title: 'Ensure permissions on /etc/gshadow are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_gshadow_backup_configured
+  number: '6.1.9'
+  title: 'Ensure permissions on /etc/gshadow- are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: permissions_etc_shells_configured
+  number: '6.1.10'
+  title: 'Ensure permissions on /etc/shells are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: world_writable_files_directories_secured
+  number: '6.1.11'
+  title: 'Ensure world writable files and directories are secured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: no_unowned_ungrouped_files_directories_exist
+  number: '6.1.12'
+  title: 'Ensure no unowned or ungrouped files or directories exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: suid_sgid_files_reviewed
+  number: '6.1.13'
+  title: 'Ensure SUID and SGID files are reviewed'
+  levels: [server_level_1, workstation_level_1]
+  automated: false
+- id: audit_system_file_permissions
+  number: '6.1.14'
+  title: 'Audit system file permissions'
+  levels: [server_level_2, workstation_level_2]
+  automated: false
+- id: accounts_etc_passwd_use_shadowed_passwords
+  number: '6.2.1'
+  title: 'Ensure accounts in /etc/passwd use shadowed passwords'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: etc_shadow_password_fields_not_empty
+  number: '6.2.2'
+  title: 'Ensure /etc/shadow password fields are not empty'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: all_groups_etc_passwd_exist_etc_group
+  number: '6.2.3'
+  title: 'Ensure all groups in /etc/passwd exist in /etc/group'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: no_duplicate_uids_exist
+  number: '6.2.4'
+  title: 'Ensure no duplicate UIDs exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: no_duplicate_gids_exist
+  number: '6.2.5'
+  title: 'Ensure no duplicate GIDs exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: no_duplicate_user_names_exist
+  number: '6.2.6'
+  title: 'Ensure no duplicate user names exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: no_duplicate_group_names_exist
+  number: '6.2.7'
+  title: 'Ensure no duplicate group names exist'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: root_path_integrity
+  number: '6.2.8'
+  title: 'Ensure root path integrity'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: root_only_uid_0_account
+  number: '6.2.9'
+  title: 'Ensure root is the only UID 0 account'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: local_interactive_user_home_directories_configured
+  number: '6.2.10'
+  title: 'Ensure local interactive user home directories are configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true
+- id: local_interactive_user_dot_files_access_configured
+  number: '6.2.11'
+  title: 'Ensure local interactive user dot files access is configured'
+  levels: [server_level_1, workstation_level_1]
+  automated: true

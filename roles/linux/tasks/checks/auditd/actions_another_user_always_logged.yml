@@ -22,7 +22,7 @@
 - name: "actions_another_user_always_logged | Audit"
   shell:
     cmd: |
-      auditctl -l | awk '/^ *-a *always,exit/ \
+      /sbin/auditctl -l | awk '/^ *-a *always,exit/ \
       &&/ -F *arch=b({{ item }})/ \
       &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
       &&(/ -C *euid!=uid/||/ -C *uid!=euid/) \
@@ -90,7 +90,9 @@
  # actions_another_user_always_logged | Remediation
 - name: "actions_another_user_always_logged | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_action_as_other_user_rule_check.remediation_status
 
 # Record the verdict for this check
