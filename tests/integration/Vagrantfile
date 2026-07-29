@@ -1,0 +1,83 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Integration test machines, one per platforms.yml entry.
+#
+# The matrix is the single source of truth: this file defines a machine for
+# every entry in platforms.yml, named after the entry, so run.sh can drive
+# them by name (`vagrant up <entry>`, `vagrant ssh-config <entry>`,
+# `vagrant destroy -f <entry>`). Adding a platform is a new matrix row plus a
+# matching expected_failures/<entry>.yml — never a change here.
+#
+# The playbooks run from the host over SSH using the inventory run.sh builds
+# from `vagrant ssh-config`, so the guest needs neither guest additions nor a
+# synced folder; both are disabled below.
+
+require 'yaml'
+
+# Resolve the matrix next to this file so `vagrant` works from anywhere
+PLATFORMS = YAML.load_file(File.expand_path('platforms.yml', __dir__))['platforms']
+
+Vagrant.configure('2') do |config|
+  PLATFORMS.each do |entry_name, entry|
+    # autostart: false keeps a bare `vagrant up` from booting the whole
+    # matrix; run.sh always names the entry it wants
+    config.vm.define entry_name, autostart: false do |machine|
+      machine.vm.box = entry['box']
+
+      # Box updates would silently change what a run is testing
+      machine.vm.box_check_update = false
+
+      # The harness talks to the guest over plain SSH only. The default
+      # /vagrant share needs vboxsf (guest additions), which the hardened
+      # boxes do not have, and nothing in the run reads from it.
+      machine.vm.synced_folder '.', '/vagrant', disabled: true
+
+      # Guest additions are never needed, so keep vagrant-vbguest out of the
+      # boot path when the plugin happens to be installed on the host. Beyond
+      # saving a pointless compile in every VM, vagrant-vbguest 0.32.0 calls
+      # File.exists?, which Ruby 3.3 removed, so its check aborts `vagrant up`
+      # with a NoMethodError before the machine is ever provisioned.
+      if Vagrant.has_plugin?('vagrant-vbguest')
+        machine.vbguest.auto_update = false
+        machine.vbguest.no_install = true
+        machine.vbguest.no_remote = true
+      end
+
+      # EFI boxes are slower to reach the SSH banner than the default 300s
+      machine.vm.boot_timeout = 600
+
+      machine.vm.provider 'virtualbox' do |vb|
+        vb.gui = false
+        vb.memory = entry['memory']
+        vb.cpus = entry['cpus']
+
+        # The firmware must match how the box's disk image boots: efi is the
+        # matrix default, bios entries say so explicitly
+        vb.customize ['modifyvm', :id, '--firmware', entry.fetch('firmware', 'efi')]
+      end
+
+      # Grow the root filesystem into the unallocated space the box leaves
+      # behind, so the hardening package upgrades have room. Only entries
+      # that declare disk_size need it (their boxes partition less than the
+      # disk they ship); the others already present a full root partition.
+      # This grows the in-guest partition only — the virtual disk itself is
+      # never resized, see provision/grow_disk.sh.
+      if entry['disk_size']
+        machine.vm.provision 'grow_disk',
+                             type: 'shell',
+                             path: 'provision/grow_disk.sh',
+                             privileged: true
+      end
+
+      # Give the vagrant user a real password, so become keeps working after
+      # the role strips NOPASSWD from sudoers. It must match the
+      # ansible_become_password run.sh passes for this entry.
+      machine.vm.provision 'set_password',
+                           type: 'shell',
+                           path: 'provision/set_password.sh',
+                           args: [entry.fetch('become_password', 'vagrant')],
+                           privileged: true
+    end
+  end
+end

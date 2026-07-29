@@ -19,7 +19,7 @@
 # Configure the official nginx.org stable repository
 - name: "{{ rule }} | Remediation"
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/nginx_signing.key] http://nginx.org/packages/{{ 'ubuntu' if ansible_distribution == 'Ubuntu' else 'debian' }} {{ ansible_distribution_release }} nginx"
+    repo: "deb [signed-by=/usr/share/keyrings/nginx_signing.key] http://nginx.org/packages/{{ 'ubuntu' if ansible_facts['distribution'] == 'Ubuntu' else 'debian' }} {{ ansible_facts['distribution_release'] }} nginx"
     filename: nginx
     update_cache: yes
     state: present

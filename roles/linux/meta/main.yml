@@ -8,7 +8,25 @@ galaxy_info:
   platforms:
   - name: Rocky
     versions:
-    - all
+    - "8"
+    - "10"
+  - name: AlmaLinux
+    versions:
+    - "8"
+    - "10"
+  - name: OracleLinux
+    versions:
+    - "8"
+    - "10"
+  - name: EL
+    versions:
+    - "8"
+    - "10"
+  - name: CentOS
+    versions:
+    - "8"
+    - "10"
+
 
   galaxy_tags:
   - cis_hardening

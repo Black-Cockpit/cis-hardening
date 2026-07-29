@@ -14,4 +14,4 @@ rpm_keys:
   "10": "bc4d06a08d8b756f"
 
 # Resolve the key id for the running major version
-rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"
+rpm_key: "{{ rpm_keys[ansible_facts['distribution_major_version']] | default('') }}"
