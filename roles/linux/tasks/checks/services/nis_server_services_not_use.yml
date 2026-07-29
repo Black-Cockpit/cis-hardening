@@ -1,0 +1,41 @@
+# nis_server_services_not_use
+#
+# The Network Information Service (NIS), formerly known as Yellow Pages, is a client-
+# server directory service protocol used to distribute system configuration files. The NIS
+# client ( ypbind ) was used to bind a machine to an NIS server and receive the
+# distributed configuration files.
+
+- name: "nis_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q ypserv && echo installed || echo not_installed
+  changed_when: false
+  register: ypserv_status_check
+
+# nis_server_services_not_use | Audit
+- name: "nis_server_services_not_use | Audit"
+  systemd:
+    name: ypserv
+  ignore_errors: yes
+  changed_when: false
+  register: ypserv_service_status_check
+  when: ypserv_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    ypserv_check:
+      remediation_status: "{{ true if (ypserv_status_check.stdout == 'not_installed' or (ypserv_service_status_check.status.ActiveState == 'inactive' and (ypserv_service_status_check.status.UnitFileState is not defined or ypserv_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "nis_server_services_not_use | Remediation"
+  systemd:
+    name: ypserv
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not ypserv_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ypserv_check.remediation_status }}"

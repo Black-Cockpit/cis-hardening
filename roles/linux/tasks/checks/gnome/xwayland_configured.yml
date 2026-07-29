@@ -1,0 +1,50 @@
+# xwayland_configured
+#
+# Xwayland allows X11 applications to run under a Wayland session. Disabling
+# Wayland in GDM forces the display manager to use X11, or site policy may
+# require Wayland disabled for compatibility reasons per the benchmark.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "xwayland_configured | Audit"
+  shell:
+    cmd: sed -n '/\[daemon\]/,/\[/p' /etc/gdm/custom.conf 2>/dev/null | grep -Psiq '^\h*WaylandEnable\h*=\h*false\b' && echo configured || echo not_configured
+  changed_when: false
+  when: gdm_installed
+  register: xwayland_status
+
+# Extract audit result
+- set_fact:
+    xwayland_check:
+      remediation_status: "{{ true if (not gdm_installed or (xwayland_status.stdout | default('')) == 'configured') else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "xwayland_configured | Remediation"
+  lineinfile:
+    path: /etc/gdm/custom.conf
+    regexp: '^\s*#?\s*WaylandEnable\s*='
+    line: "WaylandEnable=false"
+    insertafter: '^\[daemon\]'
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not xwayland_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ xwayland_check.remediation_status }}"

@@ -1,0 +1,27 @@
+# separate_partition_exists_var_log_audit
+#
+# The auditing daemon, auditd , stores log data in the /var/log/audit directory.
+
+- name: "separate_partition_exists_var_log_audit | Audit"
+  shell:
+    cmd: mount | grep -q '\s\/var\/log\/audit\s' && echo compliant || echo not_compliant
+  changed_when: false
+  register: var_log_audit_partition_status
+
+# Extract audit result
+- set_fact:
+    var_log_audit_partition:
+      remediation_status: "{{ true if var_log_audit_partition_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to create a separate partition for /var/log/audit and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "separate_partition_exists_var_log_audit | Remediation"
+  debug:
+    msg: "Consider to create a separate partition for /var/log/audit and update /etc/fstab"
+  when: not audit_only and not var_log_audit_partition.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ var_log_audit_partition.remediation_status }}"

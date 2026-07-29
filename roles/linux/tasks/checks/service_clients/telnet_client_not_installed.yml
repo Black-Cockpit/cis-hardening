@@ -1,0 +1,27 @@
+# telnet_client_not_installed
+#
+# The telnet-server package contains the telnet daemon, which accepts connections
+# from users from other systems via the telnet protocol.
+
+- name: "telnet_client_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -qE "^telnet" && echo installed || echo not_installed
+  changed_when: false
+  register: telnet_status_check
+
+# Extract audit result
+- set_fact:
+    telnet_server_check:
+      remediation_status: "{{ true if telnet_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "telnet_client_not_installed | Remediation"
+  package:
+    name: telnet
+    state: absent
+  when: not audit_only and not telnet_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ telnet_server_check.remediation_status }}"

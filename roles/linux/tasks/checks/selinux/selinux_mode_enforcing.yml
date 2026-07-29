@@ -1,0 +1,48 @@
+# selinux_mode_enforcing
+#
+# SELinux can run in one of three modes: disabled, permissive, or enforcing
+# - Enforcing: Is the default, and recommended, mode of operation; in enforcing
+#   mode SELinux operates normally, enforcing the loaded security policy on the
+#   entire system.
+#
+# - Permissive: The system acts as if SELinux is enforcing the loaded security
+#   policy, including labeling objects and emitting access denial entries in the logs,
+#   but it does not actually deny any operations. While not recommended for
+#   production systems, permissive mode can be helpful for SELinux policy
+#   development.
+#
+# - Disabled: Is strongly discouraged; not only does the system avoid enforcing the
+#   SELinux policy, it also avoids labeling any persistent objects such as files,
+#   making it difficult to enable SELinux in the future
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check SELinux configuration type
+  shell:
+    cmd: grep -Eq '^\s*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config && echo configured || echo not_configured
+  changed_when: false
+  register: selinux_config_check
+
+# Audit | Collect the current configuration state
+- name: "selinux_mode_enforcing | Audit"
+  shell:
+    cmd: "getenforce | grep -Eiq '(Enforcing)' && echo configured || echo not_configured"
+  changed_when: false
+  register: selinux_mode_config_check
+
+# Extract audit result
+- set_fact:
+    selinux_mode_check:
+      remediation_status: "{{ true if (selinux_config_check.stdout == 'configured' and selinux_mode_config_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "selinux_mode_enforcing | Remediation"
+  ansible.posix.selinux:
+    conf: /etc/selinux/config
+    policy: "{{ rhel8.selinux_policy  if rhel8.selinux_policy is defined else 'targeted' }}"
+    state: "enforcing"
+  when: not audit_only and not selinux_mode_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ selinux_mode_check.remediation_status }}"

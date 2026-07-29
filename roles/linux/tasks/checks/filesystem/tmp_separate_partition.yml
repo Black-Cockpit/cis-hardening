@@ -1,0 +1,37 @@
+# tmp_separate_partition
+#
+# The /tmp directory is a world-writable directory used for temporary storage by all users
+# and some applications.
+
+- name: "tmp_separate_partition | Audit"
+  shell:
+    cmd: findmnt -nk /tmp | grep -Eq '^(\/tmp\s)' && echo exists || echo not_exists
+  changed_when: false
+  register: tmp_mount_status
+# Check that systemd will mount the /tmp partition
+- name: "tmp_separate_partition | Audit"
+  systemd:
+    name: tmp.mount
+  changed_when: false
+  register: tmp_systemd_status
+
+# Extract audit result
+- set_fact:
+    tmp_mount:
+      remediation_status: "{{ true if (tmp_mount_status.stdout == 'exists' and (tmp_systemd_status.status.UnitFileState != 'disabled' or tmp_systemd_status.status.UnitFileState == 'masked')) else false }}"
+      remediation: "Consider to mount /tmp is a separate partition and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "tmp_separate_partition | Remediation"
+  systemd:
+    name: tmp.mount
+    enabled: true
+    masked: false
+    daemon_reload: yes
+    state: started
+  when: not audit_only and not tmp_mount.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tmp_mount.remediation_status }}"

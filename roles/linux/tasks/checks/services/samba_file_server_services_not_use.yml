@@ -1,0 +1,42 @@
+# samba_file_server_services_not_use
+#
+# The Samba daemon allows system administrators to configure their Linux systems to
+# share file systems and directories with Windows desktops. Samba will advertise the file
+# systems and directories via the Server Message Block (SMB) protocol. Windows
+# desktop users will be able to mount these directories and file systems as letter drives on
+# their systems.
+
+- name: "samba_file_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q samba && echo installed || echo not_installed
+  changed_when: false
+  register: samba_status_check
+
+# samba_file_server_services_not_use | Audit
+- name: "samba_file_server_services_not_use | Audit"
+  systemd:
+    name: smb
+  ignore_errors: yes
+  changed_when: false
+  register: smb_service_status_check
+  when: samba_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    smb_check:
+      remediation_status: "{{ true if (samba_status_check.stdout == 'not_installed' or (smb_service_status_check.status.ActiveState == 'inactive' and (smb_service_status_check.status.UnitFileState is not defined or smb_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "samba_file_server_services_not_use | Remediation"
+  systemd:
+    name: smb
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not smb_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ smb_check.remediation_status }}"

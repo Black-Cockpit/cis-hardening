@@ -1,0 +1,43 @@
+# xdmcp_not_enabled
+#
+# X Display Manager Control Protocol (XDMCP) is designed to provide authenticated
+# access to display management services for remote displays
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "xdmcp_not_enabled | Audit"
+  shell:
+    cmd: grep -Eis '^\s*Enable\s*=\s*true' /etc/gdm/custom.conf && echo exists || echo not_exists
+  changed_when: false
+  register: xdmcp_status_check
+
+# Extract audit result
+- set_fact:
+    xdmcp_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and xdmcp_status_check.stdout == 'not_exists')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "xdmcp_not_enabled | Remediation"
+  replace:
+    path: /etc/gdm/custom.conf
+    regexp: "Enable=true"
+    replace: "#Enable=true"
+  when: not audit_only and not xdmcp_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ xdmcp_check.remediation_status }}"

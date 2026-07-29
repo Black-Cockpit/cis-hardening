@@ -1,0 +1,59 @@
+# usb_storage_kernel_module_not_available
+#
+# USB storage provides a means to transfer and store files ensuring persistence and
+# availability of the files independent of network connection status. Its popularity and utility
+# has led to USB-based malware being a simple and common means for network
+# infiltration and a first step to establishing a persistent threat within a networked
+
+- name: "usb_storage_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv usb-storage && echo loaded || echo not_loaded
+  changed_when: false
+  register: usb_storage_check_loaded_result
+# Check if module is disabled
+- name: "usb_storage_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install usb-storage /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: usb_storage_check_disabled_result
+# Check if module is blacklisted
+- name: "usb_storage_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist usb-storage" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: usb_storage_check_blacklisted_result
+# Extract audit result
+- set_fact:
+    usb_storage_check:
+      remediation_status: "{{ true if (usb_storage_check_loaded_result.stdout == 'not_loaded' or (usb_storage_check_disabled_result.stdout == 'disabled' and usb_storage_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "usb_storage_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/usb-storage.conf"
+    regexp: "^(#)?install usb-storage(\\s|$)"
+    line: "install usb-storage /bin/true"
+    create: true
+  when: not audit_only and not usb_storage_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "usb_storage_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist usb-storage(\\s|$)"
+    line: "blacklist usb-storage"
+    create: true
+    mode: "0600"
+  when: not audit_only and not usb_storage_check.remediation_status
+
+# Disable usb-storage filesystems
+- name: Disabling usb-storage filesystems
+  modprobe:
+    name: usb-storage
+    state: absent
+  when: not audit_only and not usb_storage_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ usb_storage_check.remediation_status }}"

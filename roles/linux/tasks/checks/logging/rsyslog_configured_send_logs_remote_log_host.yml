@@ -1,0 +1,47 @@
+# rsyslog_configured_send_logs_remote_log_host
+#
+# RSyslog supports the ability to send log events it gathers to a remote log host or to
+# receive messages from remote hosts, thus enabling centralized log management.
+
+- name: "rsyslog_configured_send_logs_remote_log_host | Audit"
+  shell:
+    cmd: |
+      [[ -d /etc/rsyslog.d/*.conf ]] && grep -E '^\s*([^#]+\s+)?action\(([^#]+\s+)?\btarget=\"?[^#"]+\"?\b' /etc/rsyslog.d/*.conf || echo ''
+      grep -E '^\s*([^#]+\s+)?action\(([^#]+\s+)?\btarget=\"?[^#"]+\"?\b' /etc/rsyslog.conf || echo ''
+  changed_when: false
+  register: rsyslog_send_log_to_remote_status_check
+
+# Extract audit result
+- set_fact:
+    rsyslog_send_log_to_remote_check:
+      name: "rsyslog_configured_send_logs_remote_log_host"
+      scored: true
+      automated: false
+  changed_when: false
+
+# Define remediation description
+- set_fact:
+    remediation_description:
+      remediation: 'Consider to add the appropriate configuration to send log to a remote log host'
+  changed_when: false
+  when: rsyslog_send_log_to_remote_status_check.stdout == ''
+
+# Define remediation description
+- set_fact:
+    remediation_description:
+      remediation: "Consider to review rsyslog configuration bellow: \n{{ rsyslog_send_log_to_remote_status_check.stdout }}"
+  changed_when: false
+  when: rsyslog_send_log_to_remote_status_check.stdout != ''
+
+# Append remediation
+- set_fact:
+    rsyslog_send_log_to_remote_check: "{{ rsyslog_send_log_to_remote_check | combine(remediation_description) }}"
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

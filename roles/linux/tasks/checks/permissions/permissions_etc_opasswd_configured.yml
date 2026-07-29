@@ -1,0 +1,72 @@
+# permissions_etc_opasswd_configured
+#
+# /etc/security/opasswd and it's /etc/security/opasswd.old hold user's
+# previous passwords if pam_unix or pam_pwhistory is in use on the system
+
+- name: "permissions_etc_opasswd_configured | Audit"
+  stat:
+    path: "{{ item }}"
+  changed_when: false
+  loop:
+  - "/etc/security/opasswd"
+  - "/etc/security/opasswd.old"
+  register: passwd_pam_file_status
+
+# permissions_etc_opasswd_configured | Audit
+- name: "permissions_etc_opasswd_configured | Audit"
+  shell:
+    cmd: |
+      if [[ "{{ item.stat.exists }}" == "True" ]]; then
+          [ $(({{ item.stat.mode | default () }} & {{ expected_file_mask }})) -gt 0 ] && 
+          echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+  no_log: yes
+  register: passwd_pam_permission_status
+  vars:
+    expected_file_mask: "0177"
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and item.stdout == 'configured') else false}}"
+  loop: "{{ passwd_pam_permission_status.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (not item.stat.exists or ((item.stat.pw_name | default()) == 'root' and (item.stat.gr_name | default())))) else false}}"
+  loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+  no_log: yes
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    passwd_backup_permission_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_opasswd_configured | Remediation"
+  shell:
+    cmd: |
+      if [[ "{{ item.stat.exists }}" == "True" ]]; then
+          chmod 600 "{{ item.stat.path | default() }}"
+          chown root:root "{{ item.stat.path | default() }}"
+      fi
+  loop: "{{ passwd_pam_file_status.results | default([]) | list }}"
+  no_log: yes
+  when: not audit_only and not passwd_backup_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ passwd_backup_permission_check.remediation_status }}"

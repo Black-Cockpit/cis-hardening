@@ -1,0 +1,60 @@
+# overlay_kernel_module_not_available
+#
+# The Linux overlay kernel module, commonly referred to as Overlayfs, is a union mount
+# filesystem. It allows the user to overlay one file system on top of another, and creates a
+# single, unified view.
+
+- name: "overlay_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv overlay && echo loaded || echo not_loaded
+  changed_when: false
+  register: overlay_check_loaded_result
+# Check if module is disabled
+- name: "overlay_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install overlay /bin/(true|false)" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: overlay_check_disabled_result
+# Check if module is blacklisted
+- name: "overlay_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist overlay" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: overlay_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    overlay_check:
+      remediation_status: "{{ true if (overlay_check_loaded_result.stdout == 'not_loaded' or (overlay_check_disabled_result.stdout == 'disabled' and overlay_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "overlay_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/overlay.conf"
+    regexp: "^(#)?install overlay(\\s|$)"
+    line: "install overlay /bin/false"
+    create: true
+    mode: "0600"
+  when: not audit_only and not overlay_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "overlay_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist overlay(\\s|$)"
+    line: "blacklist overlay"
+    create: true
+    mode: "0600"
+  when: not audit_only and not overlay_check.remediation_status
+
+# Unload the overlay module
+- name: "overlay_kernel_module_not_available | Remediation"
+  modprobe:
+    name: overlay
+    state: absent
+  when: not audit_only and not overlay_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ overlay_check.remediation_status }}"

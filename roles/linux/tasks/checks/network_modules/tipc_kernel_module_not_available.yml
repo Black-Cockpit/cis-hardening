@@ -1,0 +1,59 @@
+# tipc_kernel_module_not_available
+#
+# The Transparent Inter-Process Communication (TIPC) protocol is designed to provide
+# communication between cluster nodes.
+
+- name: "tipc_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv tipc && echo loaded || echo not_loaded
+  changed_when: false
+  register: tipc_check_loaded_result
+# Check if module is disabled
+- name: "tipc_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install tipc /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: tipc_check_disabled_result
+# Check if module is blacklisted
+- name: "tipc_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist tipc" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: tipc_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    tipc_check:
+      remediation_status: "{{ true if (tipc_check_loaded_result.stdout == 'not_loaded' or (tipc_check_disabled_result.stdout == 'disabled' and tipc_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "tipc_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/tipc.conf"
+    regexp: "^(#)?install tipc(\\s|$)"
+    line: "install tipc /bin/true"
+    create: true
+    mode: "0600"
+  when: not audit_only and not tipc_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "tipc_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist tipc(\\s|$)"
+    line: "blacklist tipc"
+    create: true
+    mode: "0600"
+  when: not audit_only and not tipc_check.remediation_status
+
+# Disable tipc filesystems
+- name: Disabling tipc filesystems
+  modprobe:
+    name: tipc
+    state: absent
+  when: not audit_only and not tipc_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tipc_check.remediation_status }}"

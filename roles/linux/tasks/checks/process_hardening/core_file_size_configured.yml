@@ -1,0 +1,47 @@
+# core_file_size_configured
+#
+# A core dump is the memory of an executable program. Setting a hard limit of 0
+# for core dumps for all users prevents core dumps from being created and
+# potentially leaking confidential process memory.
+
+- name: "core_file_size_configured | Audit"
+  shell:
+    cmd: |
+      compliant_line=$(grep -Psih -- '^\h*\*\h+hard\h+core\h+0\b' /etc/security/limits.conf /etc/security/limits.d/* 2>/dev/null | wc -l)
+      violating_line=$(grep -Psih -- '^\h*\*\h+hard\h+core\h+[1-9]' /etc/security/limits.conf /etc/security/limits.d/* 2>/dev/null | wc -l)
+      [ "$compliant_line" -gt 0 ] && [ "$violating_line" -eq 0 ] && echo configured || echo not_configured
+  changed_when: false
+  register: core_file_size_status
+
+# Extract audit result
+- set_fact:
+    core_file_size_check:
+      remediation_status: "{{ true if core_file_size_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Comment out any hard core entries with a value greater than 0
+- name: "core_file_size_configured | Remediation"
+  shell:
+    cmd: |
+      sed -ri 's/^(\s*\*\s+hard\s+core\s+[1-9].*)$/# \1/' /etc/security/limits.conf
+      for limits_file in /etc/security/limits.d/*; do
+        [ -f "$limits_file" ] && sed -ri 's/^(\s*\*\s+hard\s+core\s+[1-9].*)$/# \1/' "$limits_file"
+      done
+      exit 0
+  when: not audit_only and not core_file_size_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "core_file_size_configured | Remediation"
+  lineinfile:
+    path: /etc/security/limits.d/60-core-limits.conf
+    regexp: '^\s*\*\s+hard\s+core\s+'
+    line: "* hard core 0"
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not core_file_size_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ core_file_size_check.remediation_status }}"

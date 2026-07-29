@@ -1,0 +1,36 @@
+# net_ipv6_conf_default_forwarding_configured
+#
+# The net.ipv6.conf.all.forwarding flag tells the system whether it can forward IPv6
+# on the default or newly added network interface.
+# Note: If IPv6 has been disabled, or this system is a router, this recommendation is
+# not applicable.
+
+- name: "net_ipv6_conf_default_forwarding_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv6.conf.default.forwarding 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv6[.]conf[.]default[.]forwarding\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "0" ] && [ "$persisted" = "0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv6_conf_default_forwarding_status
+  when: not is_ipv6_disabled
+
+# Extract audit result
+- set_fact:
+    net_ipv6_conf_default_forwarding_check:
+      remediation_status: "{{ true if (is_ipv6_disabled or (net_ipv6_conf_default_forwarding_status.stdout | default('')) == 'configured') else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv6_conf_default_forwarding_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.default.forwarding
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv6_conf_default_forwarding_check.remediation_status and not is_ipv6_disabled
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv6_conf_default_forwarding_check.remediation_status }}"

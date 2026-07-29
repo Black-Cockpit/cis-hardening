@@ -1,0 +1,64 @@
+# sshd_usepam_enabled
+#
+# The PermitUserEnvironment option allows users to present environment options to the
+# SSH daemon.
+
+- name: "sshd_usepam_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Get ssh use pam value
+          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i usepam | awk '{print $2}')
+
+          [[ "$audit_out" == "yes" ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_use_pam_status_check
+
+# sshd_usepam_enabled | Audit
+- name: "sshd_usepam_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          grep -Pis '^\h*UsePAM\h+"?no"?\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_use_pam_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_use_pam_config_check:
+      remediation_status: "{{ true if (ssh_use_pam_status_check.stdout == 'configured' and ssh_use_pam_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_usepam_enabled | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(UsePAM|#UsePAM)"
+    state: absent
+  when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+# sshd_usepam_enabled | Remediation
+- name: "sshd_usepam_enabled | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(UsePAM)"
+    line: 'UsePAM yes'
+    state: present
+  when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+# sshd_usepam_enabled | Remediation
+- name: "sshd_usepam_enabled | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_use_pam_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_use_pam_config_check.remediation_status }}"

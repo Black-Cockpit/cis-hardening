@@ -1,0 +1,99 @@
+# web_server_services_not_use
+#
+# Web servers provide the ability to host web site content.
+
+- name: "web_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q httpd && echo installed || echo not_installed
+  changed_when: false
+  register: httpd_status_check
+
+# web_server_services_not_use | Audit
+- name: "web_server_services_not_use | Audit"
+  systemd:
+    name: httpd
+  ignore_errors: yes
+  changed_when: false
+  register: httpd_service_status_check
+  when: httpd_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if (httpd_status_check.stdout == 'not_installed' or (httpd_service_status_check.status.ActiveState == 'inactive' and (httpd_service_status_check.status.UnitFileState is not defined or httpd_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+
+# web_server_services_not_use | Audit
+- name: "web_server_services_not_use | Audit"
+  systemd:
+    name: httpd.socket
+  ignore_errors: yes
+  changed_when: false
+  register: httpd_socket_status_check
+  when: httpd_status_check.stdout == 'installed'
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (httpd_socket_status_check.status.ActiveState == 'inactive' and (httpd_socket_status_check.status.UnitFileState is not defined or httpd_socket_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: httpd_status_check.stdout == 'installed'
+
+# web_server_services_not_use | Audit
+- name: "web_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q nginx && echo installed || echo not_installed
+  changed_when: false
+  register: nginx_status_check
+
+# web_server_services_not_use | Audit
+- name: "web_server_services_not_use | Audit"
+  systemd:
+    name: nginx
+  ignore_errors: yes
+  changed_when: false
+  register: nginx_service_status_check
+  when: nginx_status_check.stdout == 'installed'
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if ((remediation_status or nginx_status_check.stdout == 'not_installed') and (nginx_service_status_check.status.ActiveState == 'inactive' and (nginx_service_status_check.status.UnitFileState is not defined or nginx_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: nginx_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    web_server_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "web_server_services_not_use | Remediation"
+  systemd:
+    name: httpd
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: httpd_status_check.stdout == 'installed' and not audit_only and not web_server_check.remediation_status
+
+# web_server_services_not_use | Remediation
+- name: "web_server_services_not_use | Remediation"
+  systemd:
+    name: httpd.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: httpd_status_check.stdout == 'installed' and not audit_only and not web_server_check.remediation_status
+
+# web_server_services_not_use | Remediation
+- name: "web_server_services_not_use | Remediation"
+  systemd:
+    name: nginx
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: nginx_status_check.stdout == 'installed' and not audit_only and not web_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ web_server_check.remediation_status }}"

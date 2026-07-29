@@ -1,0 +1,27 @@
+# nosuid_option_set_home_partition
+#
+# The nosuid mount option specifies that the filesystem cannot contain setuid files.
+
+- name: "nosuid_option_set_home_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/home\s' | grep -q nosuid && echo compliant || echo not_compliant
+  changed_when: false
+  register: home_nosuid_status
+
+# Extract audit result
+- set_fact:
+    home_nosuid:
+      remediation_status: "{{ true if home_nosuid_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /home partition with nosuid option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "nosuid_option_set_home_partition | Remediation"
+  debug:
+    msg: "Consider to mount /home partition with nosuid option by modifing /etc/fstab"
+  when: not audit_only and not home_nosuid.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ home_nosuid.remediation_status }}"

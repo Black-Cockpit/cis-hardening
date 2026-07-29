@@ -1,0 +1,97 @@
+# audit_configuration_files_owned_root
+#
+# Audit configuration files control auditd and what events are audited.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Configure auditd file access
+  block:
+  # Pre Audit | Get audit log directory
+  - name: Pre Audit | Get audit log directory
+    shell:
+      cmd: dirname $( awk -F"=" '/^\s*log_file\s*=\s*/ {print $2}' /etc/audit/auditd.conf)
+    changed_when: false
+    register: audit_log_dir
+
+  # Pre Audit | List audit log files
+  - name: Pre Audit | List audit log files
+    find:
+      paths:
+        - "{{ audit_log_dir.stdout }}"
+      file_type: file
+    changed_when: false
+    register: audit_log_files_list
+
+  # Pre Audit | stat audit log files
+  - name: Pre Audit | stat audit log files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_log_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_log_files_status
+
+  # Pre Audit | List audit configuration files
+  - name: Pre Audit | List audit configuration files
+    find:
+      paths:
+        - /etc/audit/
+        - /etc/audit/rules.d/
+        - /etc/audit/plugins.d/
+      patterns:
+        - "*.conf"
+        - "*.rules"
+      file_type: file
+    changed_when: false
+    register: audit_conf_files_list
+
+  # Pre Audit | stat audit configuration files
+  - name: Pre Audit | stat audit configuration files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_conf_files_status
+
+  # Pre Audit | stat audit tools files
+  - name: Pre Audit | stat audit tools files
+    stat:
+      path: "{{ item }}"
+    changed_when: false
+    loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+    register: audit_tools_status
+
+# Update remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# audit_configuration_files_owned_root | Audit
+- name: "audit_configuration_files_owned_root | Audit"
+  set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stat.pw_name == 'root')) }}"
+  loop: "{{ audit_conf_files_status.results | default([]) | list }}"
+  no_log: yes
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_conf_files_owner_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_configuration_files_owned_root | Remediation"
+  file:
+    path: "{{ item.path }}"
+    owner: root
+  loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+  loop_control:
+    label: "{{ item.path | default() }}"
+  when: not audit_only and not audit_conf_files_owner_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_conf_files_owner_check.remediation_status }}"

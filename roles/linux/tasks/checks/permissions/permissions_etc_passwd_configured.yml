@@ -1,0 +1,40 @@
+# permissions_etc_passwd_configured
+#
+# The /etc/passwd file contains user account information that is used by many system
+# utilities and therefore must be readable for these utilities to operate.
+
+- name: "permissions_etc_passwd_configured | Audit"
+  stat:
+    path: /etc/passwd
+  changed_when: false
+  register: passwd_file_status
+
+# permissions_etc_passwd_configured | Audit
+- name: "permissions_etc_passwd_configured | Audit"
+  shell:
+    cmd: |
+      [ $(({{ passwd_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: passwd_permission_status
+  vars:
+    expected_file_mask: "0133"
+
+# Extract audit result
+- set_fact:
+    passwd_permission_check:
+      remediation_status: "{{ true if ( passwd_file_status.stat.pw_name == 'root' and passwd_file_status.stat.gr_name == 'root' and passwd_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_passwd_configured | Remediation"
+  file:
+    path: /etc/passwd
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not passwd_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ passwd_permission_check.remediation_status }}"

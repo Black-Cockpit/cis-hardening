@@ -1,0 +1,59 @@
+# firewire_core_kernel_module_not_available
+#
+# The IEEE 1394 (FireWire) is a serial bus standard for high-speed real-time
+# communication.
+
+- name: "firewire_core_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv firewire-core && echo loaded || echo not_loaded
+  changed_when: false
+  register: firewire_core_check_loaded_result
+# Check if module is disabled
+- name: "firewire_core_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install firewire-core /bin/(true|false)" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: firewire_core_check_disabled_result
+# Check if module is blacklisted
+- name: "firewire_core_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist firewire-core" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: firewire_core_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    firewire_core_check:
+      remediation_status: "{{ true if (firewire_core_check_loaded_result.stdout == 'not_loaded' or (firewire_core_check_disabled_result.stdout == 'disabled' and firewire_core_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "firewire_core_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/firewire-core.conf"
+    regexp: "^(#)?install firewire-core(\\s|$)"
+    line: "install firewire-core /bin/false"
+    create: true
+    mode: "0600"
+  when: not audit_only and not firewire_core_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "firewire_core_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist firewire-core(\\s|$)"
+    line: "blacklist firewire-core"
+    create: true
+    mode: "0600"
+  when: not audit_only and not firewire_core_check.remediation_status
+
+# Unload the firewire-core module
+- name: "firewire_core_kernel_module_not_available | Remediation"
+  modprobe:
+    name: firewire-core
+    state: absent
+  when: not audit_only and not firewire_core_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ firewire_core_check.remediation_status }}"

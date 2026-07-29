@@ -1,0 +1,75 @@
+# root_user_umask_configured
+#
+# The user file-creation mode mask ( umask ) is used to determine the file permission for
+# newly created directories and files. In Linux, the default permissions for any newly
+# created directory is 0777 ( rwxrwxrwx ), and for any newly created file it is 0666 ( rw-rw-
+# rw- ). The umask modifies the default Linux permissions by restricting (masking) these
+# permissions. The umask is not simply subtracted, but is processed bitwise. Bits set in the
+# umask are cleared in the resulting file mode.
+#
+# umask can be set with either Octal or Symbolic values:
+# - Octal (Numeric) Value - Represented by either three or four digits. ie umask 0027
+#   or umask 027 . If a four digit umask is used, the first digit is ignored. The remaining
+#   three digits effect the resulting permissions for user, group, and world/other
+#   respectively.
+#
+# - Symbolic Value - Represented by a comma separated list for User u , group g ,
+#   and world/other o . The permissions listed are not masked by umask . ie a umask
+#   set by umask u=rwx,g=rx,o= is the Symbolic equivalent of the Octal umask 027 .
+#   This umask would set a newly created directory with file mode drwxr-x--- and a
+#   newly created file with file mode rw-r----- .
+#
+# root user Shell Configuration Files:
+# - /root/.bash_profile : Is executed to configure the root users' shell before the
+#                         initial command prompt. Is only read by login shells.
+#
+# - /root/.bashrc!      : Is executed for interactive shells. only read by a shell that's
+#                         both interactive and non-login
+#
+# umask is set by order of precedence. If umask is set in multiple locations, this order of
+# precedence will determine the system's default umask.
+# Order of precedence:
+#   1. /root/.bash_profile
+#   2. /root/.bashrc
+#   3. The system default umask
+
+- name: "root_user_umask_configured | Audit"
+  shell:
+    cmd: |
+      grep -Psiq -- '^\h*umask\h+(([0-7][0-7][01][0-7]\b|[0-7][0-7][0-7][0-6]\b)|([0-7][01][0-7]\b|[0-7][0-7][0-6]\b)|(u=[rwx]{1,3},)?(((g=[rx]?[rx]?w[rx]?[rx]?\b)(,o=[rwx]{1,3})?)|((g=[wrx]{1,3},)?o=[wrx]{1,3}\b)))' /root/.bash_profile /root/.bashrc &&
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: root_umask_status_check
+
+# Extract audit result
+- set_fact:
+    root_umask_check:
+      remediation_status: "{{ true if root_umask_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "root_user_umask_configured | Remediation"
+  replace:
+    path: "{{ item }}"
+    regexp: '^(umask)[\s]{1,}[\d]{1,}.+'
+    replace: ''
+  loop:
+  - "/root/.bash_profile"
+  - "/root/.bashrc"
+  when: not audit_only and not root_umask_check.remediation_status
+
+ # root_user_umask_configured | Remediation
+- name: "root_user_umask_configured | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^(umask)[\s]{1,}0027'
+    line: 'umask 0027'
+    state: present
+  loop:
+  - "/root/.bash_profile"
+  - "/root/.bashrc"
+  when: not audit_only and not root_umask_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_umask_check.remediation_status }}"

@@ -1,0 +1,41 @@
+# xinetd_services_not_use
+#
+# The X Window System provides a Graphical User Interface (GUI) where users can have
+# multiple windows in which to run programs and various add on. The X Windows system
+# is typically used on workstations where users login, but not on servers where users
+# typically do not login.
+
+- name: "xinetd_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q xinetd && echo installed || echo not_installed
+  changed_when: false
+  register: xinetd_server_status_check
+
+# xinetd_services_not_use | Audit
+- name: "xinetd_services_not_use | Audit"
+  systemd:
+    name: xinetd
+  ignore_errors: yes
+  changed_when: false
+  register: xinetd_service_status_check
+  when: xinetd_server_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    xinetd_server_check:
+      remediation_status: "{{ true if (xinetd_server_status_check.stdout == 'not_installed' or (xinetd_service_status_check.status.ActiveState == 'inactive' and (xinetd_service_status_check.status.UnitFileState is not defined or xinetd_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "xinetd_services_not_use | Remediation"
+  systemd:
+    name: xinetd
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not xinetd_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ xinetd_server_check.remediation_status }}"

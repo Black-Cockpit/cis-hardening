@@ -1,0 +1,27 @@
+# nodev_option_set_dev_shm_partition
+#
+# The nodev mount option specifies that the filesystem cannot contain special devices.
+
+- name: "nodev_option_set_dev_shm_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/dev/shm\s' | grep -q nodev && echo compliant || echo not_compliant
+  changed_when: false
+  register: shm_nodev_status
+
+# Extract audit result
+- set_fact:
+    shm_nodev:
+      remediation_status: "{{ true if shm_nodev_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /dev/shm partition with nodev option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "nodev_option_set_dev_shm_partition | Remediation"
+  debug:
+    msg: "Consider to mount /dev/shm partition with nodev option by modifing /etc/fstab"
+  when: not audit_only and not shm_nodev.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ shm_nodev.remediation_status }}"

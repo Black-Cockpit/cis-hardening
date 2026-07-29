@@ -1,0 +1,47 @@
+# systemd_journal_remote_configured
+#
+# Journald (via systemd-journal-remote ) supports the ability to send log events it gathers
+# to a remote log host or to receive messages from remote hosts, thus enabling
+# centralized log management.
+
+- name: "systemd_journal_remote_configured | Audit"
+  shell:
+    cmd: |
+      grep -P "^ *URL=|^ *ServerKeyFile=|^ *ServerCertificateFile=|^ *TrustedCertificateFile=" /etc/systemd/journal-upload.conf || echo ''
+  changed_when: false
+  register: systemd_journal_remote_conf_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_conf_check:
+      name: "systemd_journal_remote_configured"
+      scored: true
+      automated: false
+  changed_when: false
+
+# Define remediation description
+- set_fact:
+    remediation_description:
+      remediation: 'Consider to add the appropriate configuration of systemd-journal-remote'
+  changed_when: false
+  when: systemd_journal_remote_conf_status_check.stdout == ''
+
+# Define remediation description
+- set_fact:
+    remediation_description:
+      remediation: "Consider to review systemd-journal-remote configuration bellow: \n{{ systemd_journal_remote_conf_status_check.stdout }}"
+  changed_when: false
+  when: systemd_journal_remote_conf_status_check.stdout != ''
+
+# Append remediation
+- set_fact:
+    systemd_journal_remote_conf_check: "{{ systemd_journal_remote_conf_check | combine(remediation_description) }}"
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

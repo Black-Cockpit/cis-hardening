@@ -1,0 +1,52 @@
+# pam_pwhistory_includes_use_authtok
+#
+# use_authtok: When password changing enforce the module to set the new password to
+# the one provided by a previously stacked password module
+
+- name: "pam_pwhistory_includes_use_authtok | Audit"
+  shell:
+    cmd: |
+      if  grep -Pq -- '^\h*password\h+([^#\n\r]+)\h+pam_pwhistory\.so\h+([^#\n\r]+\h+)?\b' /etc/pam.d/{password,system}-auth ; then
+          [ -f /etc/authselect/authselect.conf ] &&
+              grep -Pq -- '^\h*password\h+([^#\n\r]+)\h+pam_pwhistory\.so\h+([^#\n\r]+\h+)?use_authtok\b' /etc/pam.d/{password,system}-auth &&
+              echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: password_use_authtok_status_check
+
+# Extract audit result
+- set_fact:
+    password_use_authtok_check:
+      remediation_status: "{{ true if password_use_authtok_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_pwhistory_includes_use_authtok | Remediation"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          pam_file="$(head -1 /etc/authselect/authselect.conf)"
+          if grep -Pq -- '^custom\/' <<<"$pam_file"; then
+              pam_file_path="/etc/authselect/$pam_file"
+          else
+              pam_file_path="/usr/share/authselect/default/$pam_file"
+          fi
+
+          if grep -Pq -- '^\h*password\h+(requisite|required|sufficient)\h+pam_pwhistory\.so\h+([^#\n\r]+\h+)?use_authtok\b' "$pam_file_path"/{password,system}-auth; then
+
+              for authselect_file in "$pam_file_path"/password-auth "$pam_file_path"/system-auth; do
+                  if ! grep -Pq '^\h*password\h+([^#\n\r]+)\h+pam_pwhistory\.so\h+([^#\n\r]+\h+)?use_authtok\b' "$authselect_file"; then
+                      sed -ri 's/(^\s*password\s+(requisite|required|sufficient)\s+pam_pwhistory\.so\s+.*)$/&use_authtok/g' "$authselect_file"
+                  fi
+              done
+          fi
+
+          authselect apply-changes
+      fi
+  when: not audit_only and not password_use_authtok_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ password_use_authtok_check.remediation_status }}"

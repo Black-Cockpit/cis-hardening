@@ -27,6 +27,8 @@ build_ignore:
 - .env
 - .venv
 - .vagrant
+- tests/integration
+- build.venv
 - .pytest_cache
 - .tox
 - .cache

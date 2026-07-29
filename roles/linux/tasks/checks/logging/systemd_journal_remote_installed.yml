@@ -1,0 +1,28 @@
+# systemd_journal_remote_installed
+#
+# Journald (via systemd-journal-remote ) supports the ability to send log events it gathers
+# to a remote log host or to receive messages from remote hosts, thus enabling
+# centralized log management.
+
+- name: "systemd_journal_remote_installed | Audit"
+  shell:
+    cmd: rpm -q systemd-journal-remote | grep -Eq 'systemd[\-]journal[\-]remote[\-][0-9]' && echo 'installed' || echo 'not_installed'
+  changed_when: false
+  register: systemd_journal_remote_status_check
+
+# Extract audit result
+- set_fact:
+    systemd_journal_remote_check:
+      remediation_status: "{{ true if systemd_journal_remote_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "systemd_journal_remote_installed | Remediation"
+  package:
+    name: systemd-journal-remote
+    state: present
+  when: not audit_only and not systemd_journal_remote_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ systemd_journal_remote_check.remediation_status }}"

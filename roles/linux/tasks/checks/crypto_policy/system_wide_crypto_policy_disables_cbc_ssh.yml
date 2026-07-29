@@ -1,0 +1,81 @@
+# system_wide_crypto_policy_disables_cbc_ssh
+#
+# SHA-1 (Secure Hash Algorithm) is a cryptographic hash function that produces a 160 bit
+# hash value.
+
+- name: "system_wide_crypto_policy_disables_cbc_ssh | Audit"
+  shell:
+    cmd: |
+      grep -Piq -- '^\h*cipher\h*=\h*([^#\n\r]+)?-CBC\b' /etc/crypto-policies/state/CURRENT.pol \
+      && echo cbc_enabled || echo cbc_disabled
+  changed_when: false
+  register: cbc_status_check
+
+# system_wide_crypto_policy_disables_cbc_ssh | Audit
+- name: "system_wide_crypto_policy_disables_cbc_ssh | Audit"
+  shell:
+    cmd: |
+      grep -Piq -- '^\h*cipher@(lib|open)ssh(-server|-client)?\h*=\h*' /etc/crypto-policies/state/CURRENT.pol \
+      && echo ssh_cbc_enabled || echo ssh_cbc_disabled
+  changed_when: false
+  register: ssh_cbc_status_check
+  when: cbc_status_check.stdout == 'cbc_enabled'
+
+
+# system_wide_crypto_policy_disables_cbc_ssh | Audit
+- name: "system_wide_crypto_policy_disables_cbc_ssh | Audit"
+  shell:
+    cmd: |
+      grep -Piq -- '^\h*cipher@(lib|open)ssh(-server|-client)?\h*=\h*([^#\n\r]+)?-CBC\b' /etc/crypto-policies/state/CURRENT.pol \
+      && echo ssh_cbc_disabled || echo ssh_cbc_enabled
+  changed_when: false
+  register: ssh_cbc_policy_status_check
+  when: cbc_status_check.stdout == 'ssh_cbc_enabled'
+
+# Define compliace status
+- set_fact:
+    cbc_rule_remediation_status: "{{ true if (cbc_status_check.stdout == 'cbc_disabled') else false }}"
+  changed_when: false
+
+# Append to compliace status
+- set_fact:
+    cbc_rule_remediation_status: "{{ true if (cbc_rule_remediation_status and ssh_cbc_status_check.stdout == 'ssh_cbc_disabled') else false }}"
+  changed_when: false
+  when: (ssh_cbc_status_check is defined) and (ssh_cbc_status_check.stdout is defined)
+
+# Append to compliace status
+- set_fact:
+    cbc_rule_remediation_status: "{{ true if (cbc_rule_remediation_status and ssh_cbc_policy_status_check.stdout == 'ssh_cbc_disabled') else false }}"
+  changed_when: false
+  when: (ssh_cbc_policy_status_check is defined) and (ssh_cbc_policy_status_check.stdout is defined)
+
+# Extract audit result
+- set_fact:
+    cbc_check:
+      remediation_status: "{{ true if cbc_rule_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "system_wide_crypto_policy_disables_cbc_ssh | Remediation"
+  blockinfile:
+    path: /etc/crypto-policies/policies/modules/NO-SSHCBC.pmod
+    mode: "0644"
+    owner: root
+    group: root
+    block: |
+      # This is a subpolicy to disable all CBC mode ciphers
+      # for the SSH protocol (libssh and OpenSSH)
+      cipher = -*-CBC
+    state: present
+    create: true
+  when: not audit_only and not cbc_check.remediation_status
+
+# system_wide_crypto_policy_disables_cbc_ssh | Remediation
+- name: "system_wide_crypto_policy_disables_cbc_ssh | Remediation"
+  shell:
+    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC"
+  when: not audit_only and not cbc_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cbc_check.remediation_status }}"

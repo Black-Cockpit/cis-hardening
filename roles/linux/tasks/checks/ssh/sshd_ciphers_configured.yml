@@ -1,0 +1,57 @@
+# sshd_ciphers_configured
+#
+# This variable limits the ciphers that SSH can use during communication.
+
+- name: "sshd_ciphers_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Extract ssh ciphers
+          sshd_ciphers=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep ciphers)
+
+          # check if ssh has a weak cipher in use
+          if grep -q "3des-cbc" <<<"$sshd_ciphers" || grep "aes128-cbc" <<<"$sshd_ciphers" || \
+             grep "aes192-cbc" <<<"$sshd_ciphers" || grep "aes256-cbc" <<<"$sshd_ciphers" || grep "rijndael-cbc@lysator.liu.se" <<<"$sshd_ciphers"; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_ciphers_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_ciphers_check:
+      remediation_status: "{{ true if ssh_ciphers_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_ciphers_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(Ciphers|#Ciphers)"
+    state: absent
+  when: not audit_only and not ssh_ciphers_check.remediation_status
+
+# sshd_ciphers_configured | Remediation
+- name: "sshd_ciphers_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(Ciphers)"
+    line: 'Ciphers -3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,rijndael-cbc@lysator.liu.se'
+    state: present
+  when: not audit_only and not ssh_ciphers_check.remediation_status
+
+# sshd_ciphers_configured | Remediation
+- name: "sshd_ciphers_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_ciphers_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_ciphers_check.remediation_status }}"

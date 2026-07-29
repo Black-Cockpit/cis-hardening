@@ -1,0 +1,114 @@
+# sudo_authentication_timeout_configured_correctly
+#
+# sudo caches used credentials for a default of 5 minutes. This is for ease of use when
+# there are multiple administrative tasks to perform. The timeout can be modified to suit
+# local security policies.
+
+- name: "sudo_authentication_timeout_configured_correctly | Audit"
+  shell:
+    cmd: |
+      # Check if sudo authentication timestamp timeout si greater than 15 minute
+      if [[ "$(sudo -V | grep "Authentication timestamp timeout:" | awk '{print $4}' | awk -F '.' '{print $1}')" -gt 15 ]]; then
+          echo 'not_configured'
+      else
+          echo "configured"
+      fi
+  changed_when: false
+  register: sudo_authentication_timeout_status_check
+
+# sudo_authentication_timeout_configured_correctly | Audit
+- name: "sudo_authentication_timeout_configured_correctly | Audit"
+  shell:
+    cmd: |
+      # Init audit result
+      sudoers_file_audit='configured'
+
+      # Check if the sudoers file has an authentication timestamp timeout si greater than 15 minute
+      for i in $(grep -Po "timestamp_timeout=\K[0-9]*" {{ item }} | awk -F '.' '{print $1}' || echo '5'); do
+          if [[ "$i" -gt 15 ]]; then
+              sudoers_file_audit='not_configured'
+              break
+          fi
+      done
+
+      echo "$sudoers_file_audit"
+  changed_when: false
+  loop: "{{ sudoers_files }}"
+  failed_when: sudoers_files is not defined
+  register: sudoers_files_authentication_timeout_status_status_check
+
+# Define remediation status
+- set_fact:
+    sudo_authentication_timeout_status: "{{ true if sudo_authentication_timeout_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Check if pseudo terminal is configured in all the listed sudoers files
+- set_fact:
+    sudo_authentication_timeout_status: "{{ true if (sudo_authentication_timeout_status and item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ sudoers_files_authentication_timeout_status_status_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    sudo_authentication_timeout_check:
+      remediation_status: "{{ true if sudo_authentication_timeout_status else false }}"
+  # Extract audit result
+  changed_when: false
+
+# Appending audit result
+- name: "sudo_authentication_timeout_configured_correctly | Remediation"
+  # sudo_authentication_timeout_configured_correctly | Remediation
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults[\s]{1,}.+timestamp_timeout'
+    state: absent
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_authentication_timeout_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "sudo_authentication_timeout_configured_correctly | Remediation"
+  # sudo_authentication_timeout_configured_correctly | Remediation
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults[\s]{1,}env_reset'
+    state: absent
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_authentication_timeout_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "sudo_authentication_timeout_configured_correctly | Remediation"
+  # sudo_authentication_timeout_configured_correctly | Remediation
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults timestamp_timeout=15'
+    line: "Defaults timestamp_timeout=15"
+    state: present
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_authentication_timeout_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "sudo_authentication_timeout_configured_correctly | Remediation"
+  # sudo_authentication_timeout_configured_correctly | Remediation
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults env_reset'
+    line: "Defaults env_reset"
+    state: present
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_authentication_timeout_check.remediation_status
+
+# sudo_authentication_timeout_configured_correctly | Remediation
+- name: "sudo_authentication_timeout_configured_correctly | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^Defaults env_reset, timestamp_timeout=15'
+    line: "Defaults env_reset, timestamp_timeout=15"
+    state: present
+  loop: "{{ sudoers_files }}"
+  when: not audit_only and not sudo_authentication_timeout_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sudo_authentication_timeout_check.remediation_status }}"

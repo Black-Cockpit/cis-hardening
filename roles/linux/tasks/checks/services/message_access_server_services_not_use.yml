@@ -1,0 +1,100 @@
+# message_access_server_services_not_use
+#
+# dovecot and cyrus-imapd are open source IMAP and POP3 server packages for Linux
+# based systems.
+
+- name: "message_access_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q dovecot && echo installed || echo not_installed
+  changed_when: false
+  register: dovecot_status_check
+
+# message_access_server_services_not_use | Audit
+- name: "message_access_server_services_not_use | Audit"
+  systemd:
+    name: dovecot
+  ignore_errors: yes
+  changed_when: false
+  register: dovecot_service_status_check
+  when: dovecot_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if (dovecot_status_check.stdout == 'not_installed' or (dovecot_service_status_check.status.ActiveState == 'inactive' and (dovecot_service_status_check.status.UnitFileState is not defined or dovecot_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+
+# message_access_server_services_not_use | Audit
+- name: "message_access_server_services_not_use | Audit"
+  systemd:
+    name: dovecot.socket
+  ignore_errors: yes
+  changed_when: false
+  register: dovecot_socket_status_check
+  when: dovecot_status_check.stdout == 'installed'
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (dovecot_socket_status_check.status.ActiveState == 'inactive' and (dovecot_socket_status_check.status.UnitFileState is not defined or dovecot_socket_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: dovecot_status_check.stdout == 'installed'
+
+# message_access_server_services_not_use | Audit
+- name: "message_access_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "cyrus-imapd" && echo installed || echo not_installed
+  changed_when: false
+  register: cyrus_imapd_status_check
+
+# message_access_server_services_not_use | Audit
+- name: "message_access_server_services_not_use | Audit"
+  systemd:
+    name: cyrus-imapd
+  ignore_errors: yes
+  changed_when: false
+  register: cyrus_imapd_service_status_check
+  when: cyrus_imapd_status_check.stdout == 'installed'
+
+# Update remediation status
+- set_fact:
+    remediation_status: "{{ true if ((remediation_status or cyrus_imapd_status_check.stdout == 'not_installed') and (cyrus_imapd_service_status_check.status.ActiveState == 'inactive' and (cyrus_imapd_service_status_check.status.UnitFileState is not defined or cyrus_imapd_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: cyrus_imapd_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    message_access_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "message_access_server_services_not_use | Remediation"
+  systemd:
+    name: dovecot
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: dovecot_status_check.stdout == 'installed' and not audit_only and not message_access_check.remediation_status
+
+# message_access_server_services_not_use | Remediation
+- name: "message_access_server_services_not_use | Remediation"
+  systemd:
+    name: dovecot.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: dovecot_status_check.stdout == 'installed' and not audit_only and not message_access_check.remediation_status
+
+# message_access_server_services_not_use | Remediation
+- name: "message_access_server_services_not_use | Remediation"
+  systemd:
+    name: cyrus-imapd
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: cyrus_imapd_status_check.stdout == 'installed' and not audit_only and not message_access_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ message_access_check.remediation_status }}"

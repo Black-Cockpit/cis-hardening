@@ -1,0 +1,27 @@
+# mcs_translation_service_mcstrans_not_installed
+#
+# The mcstransd daemon provides category label information to client processes
+# requesting information. The label translations are defined in /etc/selinux/targeted/setrans.conf
+
+- name: "mcs_translation_service_mcstrans_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -q mcstrans && echo installed || echo not_installed
+  changed_when: false
+  register: mcstrans_status_check
+
+# Extract audit result
+- set_fact:
+    mcstrans_check:
+      remediation_status: "{{ true if mcstrans_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "mcs_translation_service_mcstrans_not_installed | Remediation"
+  package:
+    name: mcstrans
+    state: absent
+  when: not audit_only and not mcstrans_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ mcstrans_check.remediation_status }}"

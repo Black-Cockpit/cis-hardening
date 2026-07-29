@@ -1,0 +1,32 @@
+# audit_system_file_permissions
+#
+# The RPM Package Manager has a number of useful options. One of these, the -V for RPM
+# option, can be used to verify that system packages are correctly installed. The -V option
+# can be used to verify a particular package or to verify all system packages. If no output
+# is returned, the package is installed correctly.
+
+- set_fact:
+    package_management_check:
+      name: "audit_system_file_permissions"
+      scored: false
+      automated: false
+  changed_when: false
+
+# Define remediation description
+- set_fact:
+    remediation_description:
+      remediation: "Consider to audit file system permssions"
+  changed_when: false
+
+# Append remediation description
+- set_fact:
+    package_management_check: "{{ package_management_check | combine(remediation_description) }}"
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

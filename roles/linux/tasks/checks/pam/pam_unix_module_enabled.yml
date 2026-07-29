@@ -1,0 +1,42 @@
+# pam_unix_module_enabled
+#
+# The pam_unix.so module is the standard Unix authentication module. It uses standard
+# calls from the system's libraries to retrieve and set account information as well as
+# authentication. Usually this is obtained from the /etc/passwd and the /etc/shadow file
+# as well if shadow is enabled.
+
+- name: "pam_unix_module_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          # Check if pam_unix module is configured
+          grep -Pq -- '\bpam_unix\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+      else
+          echo 'not_configured'
+      fi
+  changed_when: false
+  register: authselect_pam_unix_module_status_check
+
+# Extract audit result
+- set_fact:
+    authselect_pam_unix_module_check:
+      remediation_status: "{{ true if authselect_pam_unix_module_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Set remediation description
+- set_fact:
+    remediation_description:
+      remediation: "Consider to create a custom authselect profile and ensure that pam_unix is enabled"
+  changed_when: false
+
+# Append remediation description to audit result
+- set_fact:
+    authselect_pam_unix_module_check: "{{ authselect_pam_unix_module_check | combine(remediation_description) }}"
+  changed_when: false
+  when: not audit_only and not authselect_pam_unix_module_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_pam_unix_module_check.remediation_status }}"

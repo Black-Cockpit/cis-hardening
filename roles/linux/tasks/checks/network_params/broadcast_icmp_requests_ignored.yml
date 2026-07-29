@@ -1,0 +1,102 @@
+# broadcast_icmp_requests_ignored
+#
+# Setting net.ipv4.icmp_echo_ignore_broadcasts to 1 will cause the system to ignore all
+# ICMP echo and timestamp requests to broadcast and multicast addresses.
+
+- name: "broadcast_icmp_requests_ignored | Audit"
+  shell:
+    cmd: |
+      ipv4="$(sysctl "net.ipv4.icmp_echo_ignore_broadcasts" | awk -F= '{print $2}')";
+      echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: icmp_broadcast_request_current_status_conf_check
+
+# Define remediation status
+- set_fact:
+    icmp_broadcast_request_remediation_status: "{{ true if icmp_broadcast_request_current_status_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Check net.ipv4.icmp_echo_ignore_broadcasts is disabled on sysctl.conf file
+- name: "broadcast_icmp_requests_ignored | Audit"
+  shell:
+    cmd: 'grep -Eq "^\s{0,}net.ipv4.icmp_echo_ignore_broadcasts\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+  changed_when: false
+  register: icmp_broadcast_request_sysctl_conf_check
+
+# Update remediation status
+- set_fact:
+    icmp_broadcast_request_remediation_status: "{{ true if (icmp_broadcast_request_remediation_status and icmp_broadcast_request_sysctl_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: icmp_broadcast_request_remediation_status
+
+# Check if one of sysctl configuration files has net.ipv4.icmp_echo_ignore_broadcasts configuration
+- name: "broadcast_icmp_requests_ignored | Audit"
+  shell:
+    cmd: |
+      'item_exists=$(grep -E "^\s{0,}net.ipv4.icmp_echo_ignore_broadcasts\s{0,}" {{ item }}';
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.icmp_echo_ignore_broadcasts\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: icmp_broadcast_request_conf_check
+  loop: "{{ sysctl_conf_files }}"
+
+# Update remediation status
+- set_fact:
+    icmp_broadcast_request_remediation_status: "{{ true if (icmp_broadcast_request_remediation_status or item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ icmp_broadcast_request_conf_check.results | list }}"
+  when: icmp_broadcast_request_remediation_status
+
+# Check if net.ipv4.icmp_echo_ignore_broadcasts is configured in one of the UFW sysctl configuration files
+- name: "broadcast_icmp_requests_ignored | Audit"
+  shell:
+    cmd: |
+      ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+      item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.icmp_echo_ignore_broadcasts\s{0,}" $(echo $ufw_conf))
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.icmp_echo_ignore_broadcasts\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: icmp_broadcast_request_ufw_sysctl_conf_files_check
+
+# Update remediation status
+- set_fact:
+    icmp_broadcast_request_remediation_status: "{{ true if (icmp_broadcast_request_remediation_status and icmp_broadcast_request_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: icmp_broadcast_request_remediation_status
+
+# Extract audit result
+- set_fact:
+    icmp_broadcast_request_check:
+      remediation_status: "{{ true if icmp_broadcast_request_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "broadcast_icmp_requests_ignored | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.icmp_echo_ignore_broadcasts
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not icmp_broadcast_request_check.remediation_status
+
+# broadcast_icmp_requests_ignored | Remediation
+- name: "broadcast_icmp_requests_ignored | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not icmp_broadcast_request_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ icmp_broadcast_request_check.remediation_status }}"

@@ -1,0 +1,57 @@
+# local_interactive_user_dot_files_access_configured
+#
+# Local interactive user dot files must not include .forward, .rhost or
+# .netrc files, must be mode 0644 or more restrictive (.bash_history 0600),
+# and must be owned by the user and the user's primary group.
+
+- name: "local_interactive_user_dot_files_access_configured | Audit"
+  shell:
+    cmd: |
+      valid_shells="^($(awk -F/ '$NF != "nologin" {print}' /etc/shells | sed -rn '/^\//{s,/,\\\\/,g;p}' | paste -s -d '|' - ))$"
+      awk -v pat="$valid_shells" -F: '$(NF) ~ pat { print $1 " " $(NF-1) }' /etc/passwd | while read -r user home; do
+        [ -d "$home" ] || continue
+        primary_group="$(id -gn "$user" 2>/dev/null)"
+        for dot_file in "$home"/.*; do
+          [ -f "$dot_file" ] || continue
+          base_name="$(basename "$dot_file")"
+          case "$base_name" in
+            .forward|.rhost|.rhosts|.netrc) echo "forbidden:$user:$dot_file"; continue ;;
+          esac
+          file_mode="$(stat -Lc '%a' "$dot_file")"
+          if [ "$base_name" = ".bash_history" ]; then
+            [ $(( 0$file_mode & 0177 )) -gt 0 ] && echo "mode:$user:$dot_file"
+          else
+            [ $(( 0$file_mode & 0133 )) -gt 0 ] && echo "mode:$user:$dot_file"
+          fi
+          [ "$(stat -Lc '%U' "$dot_file")" != "$user" ] && echo "owner:$user:$dot_file"
+          [ "$(stat -Lc '%G' "$dot_file")" != "$primary_group" ] && echo "group:$user:$dot_file"
+        done
+      done
+      exit 0
+  changed_when: false
+  register: user_dot_files_status
+
+# Extract audit result
+- set_fact:
+    user_dot_files_check:
+      remediation_status: "{{ true if user_dot_files_status.stdout == '' else false }}"
+  changed_when: false
+
+# Global modification of user dot files can cause unexpected outages: the
+# benchmark recommends handling findings through site policy, so they are
+# reported instead of changed
+- name: "local_interactive_user_dot_files_access_configured | Remediation"
+  debug:
+    msg: "Review the reported dot file findings and apply the action defined by site policy"
+  when: not audit_only and not user_dot_files_check.remediation_status
+  changed_when: false
+
+# Expose the findings to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Dot file findings requiring site policy review: ' ~ (user_dot_files_status.stdout_lines | join(', '))} }}"
+  changed_when: false
+  when: not user_dot_files_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ user_dot_files_check.remediation_status }}"

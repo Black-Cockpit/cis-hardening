@@ -1,6 +1,24 @@
 # tasks file for cis_hardening
 - include_tasks:
-    file: "rhel_platforms/main.yml"
+    file: "rhel_platforms/rhel_pre_audit.yml"
 
+# OS specific settings (rpm keys, packager identity)
+- include_vars:
+    file: "{{ ansible_distribution }}.yml"
+
+# Resolve and load the benchmark mapping for this host
+- include_tasks:
+    file: "select_benchmark.yml"
+
+# Run every rule of the selected benchmark that matches the requested levels
+- include_tasks:
+    file: "run_check.yml"
+  loop: "{{ benchmark_rules }}"
+  loop_control:
+    loop_var: benchmark_rule
+    label: "{{ benchmark_rule.number }} {{ benchmark_rule.title }}"
+  when: benchmark_rule.levels | intersect(levels) | length > 0
+
+# Print the collected audit report
 - debug:
     var: audit_result

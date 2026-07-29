@@ -1,0 +1,84 @@
+# crontab_restricted_authorized_users
+#
+# crontab is the program used to install, deinstall, or list the tables used to drive the cron
+# daemon. Each user can have their own crontab, and though these are files in
+# /var/spool/cron/crontabs , they are not intended to be edited directly.
+#
+# If the /etc/cron.allow file exists, then you must be listed (one user per line) therein in
+# order to be allowed to use this command. If the /etc/cron.allow file does not exist but
+# the /etc/cron.deny file does exist, then you must not be listed in the /etc/cron.deny
+# file in order to use this command.
+#
+# If neither of these files exists, then depending on site-dependent configuration
+# parameters, only the super user will be allowed to use this command, or all users will be
+# able to use this command.
+#
+# If both files exist then /etc/cron.allow takes precedence. Which means that
+# /etc/cron.deny is not considered and your user must be listed in /etc/cron.allow in
+# order to be able to use the crontab.
+#
+# Regardless of the existence of any of these files, the root administrative user is always
+# allowed to setup a crontab.
+#
+# The files /etc/cron.allow and /etc/cron.deny , if they exist, must be either world-
+# readable, or readable by group crontab . If they are not, then cron will deny access to all
+# users until the permissions are fixed.
+#
+# There is one file for each user's crontab under the /var/spool/cron/crontabs directory.
+# Users are not allowed to edit the files under that directory directly to ensure that only
+# users allowed by the system to run periodic tasks can add them, and only syntactically
+# correct crontabs will be written there. This is enforced by having the directory writable
+# only by the crontab group and configuring crontab command with the setgid bid set for
+# that specific group.
+
+- name: "crontab_restricted_authorized_users | Audit"
+  stat:
+    path: /etc/cron.allow
+  changed_when: false
+  register: cron_allow_stat
+
+# Audit /etc/cron.allow
+- set_fact:
+    cron_allow_check: "{{ true if (not cron_allow_stat.stat.exists or (cron_allow_stat.stat.mode == '0640' and cron_allow_stat.stat.pw_name == 'root' and cron_allow_stat.stat.gr_name == 'root')) else false}}"
+
+# crontab_restricted_authorized_users | Audit
+- name: "crontab_restricted_authorized_users | Audit"
+  stat:
+    path: /etc/cron.deny
+  changed_when: false
+  register: cron_deny_stat
+
+# Audit /etc/cron.deny
+- set_fact:
+    cron_deny_check: "{{ true if ((cron_allow_check and not cron_deny_stat.stat.exists) or (cron_deny_stat.stat.exists and cron_deny_stat.stat.mode == '0640' and cron_deny_stat.stat.pw_name == 'root' and cron_deny_stat.stat.gr_name == 'root')) else false}}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    cron_authorization_check:
+      remediation_status: "{{ true if (cron_allow_check and cron_deny_check) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "crontab_restricted_authorized_users | Remediation"
+  file:
+    path: /etc/cron.allow
+    owner: root
+    group: root
+    mode: "0640"
+    state: file
+  when: not audit_only and not cron_authorization_check.remediation_status and cron_allow_stat.stat.exists
+
+# crontab_restricted_authorized_users | Remediation
+- name: "crontab_restricted_authorized_users | Remediation"
+  file:
+    path: /etc/cron.deny
+    owner: root
+    group: root
+    mode: "0640"
+    state: file
+  when: not audit_only and not cron_authorization_check.remediation_status and not cron_allow_stat.stat.exists and not cron_deny_check
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cron_authorization_check.remediation_status }}"

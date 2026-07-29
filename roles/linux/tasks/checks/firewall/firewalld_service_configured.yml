@@ -1,0 +1,32 @@
+# firewalld_service_configured
+#
+# firewalld.service must be enabled and active for the host based firewall to
+# enforce its configured rules.
+
+- name: "firewalld_service_configured | Audit"
+  shell:
+    cmd: |
+      enabled_state="$(systemctl is-enabled firewalld.service 2>/dev/null)"
+      active_state="$(systemctl is-active firewalld.service 2>/dev/null)"
+      [ "$enabled_state" = "enabled" ] && [ "$active_state" = "active" ] && echo configured || echo not_configured
+  changed_when: false
+  register: firewalld_service_status
+
+# Extract audit result
+- set_fact:
+    firewalld_service_check:
+      remediation_status: "{{ true if firewalld_service_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required service state
+- name: "firewalld_service_configured | Remediation"
+  systemd:
+    name: firewalld.service
+    enabled: true
+    state: started
+    masked: false
+  when: not audit_only and not firewalld_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ firewalld_service_check.remediation_status }}"

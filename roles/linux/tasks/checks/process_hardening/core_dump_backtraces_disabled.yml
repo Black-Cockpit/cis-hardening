@@ -1,0 +1,63 @@
+# core_dump_backtraces_disabled
+#
+# A core dump is the memory of an executable program. It is generally used to determine
+# why a program aborted. It can also be used to glean confidential information from a core
+# file.
+
+- name: "core_dump_backtraces_disabled | Audit"
+  shell:
+    cmd: "[[ -f /usr/bin/systemd-analyze ]] &&  /usr/bin/systemd-analyze cat-config /etc/systemd/coredump.conf | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
+  changed_when: false
+  register: core_dump_conf_files_list
+
+# Check if one of core dump configuration files has ProcessSizeMax configuration
+- name: "core_dump_backtraces_disabled | Audit"
+  shell:
+    cmd: 'grep -Eq "^\s{0,}ProcessSizeMax\s{0,}=\s{0,}0" {{ item }} && echo exists || echo not_exists'
+  changed_when: false
+  register: process_size_max_conf_files_check
+  loop: "{{ core_dump_conf_files_list.stdout_lines | list }}"
+
+# Set ProcessSizeMax configuration compliance tracker
+- set_fact:
+    process_size_max_configured: false
+  changed_when: false
+
+# Check if ProcessSizeMax is configured in one of the core dump listed files
+- set_fact:
+    process_size_max_configured: "{{ true if (process_size_max_configured or item.stdout == 'exists') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ process_size_max_conf_files_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    process_size_max_configured_check: 
+      remediation_status: "{{ true if process_size_max_configured  else false }}" 
+  changed_when: false
+
+# Appending audit result
+- name: "core_dump_backtraces_disabled | Remediation"
+  replace:
+    name: "/etc/systemd/coredump.conf"
+    regexp: '^[#]{0,}(ProcessSizeMax=)[\s]{0,}[\d]{0,}.+'
+    replace: "ProcessSizeMax=0"
+  when: not audit_only and not process_size_max_configured_check.remediation_status
+
+# core_dump_backtraces_disabled | Remediation
+- name: "core_dump_backtraces_disabled | Remediation"
+  lineinfile:
+    path: "/etc/systemd/coredump.conf"
+    line: "ProcessSizeMax=0"
+    state: present
+    regexp: "^ProcessSizeMax=0"
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not process_size_max_configured_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ process_size_max_configured_check.remediation_status }}"

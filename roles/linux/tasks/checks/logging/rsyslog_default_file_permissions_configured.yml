@@ -1,0 +1,89 @@
+# rsyslog_default_file_permissions_configured
+#
+# RSyslog will create logfiles that do not already exist on the system. This setting controls
+# what permissions will be applied to these newly created files.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: "Pre Audit | Get rsyslog configuration"
+  block:
+  # Pre Audit | Stat /etc/rsyslog.d/
+  - name: "Pre Audit | Get rsyslog configuration"
+    stat:
+      path: "/etc/rsyslog.d/"
+    register: rsyslog_d_conf
+    changed_when: false
+
+  # Pre Audit | List rsyslog configuration files
+  - name: "Pre Audit | List rsyslog configuration files"
+    find:
+      paths:
+        - "/etc/rsyslog.d/"
+      patterns:
+        - "*.conf"
+    register: rsyslog_d_conf_files_list
+    changed_when: false
+    when: rsyslog_d_conf.stat.exists
+
+  # Define rsyslog configuration files list
+  - set_fact:
+      rsyslog_conf_files: "{{ rsyslog_conf_files | default([]) + [item.path]}}"
+    changed_when: false
+    loop: "{{ rsyslog_d_conf_files_list.files | default([]) }}"
+    loop_control:
+      label: "{{ item.path }}"
+    when: rsyslog_d_conf.stat.exists
+
+  # Append /etc/rsyslog.conf to rsyslog configuration files list
+  - set_fact:
+      rsyslog_conf_files: "{{ rsyslog_conf_files | default([]) + ['/etc/rsyslog.conf'] }}"
+    changed_when: false
+
+# Audit | Collect the current configuration state
+- name: "rsyslog_default_file_permissions_configured | Audit"
+  shell:
+    cmd: |
+      grep -Psq '^\h*\$FileCreateMode\h+0[0,2,4,6][0,2,4]0\b' /etc/rsyslog.conf /etc/rsyslog.d/*.conf && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: rsyslog_file_permissions_status_check
+
+# Extract audit result
+- set_fact:
+    rsyslog_file_permissions_check:
+      remediation_status: "{{ true if rsyslog_file_permissions_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "rsyslog_default_file_permissions_configured | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^[#]{0,}.*(FileCreateMode).*'
+    state: absent
+  loop: "{{ rsyslog_conf_files }}"
+  when: not audit_only and not rsyslog_file_permissions_check.remediation_status
+
+# rsyslog_default_file_permissions_configured | Remediation
+- name: "rsyslog_default_file_permissions_configured | Remediation"
+  file:
+    path: "/etc/rsyslog.d/"
+    state: directory
+  when: not audit_only and not rsyslog_d_conf.stat.exists and not rsyslog_file_permissions_check.remediation_status
+
+# rsyslog_default_file_permissions_configured | Remediation
+- name: "rsyslog_default_file_permissions_configured | Remediation"
+  copy:
+    dest: "/etc/rsyslog.d/cis-file-create-mode-rsyslog.conf"
+    content: '$FileCreateMode 0640'
+    mode: "0644"
+    owner: "root"
+  when: not audit_only and not rsyslog_file_permissions_check.remediation_status
+
+# rsyslog_default_file_permissions_configured | Remediation
+- name: "rsyslog_default_file_permissions_configured | Remediation"
+  service:
+    name: rsyslog
+    state: restarted
+  when: not audit_only and not rsyslog_file_permissions_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ rsyslog_file_permissions_check.remediation_status }}"

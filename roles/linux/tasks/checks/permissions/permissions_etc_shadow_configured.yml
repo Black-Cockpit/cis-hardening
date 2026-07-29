@@ -1,0 +1,41 @@
+# permissions_etc_shadow_configured
+#
+# The /etc/shadow file is used to store the information about user accounts that is critical
+# to the security of those accounts, such as the hashed password and other security
+# information.
+
+- name: "permissions_etc_shadow_configured | Audit"
+  stat:
+    path: "/etc/shadow"
+  changed_when: false
+  register: shadow_file_status
+
+# permissions_etc_shadow_configured | Audit
+- name: "permissions_etc_shadow_configured | Audit"
+  shell:
+    cmd: |
+      [ $(({{ shadow_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: shadow_permission_status
+  vars:
+    expected_file_mask: "0777"
+
+# Extract audit result
+- set_fact:
+    shadow_permission_check:
+      remediation_status: "{{ true if ( shadow_file_status.stat.pw_name == 'root' and shadow_file_status.stat.gr_name == 'root' and shadow_permission_status.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_shadow_configured | Remediation"
+  file:
+    path: "/etc/shadow"
+    mode: "0000"
+    owner: root
+    group: root
+  when: not audit_only and not shadow_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ shadow_permission_check.remediation_status }}"

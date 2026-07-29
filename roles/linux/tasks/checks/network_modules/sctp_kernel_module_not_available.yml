@@ -1,0 +1,62 @@
+# sctp_kernel_module_not_available
+#
+# The Stream Control Transmission Protocol (SCTP) is a transport layer protocol used to
+# support message oriented communication, with several streams of messages in one
+# connection. It serves a similar function as TCP and UDP, incorporating features of both.
+# It is message-oriented like UDP, and ensures reliable in-sequence transport of
+# messages with congestion control like TCP.
+
+- name: "sctp_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv sctp && echo loaded || echo not_loaded
+  changed_when: false
+  register: sctp_check_loaded_result
+# Check if module is disabled
+- name: "sctp_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install sctp /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: sctp_check_disabled_result
+# Check if module is blacklisted
+- name: "sctp_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist sctp" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: sctp_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    sctp_check:
+      remediation_status: "{{ true if (sctp_check_loaded_result.stdout == 'not_loaded' or (sctp_check_disabled_result.stdout == 'disabled' and sctp_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sctp_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/sctp.conf"
+    regexp: "^(#)?install sctp(\\s|$)"
+    line: "install sctp /bin/true"
+    create: true
+    mode: "0600"
+  when: not audit_only and not sctp_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "sctp_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist sctp(\\s|$)"
+    line: "blacklist sctp"
+    create: true
+    mode: "0600"
+  when: not audit_only and not sctp_check.remediation_status
+
+# Disable sctp filesystems
+- name: Disabling sctp filesystems
+  modprobe:
+    name: sctp
+    state: absent
+  when: not audit_only and not sctp_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ sctp_check.remediation_status }}"

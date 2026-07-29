@@ -1,0 +1,44 @@
+# pam_pwquality_module_enabled
+#
+# The pam_pwquality.so module performs password quality checking. This module can
+# be plugged into the password stack of a given service to provide strength-checking for
+# passwords. The code was originally based on pam_cracklib module and the module is
+# backwards compatible with its options.
+#
+# The action of this module is to prompt the user for a password and check its strength
+# against a system dictionary and a set of rules for identifying poor choices.
+#
+# The first action is to prompt for a single password, check its strength and then, if it is
+# considered strong, prompt for the password a second time (to verify that it was typed
+# correctly on the first occasion). All being well, the password is passed on to subsequent
+# modules to be installed as the new authentication token.
+
+- name: "pam_pwquality_module_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          # Check if pam_pwquality module is configured
+          grep -Pq -- '\bpam_pwquality\.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+      else
+          echo 'not_configured'
+      fi
+  changed_when: false
+  register: authselect_pam_pwquality_module_status_check
+
+ # Extract audit result
+- set_fact:
+    authselect_pam_pwquality_module_check:
+      remediation_status: "{{ true if authselect_pam_pwquality_module_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_pwquality_module_enabled | Remediation"
+  shell:
+    cmd: |
+      authselect enable-feature with-pwquality
+      authselect apply-changes
+  when: not audit_only and not authselect_pam_pwquality_module_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_pam_pwquality_module_check.remediation_status }}"

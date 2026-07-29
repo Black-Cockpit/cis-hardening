@@ -1,0 +1,59 @@
+# squashfs_kernel_module_not_available
+#
+# The squashfs filesystem type is a compressed read-only Linux filesystem embedded in
+# small footprint systems. A squashfs image can be used without having to first
+# decompress the image.
+
+- name: "squashfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv squashfs && echo loaded || echo not_loaded
+  changed_when: false
+  register: squashfs_check_loaded_result
+# Check if module is disabled
+- name: "squashfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install squashfs /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: squashfs_check_disabled_result
+# Check if module is blacklisted
+- name: "squashfs_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist squashfs" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: squashfs_check_blacklisted_result
+
+# Extract audit result
+- set_fact:
+    squashfs_check:
+      remediation_status: "{{ true if (squashfs_check_loaded_result.stdout == 'not_loaded' or (squashfs_check_disabled_result.stdout == 'disabled' and squashfs_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "squashfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/squashfs.conf"
+    regexp: "^(#)?install squashfs(\\s|$)"
+    line: "install squashfs /bin/true"
+    create: true
+  when: not audit_only and not squashfs_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "squashfs_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist squashfs(\\s|$)"
+    line: "blacklist squashfs"
+    create: true
+    mode: "0600"
+  when: not audit_only and not squashfs_check.remediation_status
+
+# Disable squashfs filesystems
+- name: Disabling squashfs filesystems
+  modprobe:
+    name: squashfs
+    state: absent
+  when: not audit_only and not squashfs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ squashfs_check.remediation_status }}"

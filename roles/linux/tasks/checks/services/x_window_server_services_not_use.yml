@@ -1,0 +1,29 @@
+# x_window_server_services_not_use
+#
+# The X Window System provides a Graphical User Interface (GUI) where users can have
+# multiple windows in which to run programs and various add on. The X Windows system
+# is typically used on workstations where users login, but not on servers where users
+# typically do not login.
+
+- name: "x_window_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "xorg-x11-server-common" && echo installed || echo not_installed
+  changed_when: false
+  register: xorg_status_check
+
+# Extract audit result
+- set_fact:
+    xorg_server_check:
+      remediation_status: "{{ true if xorg_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "x_window_server_services_not_use | Remediation"
+  package:
+    name: xorg-x11-server-common
+    state: absent
+  when: not audit_only and not xorg_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ xorg_server_check.remediation_status }}"

@@ -1,0 +1,114 @@
+# default_user_umask_configured
+#
+# The user file-creation mode mask ( umask ) is used to determine the file permission for
+# newly created directories and files. In Linux, the default permissions for any newly
+# created directory is 0777 ( rwxrwxrwx ), and for any newly created file it is 0666 ( rw-rw-
+# rw- ). The umask modifies the default Linux permissions by restricting (masking) these
+# permissions. The umask is not simply subtracted, but is processed bitwise. Bits set in the
+# umask are cleared in the resulting file mode.
+# - Octal (Numeric) Value - Represented by either three or four digits. ie umask 0027
+#   or umask 027 . If a four digit umask is used, the first digit is ignored. The remaining
+#   three digits effect the resulting permissions for user, group, and world/other
+#   respectively.
+#
+# - Symbolic Value - Represented by a comma separated list for User u , group g ,
+#   and world/other o . The permissions listed are not masked by umask . ie a umask
+#   set by umask u=rwx,g=rx,o= is the Symbolic equivalent of the Octal umask 027 .
+#   This umask would set a newly created directory with file mode drwxr-x--- and a
+#   newly created file with file mode rw-r----- .
+#
+# The default umask can be set to use the pam_umask module or in a System Wide Shell
+# Configuration File . The user creating the directories or files has the discretion of
+# changing the permissions via the chmod command, or choosing a different default
+# umask by adding the umask command into a User Shell Configuration File , (
+# .bash_profile or .bashrc ), in their home directory.
+
+- name: "default_user_umask_configured | Audit"
+  shell:
+    cmd: |
+      l_output="" l_output2=""
+
+      file_umask_chk() {
+          if grep -Psiq -- '^\h*umask\h+(0?[0-7][2-7]7|u(=[rwx]{0,3}),g=([rx]{0,2}),o=)(\h*#.*)?$' "$l_file"; then
+              l_output="$l_output\n - umask is set correctly in \"$l_file\""
+          elif grep -Psiq -- '^\h*umask\h+(([0-7][0-7][01][0-7]\b|[0-7][0-7][0-7][0-6]\b)|([0-7][01][0-7]\b|[0-7][0-7][0-6]\b)|(u=[rwx]{1,3},)?(((g=[rx]?[rx]?w[rx]?[rx]?\b)(,o=[rwx]{1,3})?)|((g=[wrx]{1,3},)?o=[wrx]{1,3}\b)))' "$l_file"; then
+              l_output2="$l_output2\n - umask is incorrectly set in \"$l_file\""
+          fi
+      }
+
+      while IFS= read -r -d $'\0' l_file; do
+          file_umask_chk
+      done < <(find /etc/profile.d/ -type f -name '*.sh' -print0)
+
+      l_file="/etc/profile" && file_umask_chk
+      l_file="/etc/bashrc" && file_umask_chk
+      l_file="/etc/bash.bashrc" && file_umask_chk
+      l_file="/etc/pam.d/postlogin"
+
+      if grep -Psiq -- '^\h*session\h+[^#\n\r]+\h+pam_umask\.so\h+([^#\n\r]+\h+)?umask=(0?[0-7][2-7]7)\b' "$l_file"; then
+          l_output1="$l_output1\n - umask is set correctly in \"$l_file\""
+      elif grep -Psiq '^\h*session\h+[^#\n\r]+\h+pam_umask\.so\h+([^#\n\r]+\h+)?umask=(([0-7][0-7][01][0-7]\b|[0-7][0-7][0-7][0-6]\b)|([0-7][01][0-7]\b))' "$l_file"; then
+          l_output2="$l_output2\n - umask is incorrectly set in \"$l_file\""
+      fi
+
+      l_file="/etc/login.defs" && file_umask_chk
+      l_file="/etc/default/login" && file_umask_chk
+
+      [[ -z "$l_output" && -z "$l_output2" ]] && l_output2="$l_output2\n - umask is not set"
+      if [ -z "$l_output2" ]; then
+          echo 'configured'
+      else
+          echo 'not_configured'
+      fi
+  changed_when: false
+  register: default_user_umask_status_check
+
+# Extract audit result
+- set_fact:
+    default_user_umask_check:
+      remediation_status: "{{ true if default_user_umask_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "default_user_umask_configured | Remediation"
+  replace:
+    path: "{{ item }}"
+    regexp: '^(umask)[\s]{1,}[\d]{1,}.+'
+    replace: ''
+  loop:
+  - "/etc/profile"
+  - "/etc/bashrc"
+  when: not audit_only and not default_user_umask_check.remediation_status
+
+ # default_user_umask_configured | Remediation
+- name: "default_user_umask_configured | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^(umask)[\s]{1,}0027'
+    line: 'umask 0027'
+    state: present
+  loop:
+  - "/etc/profile"
+  - "/etc/bashrc"
+  when: not audit_only and not default_user_umask_check.remediation_status
+
+# default_user_umask_configured | Remediation
+- name: "default_user_umask_configured | Remediation"
+  replace:
+    path: "/etc/login.defs"
+    regexp: '^[#]{0,}(UMASK)[\s]{1,}[\d]{1,}.+'
+    replace: ''
+  when: not audit_only and not default_user_umask_check.remediation_status
+
+ # default_user_umask_configured | Remediation
+- name: "default_user_umask_configured | Remediation"
+  lineinfile:
+    path: "/etc/login.defs"
+    regexp: '^[#]{0,}(UMASK)[\s]{1,}[\d]{1,}.+'
+    line: 'UMASK 0027'
+    state: present
+  when: not audit_only and not default_user_umask_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ default_user_umask_check.remediation_status }}"

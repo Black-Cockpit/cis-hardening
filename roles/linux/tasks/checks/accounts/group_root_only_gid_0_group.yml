@@ -1,0 +1,36 @@
+# group_root_only_gid_0_group
+#
+# No group other than root may be assigned GID 0: group root membership
+# grants access to files owned by the root group.
+
+- name: "group_root_only_gid_0_group | Audit"
+  shell:
+    cmd: |
+      gid_zero_groups="$(awk -F: '$3=="0"{print $1":"$3}' /etc/group)"
+      [ "$gid_zero_groups" = "root:0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: root_gid_group_status
+
+# Extract audit result
+- set_fact:
+    root_gid_group_check:
+      remediation_status: "{{ true if root_gid_group_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Groups other than root with GID 0 need a site policy decision (assign a
+# new GID or remove the group) and are only reported
+- name: "group_root_only_gid_0_group | Remediation"
+  debug:
+    msg: "Assign a new GID to, or remove, any group other than root that has GID 0"
+  when: not audit_only and not root_gid_group_check.remediation_status
+  changed_when: false
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Groups other than root with GID 0 require a site policy decision (assign a new GID or remove the group)'} }}"
+  changed_when: false
+  when: not root_gid_group_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_gid_group_check.remediation_status }}"

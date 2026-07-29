@@ -1,0 +1,33 @@
+# kernel_kptr_restrict_configured
+#
+# kernel.kptr_restrict sets whether restrictions are placed on exposing kernel
+# addresses via /proc and other interfaces.
+
+- name: "kernel_kptr_restrict_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n kernel.kptr_restrict 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*kernel[.]kptr_restrict\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      echo "$running" | grep -qE "^(1|2)$" && echo "$persisted" | grep -qE "^(1|2)$" && echo configured || echo not_configured
+  changed_when: false
+  register: kernel_kptr_restrict_status
+
+# Extract audit result
+- set_fact:
+    kernel_kptr_restrict_check:
+      remediation_status: "{{ true if kernel_kptr_restrict_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "kernel_kptr_restrict_configured | Remediation"
+  ansible.posix.sysctl:
+    name: kernel.kptr_restrict
+    value: 2
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not kernel_kptr_restrict_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ kernel_kptr_restrict_check.remediation_status }}"

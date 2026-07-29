@@ -1,0 +1,66 @@
+# root_path_integrity
+#
+# The root user can execute any command on the system and could be fooled into
+# executing programs unintentionally if the PATH is not set correctly.
+# name.
+
+- name: "root_path_integrity | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      l_output2=""
+      l_pmask="0022"
+      l_maxperm="$(printf '%o' $((0777 & ~$l_pmask)))"
+      l_root_path="$(sudo -Hiu root env | grep '^PATH' | cut -d= -f2)"
+
+      unset a_path_loc && IFS=":" read -ra a_path_loc <<<"$l_root_path"
+
+      grep -q "::" <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains a empty directory (::)"
+
+      grep -Pq ":\h*$" <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains a trailing (:)"
+
+      grep -Pq '(\h+|:)\.(:|\h*$)' <<<"$l_root_path" && l_output2="$l_output2\n - root's path contains current working directory (.)"
+
+      while read -r l_path; do
+          if [ -d "$l_path" ]; then
+              while read -r l_fmode l_fown; do
+                  [ "$l_fown" != "root" ] && l_output2="$l_output2\n - Directory: \"$l_path\" is owned by: \"$l_fown\" should be owned by \"root\""
+                  [ $(($l_fmode & $l_pmask)) -gt 0 ] && l_output2="$l_output2\n - Directory: \"$l_path\" is mode: \"$l_fmode\" and should be mode: \"$l_maxperm\" or more restrictive"
+              done <<<"$(stat -Lc '%#a %U' "$l_path")"
+          else
+              l_output2="$l_output2\n - \"$l_path\" is not a directory"
+          fi
+      done <<<"$(printf "%s\n" "${a_path_loc[@]}")"
+      if [ -z "$l_output2" ]; then
+          echo -e ""
+      else
+          echo -e "$l_output2"
+      fi
+      {% endraw %}
+  changed_when: false
+  register: root_path_integrity_status
+
+# Extract audit result
+- set_fact:
+    root_path_integrity_check:
+      remediation_status: "{{ true if root_path_integrity_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add duplicated groups list
+- set_fact:
+    root_paths_description:
+      remediation: "Consider to review the paths bellow: \n {% for item in root_path_integrity_status.stdout_lines %}{{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not root_path_integrity_check.remediation_status
+
+# Append duplicated groups list to audit result
+- set_fact:
+    root_path_integrity_check: "{{ root_path_integrity_check | combine(root_paths_description) }}"
+  changed_when: false
+  when: not root_path_integrity_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_path_integrity_check.remediation_status }}"

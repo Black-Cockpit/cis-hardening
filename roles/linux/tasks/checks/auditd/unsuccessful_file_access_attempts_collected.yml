@@ -1,0 +1,148 @@
+# unsuccessful_file_access_attempts_collected
+#
+# Monitor for unsuccessful attempts to access files. The following parameters are
+# associated with system calls that control files
+#
+# - creation  : creat
+# - opening   : open , openat
+# - truncation: truncate , ftruncate
+#
+# An audit log record will only be written if all of the following criteria is met for the user
+# when trying to access a file:
+#
+# - a non-privileged user (auid>=UID_MIN)
+# - is not a Daemon event (auid=4294967295/unset/-1)
+# - if the system call returned EACCES (permission denied) or EPERM (some other
+# - permanent error associated with the specific system call)
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Get system min UID
+  shell:
+    cmd: awk '/^\s*UID_MIN/{print $2}' /etc/login.defs
+  changed_when: false
+  register: system_min_uid
+
+# Audit | Collect the current configuration state
+- name: "unsuccessful_file_access_attempts_collected | Audit"
+  shell:
+    cmd: |
+      awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *exit={{ item.access_failure }}/ \
+      &&/ -S/ \
+      &&/creat/ \
+      &&/open/ \
+      &&/truncate/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - arch: 32
+    access_failure: "-EACCES"
+  - arch: 64
+    access_failure: "-EACCES"
+  - arch: 32
+    access_failure: "-EPERM"
+  - arch: 64
+    access_failure: "-EPERM"
+  register: audit_unsuccessful_files_rule_status_check
+
+# unsuccessful_file_access_attempts_collected | Audit
+- name: "unsuccessful_file_access_attempts_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *exit={{ item.access_failure }}/ \
+      &&/ -S/ \
+      &&/creat/ \
+      &&/open/ \
+      &&/truncate/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - arch: 32
+    access_failure: "-EACCES"
+  - arch: 64
+    access_failure: "-EACCES"
+  - arch: 32
+    access_failure: "-EPERM"
+  - arch: 64
+    access_failure: "-EPERM"
+  register: audit_unsuccessful_files_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: "{{ true if system_min_uid.stdout != '' else false }}"
+  changed_when: false
+
+# Check if all unsuccessful file access attempts rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_unsuccessful_files_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all unsuccessful file access attempts rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_unsuccessful_files_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_unsuccessful_files_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "unsuccessful_file_access_attempts_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-unsuccessful-file-access.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_unsuccessful_files_rule_check.remediation_status
+
+# unsuccessful_file_access_attempts_collected | Remediation
+- name: "unsuccessful_file_access_attempts_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk "/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item.arch }}/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *exit={{ item.access_failure }}/ \
+      &&/ -S/ \
+      &&/creat/ \
+      &&/open/ \
+      &&/truncate/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F arch=b{{ item.arch }} -S creat,open,openat,truncate,ftruncate -F exit={{ item.access_failure }} -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k access' >> /etc/audit/rules.d/00-cis-unsuccessful-file-access.rules
+  loop:
+  - arch: 32
+    access_failure: "-EACCES"
+  - arch: 64
+    access_failure: "-EACCES"
+  - arch: 32
+    access_failure: "-EPERM"
+  - arch: 64
+    access_failure: "-EPERM"
+  when: not audit_only and not audit_unsuccessful_files_rule_check.remediation_status
+
+ # unsuccessful_file_access_attempts_collected | Remediation
+- name: "unsuccessful_file_access_attempts_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_unsuccessful_files_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_unsuccessful_files_rule_check.remediation_status }}"

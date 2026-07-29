@@ -1,0 +1,45 @@
+# permissions_etc_cron_monthly_configured
+#
+# The /etc/cron.monthly directory contains system cron jobs that need to run on a
+# monthly basis. The files in this directory cannot be manipulated by the crontab
+# command, but are instead edited by system administrators using a text editor. The
+# commands below restrict read/write and search access to user and group root,
+# preventing regular users from accessing this directory.
+
+- name: "permissions_etc_cron_monthly_configured | Audit"
+  shell:
+    cmd: 'find /etc/cron.monthly -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: crontab_monthly_stat_check
+
+# Extract audit result
+- set_fact:
+    crontab_monthly_permission_check:
+      remediation_status: "{{ true if crontab_monthly_stat_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_cron_monthly_configured | Remediation"
+  find:
+    paths: "/etc/cron.monthly"
+    file_type: file
+    recurse: true
+  register: crontab_monthly_files_list
+  when: not audit_only and not crontab_monthly_permission_check.remediation_status
+
+# permissions_etc_cron_monthly_configured | Remediation
+- name: "permissions_etc_cron_monthly_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "0700"
+    owner: root
+    group: root
+  with_items:
+  - "{{ crontab_monthly_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not crontab_monthly_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crontab_monthly_permission_check.remediation_status }}"

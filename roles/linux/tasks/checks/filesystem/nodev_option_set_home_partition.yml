@@ -1,0 +1,27 @@
+# nodev_option_set_home_partition
+#
+# The nodev mount option specifies that the filesystem cannot contain special devices.
+
+- name: "nodev_option_set_home_partition | Audit"
+  shell:
+    cmd: mount | grep -E '\s\/home\s' | grep -q nodev && echo compliant || echo not_compliant
+  changed_when: false
+  register: home_nodev_status
+
+# Extract audit result
+- set_fact:
+    home_nodev:
+      remediation_status: "{{ true if home_nodev_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to mount /home partition with nodev option by updating /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "nodev_option_set_home_partition | Remediation"
+  debug:
+    msg: "Consider to mount /home partition with nodev option by modifing /etc/fstab"
+  when: not audit_only and not home_nodev.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ home_nodev.remediation_status }}"

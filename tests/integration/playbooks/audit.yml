@@ -1,0 +1,27 @@
+# Baseline audit: run the role in audit-only mode and save the report.
+#
+# Produces reports/<entry_name>-audit.json on the control host so the
+# before/after state of a matrix entry is inspectable. Never changes the
+# target (audit_only is true).
+#
+# Expected extra-vars (supplied by run.sh from the platforms.yml entry):
+#   entry_name         matrix entry name, used for the report file name
+#   benchmark_mapping  benchmark mapping the role should load
+#   levels             CIS levels to request
+- name: "Audit {{ entry_name }}"
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    audit_only: true
+  roles:
+    - linux
+
+  post_tasks:
+    # Persist the collected report next to the harness for inspection
+    - name: "Save the audit report to the control host"
+      copy:
+        content: "{{ audit_result | to_nice_json }}"
+        dest: "{{ playbook_dir }}/../reports/{{ entry_name }}-audit.json"
+      delegate_to: localhost
+      become: false

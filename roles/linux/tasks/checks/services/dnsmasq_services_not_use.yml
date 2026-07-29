@@ -1,0 +1,39 @@
+# dnsmasq_services_not_use
+#
+# dnsmasq is a lightweight tool that provides DNS caching, DNS forwarding and DHCP
+# (Dynamic Host Configuration Protocol) services.
+
+- name: "dnsmasq_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q dnsmasq && echo installed || echo not_installed
+  changed_when: false
+  register: dnsmasq_status_check
+
+# dnsmasq_services_not_use | Audit
+- name: "dnsmasq_services_not_use | Audit"
+  systemd:
+    name: dnsmasq
+  ignore_errors: yes
+  changed_when: false
+  register: dnsmasq_service_status_check
+  when: dnsmasq_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    dnsmasq_check:
+      remediation_status: "{{ true if (dnsmasq_status_check.stdout == 'not_installed' or (dnsmasq_service_status_check.status.ActiveState == 'inactive' and (dnsmasq_service_status_check.status.UnitFileState is not defined or dnsmasq_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "dnsmasq_services_not_use | Remediation"
+  systemd:
+    name: dnsmasq
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not dnsmasq_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ dnsmasq_check.remediation_status }}"

@@ -1,0 +1,58 @@
+# Verification: re-audit after hardening and assert compliance.
+#
+# Runs the role in audit-only mode again (post-reboot) and checks that every
+# automated rule now reports compliant, except the rules listed in
+# expected_failures/<entry_name>.yml. Those are rules that cannot pass on a
+# stock Vagrant box (for example the separate-partition rules on a
+# single-partition image) and are allow-listed explicitly, so a regression
+# in any other rule still fails the run.
+#
+# Expected extra-vars (supplied by run.sh from the platforms.yml entry):
+#   entry_name         matrix entry name, selects the expected_failures file
+#   benchmark_mapping  benchmark mapping the role should load
+#   levels             CIS levels to request
+- name: "Verify {{ entry_name }}"
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    audit_only: true
+  roles:
+    - linux
+
+  post_tasks:
+    # Save the post-hardening report alongside the baseline
+    - name: "Save the verification report to the control host"
+      copy:
+        content: "{{ audit_result | to_nice_json }}"
+        dest: "{{ playbook_dir }}/../reports/{{ entry_name }}-verify.json"
+      delegate_to: localhost
+      become: false
+
+    # Load the rules that are allowed to remain non-compliant on this entry
+    - name: "Load the expected-failure allowlist for {{ entry_name }}"
+      include_vars:
+        file: "{{ playbook_dir }}/../expected_failures/{{ entry_name }}.yml"
+
+    # Reduce the report to automated rules that are still non-compliant and
+    # are not on the allowlist: anything left is a real regression
+    - name: "Compute unexpected failures"
+      set_fact:
+        unexpected_failures: >-
+          {{ audit_result
+             | selectattr('automated')
+             | rejectattr('remediation_status')
+             | map(attribute='id')
+             | reject('in', expected_failures)
+             | list }}
+
+    # Fail loudly and list the offending rule ids
+    - name: "Assert no unexpected rule remained non-compliant"
+      assert:
+        that: unexpected_failures | length == 0
+        fail_msg: >-
+          {{ unexpected_failures | length }} rule(s) failed unexpectedly on
+          {{ entry_name }}: {{ unexpected_failures | join(', ') }}
+        success_msg: >-
+          All automated rules are compliant on {{ entry_name }} except the
+          {{ expected_failures | length }} allow-listed rule(s).

@@ -1,0 +1,35 @@
+# net_ipv4_conf_default_log_martians_configured
+#
+# When enabled, this feature logs packets with un-routable source addresses to the
+# kernel log.
+# net.ipv4.conf.default.log_martians controls if IPv4 packets with un-routable
+# source addresses on a newly added network interface is logged to the kernel log.
+
+- name: "net_ipv4_conf_default_log_martians_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv4.conf.default.log_martians 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv4[.]conf[.]default[.]log_martians\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "1" ] && [ "$persisted" = "1" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv4_conf_default_log_martians_status
+
+# Extract audit result
+- set_fact:
+    net_ipv4_conf_default_log_martians_check:
+      remediation_status: "{{ true if net_ipv4_conf_default_log_martians_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv4_conf_default_log_martians_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.log_martians
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv4_conf_default_log_martians_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv4_conf_default_log_martians_check.remediation_status }}"

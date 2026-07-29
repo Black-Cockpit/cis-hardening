@@ -1,0 +1,84 @@
+# rsyslog_not_configured_receive_logs_from_remote_client
+#
+# RSyslog supports the ability to receive messages from remote hosts, thus acting as a
+# log server. Clients should not receive data from other hosts.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: "Pre Audit | Get rsyslog configuration"
+  block:
+  # Pre Audit | Stat /etc/rsyslog.d/
+  - name: "Pre Audit | Get rsyslog configuration"
+    stat:
+      path: "/etc/rsyslog.d/"
+    register: rsyslog_d_conf
+    changed_when: false
+
+  # Pre Audit | List rsyslog configuration files
+  - name: "Pre Audit | List rsyslog configuration files"
+    find:
+      paths:
+        - "/etc/rsyslog.d/"
+      patterns:
+        - "*.conf"
+    register: rsyslog_d_conf_files_list
+    changed_when: false
+    when: rsyslog_d_conf.stat.exists
+
+  # Define rsyslog configuration files list
+  - set_fact:
+      rsyslog_conf_files: "{{ rsyslog_conf_files | default([]) + [item.path]}}"
+    changed_when: false
+    loop: "{{ rsyslog_d_conf_files_list.files | default([]) }}"
+    loop_control:
+      label: "{{ item.path }}"
+    when: rsyslog_d_conf.stat.exists
+
+  # Append /etc/rsyslog.conf to rsyslog configuration files list
+  - set_fact:
+      rsyslog_conf_files: "{{ rsyslog_conf_files | default([]) + ['/etc/rsyslog.conf'] }}"
+    changed_when: false
+
+# Audit | Collect the current configuration state
+- name: "rsyslog_not_configured_receive_logs_from_remote_client | Audit"
+  shell:
+    cmd: |
+      rsyslog_module=$(grep -Eq '^*module\(load="imtcp"\)' /etc/rsyslog.conf /etc/rsyslog.d/*.conf && echo 'not_configured' || echo 'configured')
+      rsyslog_input=$(grep -Eq '^*input\(type="imtcp" port="514"\)' /etc/rsyslog.conf /etc/rsyslog.d/*.conf && echo 'not_configured' || echo 'configured')
+      [[ "$rsyslog_module" == 'configured' && "$rsyslog_module" == 'configured' ]] && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: rsyslog_as_log_server_status_check
+
+# Extract audit result
+- set_fact:
+    rsyslog_as_log_server_check:
+      remediation_status: "{{ true if rsyslog_as_log_server_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "rsyslog_not_configured_receive_logs_from_remote_client | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '.*module\(load="imtcp"\)'
+    state: absent
+  loop: "{{ rsyslog_conf_files }}"
+  when: not audit_only and not rsyslog_as_log_server_check.remediation_status
+
+# rsyslog_not_configured_receive_logs_from_remote_client | Remediation
+- name: "rsyslog_not_configured_receive_logs_from_remote_client | Remediation"
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '.*input\(type="imtcp" port="514"\)'
+    state: absent
+  loop: "{{ rsyslog_conf_files }}"
+  when: not audit_only and not rsyslog_as_log_server_check.remediation_status
+
+# rsyslog_not_configured_receive_logs_from_remote_client | Remediation
+- name: "rsyslog_not_configured_receive_logs_from_remote_client | Remediation"
+  service:
+    name: rsyslog
+    state: restarted
+  when: not audit_only and not rsyslog_as_log_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ rsyslog_as_log_server_check.remediation_status }}"

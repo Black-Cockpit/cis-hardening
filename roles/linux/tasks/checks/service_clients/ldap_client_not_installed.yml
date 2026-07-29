@@ -1,0 +1,28 @@
+# ldap_client_not_installed
+#
+# The Lightweight Directory Access Protocol (LDAP) was introduced as a replacement for
+# NIS/YP. It is a service that provides a method for looking up information from a central
+# database.
+
+- name: "ldap_client_not_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -q openldap-clients && echo installed || echo not_installed
+  changed_when: false
+  register: openldap_clients_status_check
+
+# Extract audit result
+- set_fact:
+    openldap_clients_server_check:
+      remediation_status: "{{ true if openldap_clients_status_check.stdout == 'not_installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "ldap_client_not_installed | Remediation"
+  package:
+    name: openldap-clients
+    state: absent
+  when: not audit_only and not openldap_clients_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ openldap_clients_server_check.remediation_status }}"

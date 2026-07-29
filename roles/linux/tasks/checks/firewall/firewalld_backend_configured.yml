@@ -1,0 +1,32 @@
+# firewalld_backend_configured
+#
+# firewalld supports an iptables and an nftables backend. The nftables backend
+# is the supported and recommended packet filtering framework.
+
+- name: "firewalld_backend_configured | Audit"
+  shell:
+    cmd: grep -Psiq -- '^\h*FirewallBackend\h*=\h*nftables\b' /etc/firewalld/firewalld.conf 2>/dev/null && echo configured || echo not_configured
+  changed_when: false
+  register: firewalld_backend_status
+
+# Extract audit result
+- set_fact:
+    firewalld_backend_check:
+      remediation_status: "{{ true if firewalld_backend_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "firewalld_backend_configured | Remediation"
+  lineinfile:
+    path: /etc/firewalld/firewalld.conf
+    regexp: '^\s*#?\s*FirewallBackend\s*='
+    line: "FirewallBackend=nftables"
+    create: true
+    mode: "0600"
+    owner: root
+    group: root
+  when: not audit_only and not firewalld_backend_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ firewalld_backend_check.remediation_status }}"

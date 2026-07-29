@@ -1,0 +1,27 @@
+# rsyslog_installed
+#
+# The rsyslog software is recommended in environments where journald does not meet
+# operation requirements.
+
+- name: "rsyslog_installed | Audit"
+  shell:
+    cmd: rpm -q rsyslog | grep -Eq 'rsyslog[\-][0-9]' && echo 'installed' || echo 'not_installed'
+  changed_when: false
+  register: rsyslog_status_check
+
+# Extract audit result
+- set_fact:
+    rsyslog_check:
+      remediation_status: "{{ true if rsyslog_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "rsyslog_installed | Remediation"
+  package:
+    name: rsyslog
+    state: present
+  when: not audit_only and not rsyslog_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ rsyslog_check.remediation_status }}"

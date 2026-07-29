@@ -1,0 +1,59 @@
+# udf_kernel_module_not_available
+#
+# The udf filesystem type is the universal disk format used to implement ISO/IEC 13346
+# and ECMA-167 specifications. This is an open vendor filesystem type for data storage
+# on a broad range of media. This filesystem type is necessary to support writing DVDs
+# and newer optical disc formats.
+
+- name: "udf_kernel_module_not_available | Audit"
+  shell:
+    cmd: modprobe -nqv udf && echo loaded || echo not_loaded
+  changed_when: false
+  register: udf_check_loaded_result
+# Check if module is disabled
+- name: "udf_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?install udf /bin/true" /etc/modprobe.d/ > /dev/null && echo disabled || echo not_disabled
+  changed_when: false
+  register: udf_check_disabled_result
+# Check if module is blacklisted
+- name: "udf_kernel_module_not_available | Audit"
+  shell:
+    cmd: grep -r -E "^(#)?blacklist udf" /etc/modprobe.d/ > /dev/null && echo blacklisted || echo not_blacklisted
+  changed_when: false
+  register: udf_check_blacklisted_result
+# Extract audit result
+- set_fact:
+    udf_check:
+      remediation_status: "{{ true if (udf_check_loaded_result.stdout == 'not_loaded' or (udf_check_disabled_result.stdout == 'disabled' and udf_check_blacklisted_result.stdout == 'blacklisted')) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "udf_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: "/etc/modprobe.d/udf.conf"
+    regexp: "^(#)?install udf(\\s|$)"
+    line: "install udf /bin/true"
+    create: true
+  when: not audit_only and not udf_check.remediation_status
+
+# Remediation | Enforce the required configuration line
+- name: "udf_kernel_module_not_available | Remediation"
+  lineinfile:
+    path: /etc/modprobe.d/blacklist.conf
+    regexp: "^(#)?blacklist udf(\\s|$)"
+    line: "blacklist udf"
+    create: true
+    mode: "0600"
+  when: not audit_only and not udf_check.remediation_status
+
+# Disable udf filesystems
+- name: Disabling udf filesystems
+  modprobe:
+    name: udf
+    state: absent
+  when: not audit_only and not udf_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ udf_check.remediation_status }}"

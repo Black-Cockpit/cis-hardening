@@ -1,0 +1,109 @@
+# tcp_syn_cookies_enabled
+#
+# When tcp_syncookies is set, the kernel will handle TCP SYN packets normally until the
+# half-open connection queue is full, at which time, the SYN cookie functionality kicks in.
+# SYN cookies work by not using the SYN queue at all. Instead, the kernel simply replies
+# to the SYN with a SYN|ACK, but will include a specially crafted TCP sequence number
+# that encodes the source and destination IP address and port number and the time the
+# packet was sent. A legitimate connection would send the ACK packet of the three way
+# handshake with the specially crafted sequence number. This allows the system to verify
+# that it has received a valid response to a SYN cookie and allow the connection, even
+# though there is no corresponding SYN in the queue.
+
+- name: "tcp_syn_cookies_enabled | Audit"
+  shell:
+    cmd: |
+      ipv4="$(sysctl "net.ipv4.tcp_syncookies" | awk -F= '{print $2}')";
+      echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: tcp_syn_cookies_current_status_conf_check
+
+# Define remediation status
+- set_fact:
+    tcp_syn_cookies_remediation_status: "{{ true if tcp_syn_cookies_current_status_conf_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Check net.ipv4.tcp_syncookies is disabled on sysctl.conf file
+- name: "tcp_syn_cookies_enabled | Audit"
+  shell:
+    cmd: 'grep -Eq "^\s{0,}net.ipv4.tcp_syncookies\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+  changed_when: false
+  register: tcp_syn_cookies_sysctl_conf_check
+
+# Update remediation status
+- set_fact:
+    tcp_syn_cookies_remediation_status: "{{ true if (tcp_syn_cookies_remediation_status and tcp_syn_cookies_sysctl_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: tcp_syn_cookies_remediation_status
+
+# Check if one of sysctl configuration files has net.ipv4.tcp_syncookies configuration
+- name: "tcp_syn_cookies_enabled | Audit"
+  shell:
+    cmd: |
+      'item_exists=$(grep -E "^\s{0,}net.ipv4.tcp_syncookies\s{0,}" {{ item }}';
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.tcp_syncookies\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: tcp_syn_cookies_conf_check
+  loop: "{{ sysctl_conf_files }}"
+
+# Update remediation status
+- set_fact:
+    tcp_syn_cookies_remediation_status: "{{ true if (tcp_syn_cookies_remediation_status or item.stdout == 'configured') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ tcp_syn_cookies_conf_check.results | list }}"
+  when: tcp_syn_cookies_remediation_status
+
+# Check if net.ipv4.tcp_syncookies is configured in one of the UFW sysctl configuration files
+- name: "tcp_syn_cookies_enabled | Audit"
+  shell:
+    cmd: |
+      ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+      item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.tcp_syncookies\s{0,}" $(echo $ufw_conf))
+      if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+        echo $item_exists | grep -Eq "^\s{0,}net.ipv4.tcp_syncookies\s{0,}=\s{0,}1" && echo configured || echo not_configured
+      else
+        echo configured
+      fi;
+  changed_when: false
+  register: tcp_syn_cookies_ufw_sysctl_conf_files_check
+
+# Update remediation status
+- set_fact:
+    tcp_syn_cookies_remediation_status: "{{ true if (tcp_syn_cookies_remediation_status and tcp_syn_cookies_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: tcp_syn_cookies_remediation_status
+
+# Extract audit result
+- set_fact:
+    tcp_syn_cookies_check:
+      remediation_status: "{{ true if tcp_syn_cookies_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "tcp_syn_cookies_enabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_syncookies
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not tcp_syn_cookies_check.remediation_status
+
+# tcp_syn_cookies_enabled | Remediation
+- name: "tcp_syn_cookies_enabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not tcp_syn_cookies_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tcp_syn_cookies_check.remediation_status }}"

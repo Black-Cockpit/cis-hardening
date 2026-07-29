@@ -1,0 +1,41 @@
+# audit_configuration_loaded_regardless_errors
+#
+# The -c option in the audit rules causes the audit system to continue
+# loading rules when an error is encountered, so a single faulty rule does
+# not prevent the rest of the configuration from loading.
+
+- name: "audit_configuration_loaded_regardless_errors | Audit"
+  shell:
+    cmd: |
+      last_flag="$(grep -Ph -- '^\h*-c\b' /etc/audit/rules.d/*.rules 2>/dev/null | tail -1 | tr -d '[:space:]')"
+      [ "$last_flag" = "-c" ] && echo configured || echo not_configured
+  changed_when: false
+  register: audit_continue_flag_status
+
+# Extract audit result
+- set_fact:
+    audit_continue_flag_check:
+      remediation_status: "{{ true if audit_continue_flag_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "audit_configuration_loaded_regardless_errors | Remediation"
+  lineinfile:
+    path: /etc/audit/rules.d/01-initialize.rules
+    line: "-c"
+    state: present
+    create: true
+    mode: "0600"
+    owner: root
+    group: root
+  when: not audit_only and not audit_continue_flag_check.remediation_status
+
+# Remediation | Apply the remediation commands
+- name: "audit_configuration_loaded_regardless_errors | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_continue_flag_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_continue_flag_check.remediation_status }}"

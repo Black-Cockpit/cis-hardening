@@ -1,0 +1,26 @@
+# auditing_processes_start_prior_auditd_enabled
+#
+# Configure grub2 so that processes that are capable of being audited can be audited
+# even if they start up prior to auditd startup.
+
+- name: "auditing_processes_start_prior_auditd_enabled | Audit"
+  shell:
+    cmd: grubby --info=ALL | grep -Poq '\baudit=1\b' && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: auditd_grub_processes_status_check
+
+# Extract audit result
+- set_fact:
+    auditd_grub_processes_check:
+      remediation_status: "{{ true if auditd_grub_processes_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "auditing_processes_start_prior_auditd_enabled | Remediation"
+  shell:
+    cmd: grubby --update-kernel ALL --args 'audit=1'
+  when: not audit_only and not auditd_grub_processes_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ auditd_grub_processes_check.remediation_status }}"

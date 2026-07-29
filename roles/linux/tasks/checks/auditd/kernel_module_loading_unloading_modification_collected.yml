@@ -1,0 +1,166 @@
+# kernel_module_loading_unloading_modification_collected
+#
+# Monitor the loading and unloading of kernel modules. All the loading / listing /
+# dependency checking of modules is done by kmod via symbolic links.
+#
+# The following system calls control loading and unloading of modules:
+#
+#
+# - init_module   : load a module
+# - finit_module  : load a module (used when the overhead of using cryptographically signed modules to determine the authenticity of a module can be avoided)
+# - delete_module : delete a module
+# - create_module : create a loadable module entry
+# - query_module  : query the kernel for various bits pertaining to modules
+#
+# Any execution of the loading and unloading module programs and system calls will
+# trigger an audit record with an identifier of modules .
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Get system min UID
+  shell:
+    cmd: awk '/^\s*UID_MIN/{print $2}' /etc/login.defs
+  changed_when: false
+  register: system_min_uid
+
+# Audit | Collect the current configuration state
+- name: "kernel_module_loading_unloading_modification_collected | Audit"
+  shell:
+    cmd: |
+      awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item }}/ \
+      &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&(/init_module,finit_module,delete_module,create_module,query_module/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_kernel_module_syscall_rule_status_check
+
+# kernel_module_loading_unloading_modification_collected | Audit
+- name: "kernel_module_loading_unloading_modification_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item }}/ \
+      &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&(/create_module,init_module,delete_module,query_module,finit_module/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
+  changed_when: false
+  loop:
+  - "32"
+  - "64"
+  register: audit_kernel_module_syscall_running_rule_status_check
+
+# Set kernel module syscall rules audit result
+- set_fact:
+    audit_kernel_module_syscall_status: "{{ true if system_min_uid.stdout != '' else false }}"
+  changed_when: false
+
+# Check if all kernel module syscall rules rules are configured
+- set_fact:
+    audit_kernel_module_syscall_status: "{{ true if (audit_kernel_module_syscall_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_kernel_module_syscall_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all kernel module syscall rules are loaded
+- set_fact:
+    audit_kernel_module_syscall_status: "{{ true if (audit_kernel_module_syscall_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_kernel_module_syscall_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# kernel_module_loading_unloading_modification_collected | Audit
+- name: "kernel_module_loading_unloading_modification_collected | Audit"
+  shell:
+    cmd: |
+      awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/kmod/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  register: audit_kernel_module_rule_status_check
+
+# kernel_module_loading_unloading_modification_collected | Audit
+- name: "kernel_module_loading_unloading_modification_collected | Audit"
+  shell:
+    cmd: |
+      auditctl -l | awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/kmod/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  register: audit_kernel_module_running_rule_status_check
+
+# Set kernel module rules audit result
+- set_fact:
+    audit_kernel_module_status: "{{ true if (system_min_uid.stdout != '' and (audit_kernel_module_rule_status_check.stdout | int) > 0 and (audit_kernel_module_running_rule_status_check.stdout | int) > 0) else false }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_kernel_module_rule_check:
+      remediation_status: "{{ true if (audit_kernel_module_syscall_status and audit_kernel_module_status) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "kernel_module_loading_unloading_modification_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-kernel-modules.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+# kernel_module_loading_unloading_modification_collected | Remediation
+- name: "kernel_module_loading_unloading_modification_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk '/^ *-a *always,exit/ \
+      &&/ -F *arch=b{{ item }}/ \
+      &&(/ -F auid!=unset/||/ -F auid!=-1/||/ -F auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -S/ \
+      &&(/init_module,finit_module,delete_module,create_module,query_module/) \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F arch=b{{ item }} -S init_module,finit_module,delete_module,create_module,query_module -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k kernel_modules' >> /etc/audit/rules.d/00-cis-kernel-modules.rules
+  loop:
+  - "32"
+  - "64"
+  when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+# kernel_module_loading_unloading_modification_collected | Remediation
+- name: "kernel_module_loading_unloading_modification_collected | Remediation"
+  shell:
+    cmd: |
+      rule_count=$(awk "/^ *-a *always,exit/ \
+      &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
+      &&/ -F *auid>={{ system_min_uid.stdout }}/ \
+      &&/ -F *perm=x/ \
+      &&/ -F *path=\/usr\/bin\/kmod/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-a always,exit -F path=/usr/bin/kmod -F perm=x -F auid>={{ system_min_uid.stdout }} -F auid!=unset -k kernel_modules' >> /etc/audit/rules.d/00-cis-kernel-modules.rules
+  when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+ # kernel_module_loading_unloading_modification_collected | Remediation
+- name: "kernel_module_loading_unloading_modification_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_kernel_module_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_kernel_module_rule_check.remediation_status }}"

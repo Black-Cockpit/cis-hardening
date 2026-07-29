@@ -1,0 +1,36 @@
+# local_login_warning_banner_configured_properly
+#
+# The contents of the /etc/issue file are displayed to users prior to login for local
+# terminals.
+#
+# Unix-based systems have typically displayed information about the OS release and
+# patch level upon logging in to the system. This information can be useful to developers
+# who are developing software for a particular OS platform. If mingetty(8) supports the
+# following options, they display operating system information: \m - machine architecture
+# \r - operating system release \s - operating system name \v - operating system version
+
+- name: "local_login_warning_banner_configured_properly | Audit"
+  shell:
+    cmd: grep -E -i "(\\\v|\\\r|\\\m|\\\s|$(grep '^ID=' /etc/os-release | cut -d= -f2 | sed -e 's/"//g'))" /etc/issue | wc -l
+  changed_when: false
+  register: issue_message_status_check
+
+# Extract audit result
+- set_fact:
+    issue_message_check:
+      remediation_status: "{{ true if issue_message_status_check.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "local_login_warning_banner_configured_properly | Remediation"
+  template:
+    src: rhel/etc/issue.j2
+    dest: /etc/issue
+    owner: root
+    group: root
+    mode: "0644"
+  when: not audit_only and not issue_message_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ issue_message_check.remediation_status }}"

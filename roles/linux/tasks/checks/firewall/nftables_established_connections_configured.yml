@@ -1,0 +1,18 @@
+# nftables_established_connections_configured
+#
+# Configure the firewall rules for new outbound and established connections
+
+- set_fact:
+    nftables_established_connections_check:
+      name: "nftables_established_connections_configured"
+      scored: false
+      automated: false
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

@@ -1,0 +1,39 @@
+# firewalld_drops_unnecessary_services_ports
+#
+# Services and ports can be accepted or explicitly rejected or dropped by a zone.
+#
+# For every zone, you can set a default behavior that handles incoming traffic that is not
+# further specified. Such behavior is defined by setting the target of the zone. There are
+# three options - default, ACCEPT, REJECT, and DROP.
+#
+#   - ACCEPT: you accept all incoming packets except those disabled by a specific
+#             rule.
+#   - REJECT: you disable all incoming packets except those that you have allowed
+#             in specific rules and the source machine is informed about the rejection.
+#   - DROP:   you disable all incoming packets except those that you have allowed in
+#            specific rules and no information sent to the source machine.
+
+- name: "firewalld_drops_unnecessary_services_ports | Audit"
+  shell:
+    cmd: |
+      systemctl is-enabled firewalld.service | grep -q 'enabled' && \
+      firewall-cmd --list-all --zone="$(firewall-cmd --list-all | awk '/\(active\)/ { print $1}')" | grep -P -- '^\h*(services:|ports:)'
+  changed_when: false
+  register: unnecessary_services_status_check
+
+# Extract audit result
+- set_fact:
+    unnecessary_services_check:
+      name: "firewalld_drops_unnecessary_services_ports"
+      scored: false
+      automated: false
+      remediation: "Consider to verify the list of enabled firewall services bellow: \n {{ unnecessary_services_status_check.stdout }}"
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

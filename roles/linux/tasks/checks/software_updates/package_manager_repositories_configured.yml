@@ -1,0 +1,27 @@
+# package_manager_repositories_configured
+#
+# Systems need to have the respective package manager repositories configured to
+# ensure that the system is able to receive the latest patches and updates.
+
+- name: "package_manager_repositories_configured | Audit"
+  shell:
+    cmd: dnf repolist | awk '(NR>1)'
+  changed_when: false
+  register: dnf_repolist_check_status
+
+# Extract audit result
+- set_fact:
+    dnf_repolist_check:
+      name: "package_manager_repositories_configured"
+      scored: false
+      automated: false
+      remediation: "Consider to verify the repositories bellow: \n {% for item in dnf_repolist_check_status.stdout_lines %}{{ item + '\n'}}{% endfor %}"
+  changed_when: false
+
+# Appending audit result
+
+# Manual/advisory rule: the benchmark marks it unscored/manual, so there is
+# no automated pass/fail. Report it as not-a-failure and let the operator
+# review the recommendation in the task output.
+- set_fact:
+    check_compliant: true

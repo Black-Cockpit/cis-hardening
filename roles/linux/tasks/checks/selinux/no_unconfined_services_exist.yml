@@ -1,0 +1,45 @@
+# no_unconfined_services_exist
+#
+# Unconfined processes run in unconfined domains
+
+- name: "no_unconfined_services_exist | Audit"
+  shell:
+    cmd: "ps -eZ | grep unconfined_service_t | awk '{print $NF}'"
+  changed_when: false
+  register: unconfined_service_list
+
+# Extract audit result
+- set_fact:
+    unconfined_service_check:
+      remediation_status: "{{ true if (unconfined_service_list.stdout_lines | list | length) == 0 else false }}"
+  changed_when: false
+
+# Define remediation message
+- set_fact:
+    unconfined_service_recommendation:
+      remediation: "Consider to investigate any unconfined processes list bellow : \n {% for item in (unconfined_service_list.stdout_lines | list) %}{{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not unconfined_service_check.remediation_status
+
+# Append remediation
+- set_fact:
+    unconfined_service_check: "{{ unconfined_service_check | combine(unconfined_service_recommendation) }}"
+  changed_when: false
+  when: not unconfined_service_check.remediation_status
+
+# Remediation | Report the site policy action to take
+- name: "no_unconfined_services_exist | Remediation"
+  debug:
+    msg: "Consider to investigate any unconfined processes list"
+  when: not audit_only and not unconfined_service_check.remediation_status
+  changed_when: false
+
+# Expose the remediation hint to the report
+- set_fact:
+    check_extra: "{{ {'remediation': unconfined_service_check.remediation} }}"
+  changed_when: false
+  when: not unconfined_service_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ unconfined_service_check.remediation_status }}"

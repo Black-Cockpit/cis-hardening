@@ -1,0 +1,43 @@
+# no_duplicate_uids_exist
+#
+# Although the useradd program will not let you create a duplicate User ID (UID), it is
+# possible for an administrator to manually edit the /etc/passwd file and change the UID
+# field.
+
+- name: "no_duplicate_uids_exist | Audit"
+  shell:
+    cmd: |
+      {% raw %}
+      while read -r l_count l_uid; do
+          if [ "$l_count" -gt 1 ]; then
+              echo -e "Duplicate UID: \"$l_uid\" Users: \"$(awk -F: '($3 == n) { print $1 }' n=$l_uid /etc/passwd | xargs)\""
+          fi
+      done < <(cut -f3 -d":" /etc/passwd | sort -n | uniq -c)
+      {% endraw %}
+  changed_when: false
+  register: users_id_status
+
+# Extract audit result
+- set_fact:
+    users_id_check:
+      remediation_status: "{{ true if users_id_status.stdout == '' else false }}"
+  changed_when: false
+
+# Add duplicated user id list
+- set_fact:
+    duplicated_id_description:
+      remediation: "Consider to review the UIDs bellow: \n {% for item in users_id_status.stdout_lines %}- {{ item + '\n'}}{% endfor %}"
+  changed_when: false
+  when: not users_id_check.remediation_status
+
+# Append duplicated user id list to audit result
+- set_fact:
+    users_id_check: "{{ users_id_check | combine(duplicated_id_description) }}"
+  changed_when: false
+  when: not users_id_check.remediation_status
+
+# Appending audit result
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ users_id_check.remediation_status }}"

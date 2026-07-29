@@ -1,0 +1,52 @@
+# system_accounts_secured
+#
+# There are a number of accounts provided with most distributions that are used to
+# manage applications and are not intended to provide an interactive shell. Furthermore,
+# a user may add special accounts that are not intended to provide an interactive shell.
+
+- name: "system_accounts_secured | Audit"
+  shell:
+    cmd: |
+      awk -F: '($1!~/^(root|halt|sync|shutdown|nfsnobody)$/ && ($3<'"$(awk '/^\s*UID_MIN/{print $2}' /etc/login.defs)"' || $3 == 65534) && $7!~/^(\/usr)?\/sbin\/nologin$/) { print $1 }' /etc/passwd
+  changed_when: false
+  register: nologin_critical_accounts_list
+
+# system_accounts_secured | Audit
+- name: "system_accounts_secured | Audit"
+  shell:
+    cmd: |
+      awk -F: '/nologin/ {print $1}' /etc/passwd | xargs -I '{}' passwd -S '{}' | awk '($2!="L" && $2!="LK") {print $1}'
+  changed_when: false
+  register: nologin_with_password_accounts_list
+
+# Extract audit result
+- set_fact:
+    nologin_accounts_check:
+      remediation_status: "{{ true if (nologin_critical_accounts_list.stdout == '' and nologin_with_password_accounts_list.stdout == '') else false }}"
+  changed_when: false
+
+# Appending audit result
+- set_fact:
+    nologin_account_list: "{{ nologin_critical_accounts_list.stdout_lines | default([]) | list }}"
+  changed_when: false
+  when: not audit_only and not nologin_accounts_check.remediation_status
+
+# Appending nologin users that have password to nologin users list
+- set_fact:
+    nologin_account_list: "{{ (nologin_account_list | default([])) + (nologin_with_password_accounts_list.stdout_lines | default()) }}"
+  changed_when: false
+  when: not audit_only and nologin_with_password_accounts_list.stdout != '' and not nologin_accounts_check.remediation_status
+
+# system_accounts_secured | Remediation
+- name: "system_accounts_secured | Remediation"
+  shell:
+    cmd: |
+      usermod -s $(command -v nologin) {{ item }}> /dev/null 2>& 1 || echo 'failed'
+      usermod -L {{ item }}> /dev/null 2>& 1 || echo 'failed'
+  loop: "{{ nologin_account_list | default([]) | unique }}"
+  ignore_errors: yes
+  when: not audit_only and not nologin_accounts_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ nologin_accounts_check.remediation_status }}"

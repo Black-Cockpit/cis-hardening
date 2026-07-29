@@ -1,0 +1,191 @@
+# secure_icmp_redirects_not_accepted
+#
+# Secure ICMP redirects are the same as ICMP redirects, except they come from
+# gateways listed on the default gateway list. It is assumed that these gateways are
+# known to your system, and that they are likely to be secure.
+
+- name: "secure_icmp_redirects_not_accepted | Audit"
+  block:
+  # Check current net.ipv4.conf.all.secure_redirects status
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.all.secure_redirects" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: secure_icmp_all_redirects_current_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if secure_icmp_all_redirects_current_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.conf.all.secure_redirects is disabled on sysctl.conf file
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.all.secure_redirects\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: secure_icmp_all_redirects_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_all_redirects_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: secure_icmp_redirects_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.all.secure_redirects configuration
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.all.secure_redirects\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: secure_icmp_all_redirects_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ secure_icmp_all_redirects_conf_check.results | list }}"
+    when: secure_icmp_redirects_remediation_status
+
+  # Check if net.ipv4.conf.all.secure_redirects is configured in one of the UFW sysctl configuration files
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.all.secure_redirects\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: secure_icmp_all_redirects_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_all_redirects_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: secure_icmp_redirects_remediation_status
+
+# Audit net.ipv4.conf.default.secure_redirects status
+- name: "secure_icmp_redirects_not_accepted | Audit"
+  block:
+  # Check current net.ipv4.conf.default.secure_redirects status
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.default.secure_redirects" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: secure_icmp_default_redirects_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: secure_icmp_redirects_remediation_status
+
+  # Check net.ipv4.conf.default.secure_redirects is disabled on sysctl.conf file
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: secure_icmp_default_redirects_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: secure_icmp_redirects_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.default.secure_redirects configuration
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: secure_icmp_default_redirects_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ secure_icmp_default_redirects_conf_check.results | list }}"
+    when: secure_icmp_redirects_remediation_status
+
+  # Check if net.ipv4.conf.default.secure_redirects is configured in one of the UFW sysctl configuration files
+  - name: "secure_icmp_redirects_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.secure_redirects\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: secure_icmp_default_redirects_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      secure_icmp_redirects_remediation_status: "{{ true if (secure_icmp_redirects_remediation_status and secure_icmp_default_redirects_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: secure_icmp_redirects_remediation_status
+
+# Extract audit result
+- set_fact:
+    secure_icmp_redirects_check:
+      remediation_status: "{{ true if secure_icmp_redirects_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "secure_icmp_redirects_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.secure_redirects
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not secure_icmp_redirects_check.remediation_status
+
+# secure_icmp_redirects_not_accepted | Remediation
+- name: "secure_icmp_redirects_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.secure_redirects
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not secure_icmp_redirects_check.remediation_status
+
+# secure_icmp_redirects_not_accepted | Remediation
+- name: "secure_icmp_redirects_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not secure_icmp_redirects_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ secure_icmp_redirects_check.remediation_status }}"

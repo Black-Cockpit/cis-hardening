@@ -1,0 +1,65 @@
+# sshd_maxauthtries_configured
+#
+# The MaxAuthTries parameter specifies the maximum number of authentication attempts
+# permitted per connection. When the login failure count reaches half the number, error
+# messages will be written to the syslog file detailing the login failure.
+
+- name: "sshd_maxauthtries_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          # Get ssh auth max retry value
+          audit_out=$(sshd -T -C user=root -C host="$(hostname)" -C addr="$(grep $(hostname) /etc/hosts | awk '{print $1}')" | grep -i maxauthtries | awk '{print $2}' || echo 100 )
+
+          [[ "$audit_out" -lt 5 ]] && echo 'configured' || echo 'not_configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_auth_max_retry_status_check
+
+# sshd_maxauthtries_configured | Audit
+- name: "sshd_maxauthtries_configured | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh ]; then
+          grep -Pis '^\h*maxauthtries\h+"?([5-9]|[1-9][0-9]+)\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf && echo 'not_configured' || echo 'configured'
+      else
+          echo 'configured'
+      fi
+  changed_when: false
+  register: ssh_auth_max_retry_conf_check
+
+# Extract audit result
+- set_fact:
+    ssh_auth_max_retry_config_check:
+      remediation_status: "{{ true if (ssh_auth_max_retry_status_check.stdout == 'configured' and ssh_auth_max_retry_conf_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_maxauthtries_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MaxAuthTries|#MaxAuthTries)"
+    state: absent
+  when: not audit_only and not ssh_auth_max_retry_config_check.remediation_status
+
+# sshd_maxauthtries_configured | Remediation
+- name: "sshd_maxauthtries_configured | Remediation"
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    regexp: "^(MaxAuthTries)"
+    line: 'MaxAuthTries {{ rhel8.sshd.auth_max_retry | default(cis_defaults.sshd.auth_max_retry) }}'
+    state: present
+  when: not audit_only and not ssh_auth_max_retry_config_check.remediation_status
+
+# sshd_maxauthtries_configured | Remediation
+- name: "sshd_maxauthtries_configured | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_auth_max_retry_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_auth_max_retry_config_check.remediation_status }}"

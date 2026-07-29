@@ -1,0 +1,34 @@
+# fs_suid_dumpable_configured
+#
+# fs.suid_dumpable governs whether a privileged process (with the setuid bit) can
+# generate a core dump, regardless of other configurations.
+# fs.suid_dumpable values:
+
+- name: "fs_suid_dumpable_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n fs.suid_dumpable 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*fs[.]suid_dumpable\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "0" ] && [ "$persisted" = "0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: fs_suid_dumpable_status
+
+# Extract audit result
+- set_fact:
+    fs_suid_dumpable_check:
+      remediation_status: "{{ true if fs_suid_dumpable_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "fs_suid_dumpable_configured | Remediation"
+  ansible.posix.sysctl:
+    name: fs.suid_dumpable
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not fs_suid_dumpable_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ fs_suid_dumpable_check.remediation_status }}"

@@ -1,0 +1,152 @@
+# gdm_screen_locks_cannot_overridden
+#
+# GNOME Desktop Manager can make the screen lock automatically whenever the user
+# is idle for some amount of time.
+#
+# By using the lockdown mode in dconf, you can prevent users from changing specific
+# settings.
+# To lock down a dconf key or subpath, create a locks subdirectory in the keyfile directory.
+# The files inside this directory contain a list of keys or subpaths to lock. Just as with the
+# keyfiles, you may add any number of files to this directory.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_screen_locks_cannot_overridden | Audit"
+  shell:
+    cmd: l_kfile="$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/)" && echo $l_kfile || echo ''
+  changed_when: false
+  register: lock_key_file_status_check
+
+# Define compliace status
+- set_fact:
+    gdm_screen_lock_protection_rule_status: "{{ true if lock_key_file_status_check.stdout != '' else false }}"
+  changed_when: false
+
+# Extract profile name for existing key file
+- name: "gdm_screen_locks_cannot_overridden | Audit"
+  shell:
+    cmd: grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+  changed_when: false
+  register: banner_profile_status_check
+  when: gdm_screen_lock_protection_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and lock_key_file_status_check.stdout != '') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_protection_rule_status
+
+# Extract profile directory
+- name: "gdm_screen_locks_cannot_overridden | Audit"
+  shell:
+    cmd: l_kfd="/etc/dconf/db/$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F'/' '{split($(NF-1),a,".");print a[1]}').d" && echo $l_kfd || echo ''
+  changed_when: false
+  register: gdm_profile_directory_status
+  when: gdm_screen_lock_protection_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_profile_directory_status.stdout != '') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_protection_rule_status
+
+# Check screen idle-delay file is locked
+- name: "gdm_screen_locks_cannot_overridden | Audit"
+  shell:
+    cmd: 'grep -Prilq "/org/gnome/desktop/session/idle-delay\b" {{ gdm_profile_directory_status.stdout }} && echo locked || echo not_locked'
+  changed_when: false
+  register: gdm_screen_idle_delay_protection_status
+  when: gdm_screen_lock_protection_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_screen_idle_delay_protection_status.stdout == 'locked') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_protection_rule_status
+
+# Check screen  file is locked
+- name: "gdm_screen_locks_cannot_overridden | Audit"
+  shell:
+    cmd: 'grep -Prilq "/org/gnome/desktop/screensaver/lock-delay\b" {{ gdm_profile_directory_status.stdout }} && echo locked || echo not_locked'
+  changed_when: false
+  register: gdm_screen_lock_delay_protection_status
+  when: gdm_screen_lock_protection_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_protection_rule_status: "{{ true if (gdm_screen_lock_protection_rule_status and gdm_screen_lock_delay_protection_status.stdout == 'locked') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_protection_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_screen_lock_protection_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_screen_lock_protection_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_screen_locks_cannot_overridden | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+# gdm_screen_locks_cannot_overridden | Remediation
+- name: "gdm_screen_locks_cannot_overridden | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/01-banner-message
+    src: rhel/etc/gdm.d/01-banner-message.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+# gdm_screen_locks_cannot_overridden | Remediation
+- name: "gdm_screen_locks_cannot_overridden | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/00-screensaver
+    src: rhel/etc/gdm.d/00-screensaver.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+# gdm_screen_locks_cannot_overridden | Remediation
+- name: "gdm_screen_locks_cannot_overridden | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/locks/screensaver
+    src: rhel/etc/gdm.d/locks/screensaver.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+# gdm_screen_locks_cannot_overridden | Remediation
+- name: "gdm_screen_locks_cannot_overridden | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_screen_lock_protection_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_screen_lock_protection_check.remediation_status }}"

@@ -1,0 +1,42 @@
+# audit_configuration_immutable
+#
+# Set system audit so that audit rules cannot be modified with auditctl . Setting the flag
+# "-e 2" forces audit to be put in immutable mode. Audit changes can only be made on
+# system reboot.
+#
+# Note: This setting will require the system to be rebooted to update the active auditd
+# configuration settings.
+
+- name: "audit_configuration_immutable | Audit"
+  shell:
+    cmd: grep -Phq -- '^\h*-e\h+2\b' /etc/audit/rules.d/*.rules && echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: audit_immutable_conf_status_check
+
+# Extract audit result
+- set_fact:
+    audit_immutable_conf_check:
+      remediation_status: "{{ true if audit_immutable_conf_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_configuration_immutable | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/99-cis-finalize.rules
+    # Break line is required
+    content: |
+      -e 2
+
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_immutable_conf_check.remediation_status
+
+ # audit_configuration_immutable | Remediation
+- name: "audit_configuration_immutable | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_immutable_conf_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_immutable_conf_check.remediation_status }}"

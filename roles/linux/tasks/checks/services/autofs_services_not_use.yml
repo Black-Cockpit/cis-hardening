@@ -1,0 +1,39 @@
+# autofs_services_not_use
+#
+# autofs allows automatic mounting of devices, typically including CD/DVDs and USB
+# drives.
+
+- name: "autofs_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q autofs && echo installed || echo not_installed
+  changed_when: false
+  register: autofs_status_check
+
+# autofs_services_not_use | Audit
+- name: "autofs_services_not_use | Audit"
+  systemd:
+    name: autofs
+  ignore_errors: yes
+  changed_when: false
+  register: autofs_service_status_check
+  when: autofs_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    autofs_check:
+      remediation_status: "{{ true if (autofs_status_check.stdout == 'not_installed' or (autofs_service_status_check.status.ActiveState == 'inactive' and (autofs_service_status_check.status.UnitFileState is not defined or autofs_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "autofs_services_not_use | Remediation"
+  systemd:
+    name: autofs
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not autofs_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ autofs_check.remediation_status }}"

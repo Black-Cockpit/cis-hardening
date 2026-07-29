@@ -1,0 +1,26 @@
+# selinux_installed
+#
+# SELinux provides Mandatory Access Control.
+
+- name: "selinux_installed | Audit"
+  shell:
+    cmd: rpm -qa | grep -q libselinux && echo installed || not_installed
+  changed_when: false
+  register: libselinux_status_check
+
+# Extract audit result
+- set_fact:
+    libselinux_check:
+      remediation_status: "{{ true if libselinux_status_check.stdout == 'installed' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "selinux_installed | Remediation"
+  package:
+    name: libselinux
+    state: present
+  when: not audit_only and not libselinux_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ libselinux_check.remediation_status }}"

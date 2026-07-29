@@ -1,0 +1,99 @@
+# gdm_autorun_never_enabled
+#
+# The autorun-never setting allows the GNOME Desktop Display Manager to disable
+# autorun through GDM.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_autorun_never_enabled | Audit"
+  shell:
+    cmd: grep -Prils -- '^\h*autorun-never\b' /etc/dconf/db/*.d | awk -F\/ '{split($(NF-1),a,".");print a[1]}' || echo ''
+  changed_when: false
+  register: banner_profile_status_check
+
+# Define compliace status
+- set_fact:
+    gdm_autorun_rule_status: "{{ true if banner_profile_status_check.stdout != '' else false }}"
+  changed_when: false
+
+
+# Check profile exists
+- name: "gdm_autorun_never_enabled | Audit"
+  shell:
+    cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+  changed_when: false
+  register: banner_profile_exist_status_check
+  when: gdm_autorun_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_autorun_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: gdm_autorun_rule_status
+
+# Check if autorun-never is enabled
+- name: "gdm_autorun_never_enabled | Audit"
+  shell:
+    cmd: |
+      profile_conf=$(l_kfile="$(grep -Prils -- '^\h*autorun-never\b' /etc/dconf/db/*.d)" && echo $l_kfile || echo '');
+      grep -Pqrs -- '^\h*autorun-never\h*=\h*true\b' $profile_conf && echo enabled || echo not_enabled
+  changed_when: false
+  register: gdm_autorunnever_status_check
+  when: gdm_autorun_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_autorun_rule_status: "{{ true if (gdm_autorun_rule_status and gdm_autorunnever_status_check.stdout == 'enabled') else false }}"
+  changed_when: false
+  when: gdm_autorun_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_autorun_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_autorun_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_autorun_never_enabled | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_autorun_check.remediation_status
+
+# gdm_autorun_never_enabled | Remediation
+- name: "gdm_autorun_never_enabled | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/00-media-autorun
+    src: rhel/etc/gdm.d/00-media-autorun.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_autorun_check.remediation_status
+
+# gdm_autorun_never_enabled | Remediation
+- name: "gdm_autorun_never_enabled | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_autorun_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_autorun_check.remediation_status }}"

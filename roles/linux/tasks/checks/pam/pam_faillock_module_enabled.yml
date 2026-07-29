@@ -1,0 +1,37 @@
+# pam_faillock_module_enabled
+#
+# The pam_faillock.so module maintains a list of failed authentication attempts per user
+# during a specified interval and locks the account in case there were more than the
+# configured number of consecutive failed authentications (this is defined by the deny
+# parameter in the faillock configuration). It stores the failure records into per-user files in
+# the tally directory.
+
+- name: "pam_faillock_module_enabled | Audit"
+  shell:
+    cmd: |
+      if [ -f /etc/authselect/authselect.conf ]; then
+          # Check if pam_faillock module is configured
+          grep -Pq -- '\bpam_faillock.so\b' /etc/pam.d/{password,system}-auth && echo 'configured' || echo 'not_configured'
+      else
+          echo 'not_configured'
+      fi
+  changed_when: false
+  register: authselect_pam_faillock_module_status_check
+
+ # Extract audit result
+- set_fact:
+    authselect_pam_faillock_module_check:
+      remediation_status: "{{ true if authselect_pam_faillock_module_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "pam_faillock_module_enabled | Remediation"
+  shell:
+    cmd: |
+      authselect enable-feature with-faillock
+      authselect apply-changes
+  when: not audit_only and not authselect_pam_faillock_module_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ authselect_pam_faillock_module_check.remediation_status }}"

@@ -1,0 +1,30 @@
+# access_etc_issue_net_configured
+#
+# The contents of the /etc/issue.net file are displayed to users prior to login for remote
+# connections from configured services.
+
+- name: "access_etc_issue_net_configured | Audit"
+  stat: 
+    path: /etc/issue.net
+  changed_when: false
+  register: issue_net_file_stat
+
+# Extract audit result
+- set_fact:
+    issue_net_file_permission_check:
+      remediation_status: "{{ true if (issue_net_file_stat.stat.mode == '0644' and issue_net_file_stat.stat.pw_name == 'root' and issue_net_file_stat.stat.gr_name == 'root') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "access_etc_issue_net_configured | Remediation"
+  template:
+    src: rhel/etc/issue.net.j2
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+  when: not audit_only and not issue_net_file_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ issue_net_file_permission_check.remediation_status }}"

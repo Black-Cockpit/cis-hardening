@@ -1,0 +1,41 @@
+# bluetooth_services_not_use
+#
+# Bluetooth is a short-range wireless technology standard that is used for exchanging
+# data between devices over short distances. It employs UHF radio waves in the ISM
+# bands, from 2.402 GHz to 2.48 GHz. It is mainly used as an alternative to wire
+# connections.
+
+- name: "bluetooth_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q bluez && echo installed || echo not_installed
+  changed_when: false
+  register: bluez_status_check
+
+# bluetooth_services_not_use | Audit
+- name: "bluetooth_services_not_use | Audit"
+  systemd:
+    name: bluetooth
+  ignore_errors: yes
+  changed_when: false
+  register: bluetooth_service_status_check
+  when: bluez_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    bluetooth_check:
+      remediation_status: "{{ true if (bluez_status_check.stdout == 'not_installed' or (bluetooth_service_status_check.status.ActiveState == 'inactive' and (bluetooth_service_status_check.status.UnitFileState is not defined or bluetooth_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "bluetooth_services_not_use | Remediation"
+  systemd:
+    name: bluetooth
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not bluetooth_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ bluetooth_check.remediation_status }}"

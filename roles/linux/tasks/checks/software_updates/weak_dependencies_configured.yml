@@ -1,0 +1,30 @@
+# weak_dependencies_configured
+#
+# The install_weak_deps option controls whether dnf installs packages that are
+# only weak dependencies. Disabling it reduces the amount of installed
+# software and the potential attack surface.
+
+- name: "weak_dependencies_configured | Audit"
+  shell:
+    cmd: grep -Piq -- '^\h*install_weak_deps\h*=\h*(0|false|no)\b' /etc/dnf/dnf.conf && echo configured || echo not_configured
+  changed_when: false
+  register: weak_deps_status
+
+# Extract audit result
+- set_fact:
+    weak_deps_check:
+      remediation_status: "{{ true if weak_deps_status.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required configuration line
+- name: "weak_dependencies_configured | Remediation"
+  lineinfile:
+    path: /etc/dnf/dnf.conf
+    regexp: '^\s*install_weak_deps\s*='
+    line: "install_weak_deps=0"
+    insertafter: '^\[main\]'
+  when: not audit_only and not weak_deps_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ weak_deps_check.remediation_status }}"

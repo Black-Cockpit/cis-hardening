@@ -1,0 +1,46 @@
+# permissions_bootloader_config_configured
+#
+# The grub files contain information on boot settings and passwords for unlocking boot
+# options.
+
+- set_fact:
+    expected_bootloader_files_permissions: "{{ '0700' if is_uefi_boot else '0600' }}"
+    bootloader_files_path: "{{ '/boot/grub2/' if not is_uefi_boot else '/boot/efi/EFI/' }}"
+# permissions_bootloader_config_configured | Audit
+- name: "permissions_bootloader_config_configured | Audit"
+  shell:
+    cmd: 'find {{ bootloader_files_path }} -type f \( -perm /077 -o ! -user root -o ! -group root \) | wc -l'
+  changed_when: false
+  register: non_compliant_permission_count
+
+# Extract audit result
+- set_fact:
+    bootloader_files_permissions_check:
+      remediation_status: "{{ true if non_compliant_permission_count.stdout == '0' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_bootloader_config_configured | Remediation"
+  find:
+    paths: "{{ bootloader_files_path }}"
+    file_type: file
+    recurse: true
+  register: bootloader_files_list
+  when: not audit_only and not bootloader_files_permissions_check.remediation_status
+
+# permissions_bootloader_config_configured | Remediation
+- name: "permissions_bootloader_config_configured | Remediation"
+  file:
+    name: "{{ item.path }}"
+    mode: "{{ expected_bootloader_files_permissions }}"
+    owner: root
+    group: root
+  with_items:
+  - "{{ bootloader_files_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not bootloader_files_permissions_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ bootloader_files_permissions_check.remediation_status }}"

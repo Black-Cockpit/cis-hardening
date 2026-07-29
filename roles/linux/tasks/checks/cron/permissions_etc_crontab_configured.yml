@@ -1,0 +1,31 @@
+# permissions_etc_crontab_configured
+#
+# The /etc/crontab file is used by cron to control its own jobs. The commands in this
+# item make sure that root is the user and group owner of the file and that only the owner
+# can access the file.
+
+- name: "permissions_etc_crontab_configured | Audit"
+  stat:
+    path: /etc/crontab
+  changed_when: false
+  register: crontab_stat_check
+
+# Extract audit result
+- set_fact:
+    crontab_permission_check:
+      remediation_status: "{{ true if (crontab_stat_check.stat.mode == '0600' and crontab_stat_check.stat.pw_name == 'root' and crontab_stat_check.stat.gr_name == 'root') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "permissions_etc_crontab_configured | Remediation"
+  file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: "0600"
+    state: file
+  when: not audit_only and not crontab_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ crontab_permission_check.remediation_status }}"

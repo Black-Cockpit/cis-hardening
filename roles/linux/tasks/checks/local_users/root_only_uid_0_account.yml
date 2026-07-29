@@ -1,0 +1,32 @@
+# root_only_uid_0_account
+#
+# This access must be limited to only the default root account and only from the system
+# console. Administrative access must be through an unprivileged account using an
+# approved mechanism as noted in Item 5.6 Ensure access to the su command is
+# restricted.
+
+- name: "root_only_uid_0_account | Audit"
+  shell:
+    cmd: |
+      awk -F: '($3 == 0 && $1 != "root") { print $1 }' /etc/passwd
+  changed_when: false
+  register: root_id_users
+
+# Extract audit result
+- set_fact:
+    root_id_users_check:
+      remediation_status: "{{ true if root_id_users.stdout == '' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "root_only_uid_0_account | Remediation"
+  user:
+    name: "{{ item }}"
+    state: absent
+    force: true
+  loop: "{{ root_id_users.stdout_lines | default([]) | list }}"
+  when: not audit_only and not root_id_users_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_id_users_check.remediation_status }}"

@@ -1,0 +1,110 @@
+# audit_tools_755_more_restrictive
+#
+# Audit tools include, but are not limited to, vendor-provided and open source audit tools
+# needed to successfully view and manipulate audit information system activity and
+# records. Audit tools include custom queries and report generators.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Configure auditd file access
+  block:
+  # Pre Audit | Get audit log directory
+  - name: Pre Audit | Get audit log directory
+    shell:
+      cmd: dirname $( awk -F"=" '/^\s*log_file\s*=\s*/ {print $2}' /etc/audit/auditd.conf)
+    changed_when: false
+    register: audit_log_dir
+
+  # Pre Audit | List audit log files
+  - name: Pre Audit | List audit log files
+    find:
+      paths:
+        - "{{ audit_log_dir.stdout }}"
+      file_type: file
+    changed_when: false
+    register: audit_log_files_list
+
+  # Pre Audit | stat audit log files
+  - name: Pre Audit | stat audit log files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_log_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_log_files_status
+
+  # Pre Audit | List audit configuration files
+  - name: Pre Audit | List audit configuration files
+    find:
+      paths:
+        - /etc/audit/
+        - /etc/audit/rules.d/
+        - /etc/audit/plugins.d/
+      patterns:
+        - "*.conf"
+        - "*.rules"
+      file_type: file
+    changed_when: false
+    register: audit_conf_files_list
+
+  # Pre Audit | stat audit configuration files
+  - name: Pre Audit | stat audit configuration files
+    stat:
+      path: "{{ item.path }}"
+    changed_when: false
+    loop: "{{ audit_conf_files_list.files | default([]) | list }}"
+    loop_control:
+      label: "{{ item.path | default() }}"
+    register: audit_conf_files_status
+
+  # Pre Audit | stat audit tools files
+  - name: Pre Audit | stat audit tools files
+    stat:
+      path: "{{ item }}"
+    changed_when: false
+    loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+    register: audit_tools_status
+
+# Audit | Collect the current configuration state
+- name: "audit_tools_755_more_restrictive | Audit"
+  shell:
+    cmd: |
+      [ $(({{ item.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
+      echo 'not_configured' || echo 'configured'
+  changed_when: false
+  register: audit_tools_permission_status
+  loop: "{{ audit_tools_status.results | default([]) | list }}"
+  no_log: yes
+  vars:
+    expected_file_mask: "0022"
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Chack if all audit log files are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout == 'configured')) }}"
+  loop: "{{ audit_tools_permission_status.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_tools_permission_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_tools_755_more_restrictive | Remediation"
+  file:
+    path: "{{ item }}"
+    mode: "0755"
+  loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+  when: not audit_only and not audit_tools_permission_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_tools_permission_check.remediation_status }}"

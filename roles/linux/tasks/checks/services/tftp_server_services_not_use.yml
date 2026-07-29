@@ -1,0 +1,70 @@
+# tftp_server_services_not_use
+#
+# Trivial File Transfer Protocol (TFTP) is a simple protocol for exchanging files between
+# two TCP/IP machines. TFTP servers allow connections from a TFTP Client for sending
+# and receiving files.
+
+- name: "tftp_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "tftp-server" && echo installed || echo not_installed
+  changed_when: false
+  register: tftp_server_status_check
+
+# tftp_server_services_not_use | Audit
+- name: "tftp_server_services_not_use | Audit"
+  systemd:
+    name: tftp
+  ignore_errors: yes
+  changed_when: false
+  register: tftp_server_service_status_check
+  when: tftp_server_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    tftp_server_remediation_status: "{{ true if (tftp_server_status_check.stdout == 'not_installed' or (tftp_server_service_status_check.status.ActiveState == 'inactive' and (tftp_server_service_status_check.status.UnitFileState is not defined or tftp_server_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# tftp_server_services_not_use | Audit
+- name: "tftp_server_services_not_use | Audit"
+  systemd:
+    name: tftp.socket
+  ignore_errors: yes
+  changed_when: false
+  register: tftp_socket_status_check
+  when: tftp_server_status_check.stdout == 'installed'
+
+# Append to remediation status
+- set_fact:
+    tftp_server_remediation_status: "{{ true if (tftp_server_remediation_status and (tftp_socket_status_check.status.ActiveState == 'inactive' and (tftp_socket_status_check.status.UnitFileState is not defined or tftp_socket_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: tftp_server_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    tftp_server_check:
+      remediation_status: "{{ true if tftp_server_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "tftp_server_services_not_use | Remediation"
+  systemd:
+    name: tftp
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not tftp_server_check.remediation_status
+
+# tftp_server_services_not_use | Remediation
+- name: "tftp_server_services_not_use | Remediation"
+  systemd:
+    name: tftp.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not tftp_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ tftp_server_check.remediation_status }}"

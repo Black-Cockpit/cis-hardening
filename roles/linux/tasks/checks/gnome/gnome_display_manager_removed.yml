@@ -1,0 +1,46 @@
+# gnome_display_manager_removed
+#
+# The GNOME Display Manager (GDM) is a program that manages graphical display
+# servers and handles graphical user logins.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Extract audit result
+- set_fact:
+    gdm_check:
+      remediation_status: "{{ true if not gdm_installed else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gnome_display_manager_removed | Remediation"
+  package:
+    name: gdm
+    state: absent
+  when: not audit_only and not gdm_check.remediation_status
+# gnome_display_manager_removed | Remediation
+- name: "gnome_display_manager_removed | Remediation"
+  package:
+    name: gdm3
+    state: absent
+  when: not audit_only and not gdm_check.remediation_status
+
+# Update gdm package tracker so the following rules see the removal
+- set_fact:
+    gdm_installed: false
+  when: not audit_only and not gdm_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_check.remediation_status }}"

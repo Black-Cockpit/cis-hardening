@@ -1,0 +1,139 @@
+# gdm_screen_locks_when_user_idle
+#
+# GNOME Desktop Manager can make the screen lock automatically whenever the user
+# is idle for some amount of time.
+#
+# - idle-delay=uint32 {n}: Number of seconds of inactivity before the screen goes blank
+# - lock-delay=uint32 {n}: Number of seconds after the screen is blank before locking the screen
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_screen_locks_when_user_idle | Audit"
+  shell:
+    cmd: l_kfile="$(grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/)" && echo $l_kfile || echo ''
+  changed_when: false
+  register: lock_key_file_status_check
+
+# Define compliace status
+- set_fact:
+    gdm_screen_lock_rule_status: "{{ true if lock_key_file_status_check.stdout != '' else false }}"
+  changed_when: false
+
+# Extract profile name for existing key file
+- name: "gdm_screen_locks_when_user_idle | Audit"
+  shell:
+    cmd: grep -Psril '^\h*idle-delay\h*=\h*uint32\h+\d+\b' /etc/dconf/db/*/ | awk -F\/ '{split($(NF-1),a,".");print a[1]}'
+  changed_when: false
+  register: banner_profile_status_check
+  when: gdm_screen_lock_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and lock_key_file_status_check.stdout != '') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_rule_status
+
+# Extract idle-delay value
+- name: "gdm_screen_locks_when_user_idle | Audit"
+  shell:
+    cmd: "awk -F 'uint32' '/idle-delay/{print $2}' {{ lock_key_file_status_check.stdout }} | xargs || ''"
+  changed_when: false
+  register: gdm_idle_delay_status
+  when: gdm_screen_lock_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and gdm_idle_delay_status.stdout != '' and (gdm_idle_delay_status.stdout | int ) > 0 and (gdm_idle_delay_status.stdout | int ) <= 900 ) else false }}"
+  changed_when: false
+  when: gdm_screen_lock_rule_status
+
+
+# Extract idle-delay value
+- name: "gdm_screen_locks_when_user_idle | Audit"
+  shell:
+    cmd: "awk -F 'uint32' '/lock-delay/{print $2}' {{ lock_key_file_status_check.stdout }} | xargs || ''"
+  changed_when: false
+  register: gdm_lock_delay_status
+  when: gdm_screen_lock_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and gdm_lock_delay_status.stdout != '' and (gdm_lock_delay_status.stdout | int ) <= 5 ) else false }}"
+  changed_when: false
+  when: gdm_screen_lock_rule_status
+
+# Check profile exists
+- name: "gdm_screen_locks_when_user_idle | Audit"
+  shell:
+    cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+  changed_when: false
+  register: banner_profile_exist_status_check
+  when: gdm_screen_lock_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_screen_lock_rule_status: "{{ true if (gdm_screen_lock_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: gdm_screen_lock_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_screen_lock_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_screen_lock_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_screen_locks_when_user_idle | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+# gdm_screen_locks_when_user_idle | Remediation
+- name: "gdm_screen_locks_when_user_idle | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/01-banner-message
+    src: rhel/etc/gdm.d/01-banner-message.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+# gdm_screen_locks_when_user_idle | Remediation
+- name: "gdm_screen_locks_when_user_idle | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/00-screensaver
+    src: rhel/etc/gdm.d/00-screensaver.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+# gdm_screen_locks_when_user_idle | Remediation
+- name: "gdm_screen_locks_when_user_idle | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_screen_lock_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_screen_lock_check.remediation_status }}"

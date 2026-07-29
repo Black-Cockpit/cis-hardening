@@ -1,0 +1,28 @@
+# default_group_root_account_gid_0
+#
+# The usermod command can be used to specify which group the root account belongs to.
+# This affects permissions of files that are created by the root account.
+
+- name: "default_group_root_account_gid_0 | Audit"
+  user:
+    name: root
+  changed_when: false
+  register: root_id_status_check
+
+# Extract audit result
+- set_fact:
+    root_id_check:
+      remediation_status: "{{ true if (root_id_status_check.uid is defined and root_id_status_check.uid == 0) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "default_group_root_account_gid_0 | Remediation"
+  user:
+    name: root
+    uid: 0
+    state: present
+  when: not audit_only and not root_id_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ root_id_check.remediation_status }}"

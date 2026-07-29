@@ -1,0 +1,28 @@
+# dev_shm_separate_partition
+#
+# The /dev/shm directory is a world-writable directory that can function as shared memory
+# that facilitates inter process communication (IPC).
+
+- name: "dev_shm_separate_partition | Audit"
+  shell:
+    cmd: findmnt -nk /dev/shm | grep -Eq '\/dev/shm\s' && echo exists || echo not_exists
+  changed_when: false
+  register: dev_shm_partition_status
+
+# Extract audit result
+- set_fact:
+    dev_shm_partition:
+      remediation_status: "{{ true if dev_shm_partition_status.stdout == 'exists' else false }}"
+      remediation: "Consider to mount /dev/shm is a separate partition and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "dev_shm_separate_partition | Remediation"
+  debug:
+    msg: "Consider to mount /dev/shm in a seperate partition and update /etc/fstab"
+  when: not audit_only and not dev_shm_partition.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ dev_shm_partition.remediation_status }}"

@@ -1,0 +1,27 @@
+# separate_partition_exists_var_log
+#
+# The /var/log directory is used by system services to store log data .
+
+- name: "separate_partition_exists_var_log | Audit"
+  shell:
+    cmd: mount | grep -Eq '\s\/var\/log\s' && echo compliant || echo not_compliant
+  changed_when: false
+  register: var_log_partition_status
+
+# Extract audit result
+- set_fact:
+    var_log_partition:
+      remediation_status: "{{ true if var_log_partition_status.stdout == 'compliant' else false }}"
+      remediation: "Consider to create a separate partition for /var/log and update /etc/fstab"
+  changed_when: false
+
+# Appending audit result
+- name: "separate_partition_exists_var_log | Remediation"
+  debug:
+    msg: "Consider to create a separate partition for /var/log and update /etc/fstab"
+  when: not audit_only and not var_log_partition.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ var_log_partition.remediation_status }}"

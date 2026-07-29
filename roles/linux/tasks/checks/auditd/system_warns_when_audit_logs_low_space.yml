@@ -1,0 +1,89 @@
+# system_warns_when_audit_logs_low_space
+#
+# The auditd daemon can be configured to halt the system, put the system in single user
+# mode or send a warning message, if the partition that holds the audit log files is low on
+# space.
+#
+# The space_left_action parameter tells the system what action to take when the system
+# has detected that it is starting to get low on disk space. Valid values are ignore , syslog ,
+# rotate , email , exec , suspend , single , and halt .
+#
+# - ignore  : the audit daemon does nothing
+# - syslog  : the audit daemon will issue a warning to syslog
+# - rotate  : the audit daemon will rotate logs, losing the oldest to free up space
+# - email   : the audit daemon will send a warning to the email account specified in
+#             action_mail_acct as well as sending the message to syslog
+# - exec    : /path-to-script will execute the script. You cannot pass parameters to the
+#             script. The script is also responsible for telling the auditd daemon to resume
+#             logging once its completed its action
+# - suspend : the audit daemon will stop writing records to the disk
+# - single  : the audit daemon will put the computer system in single user mode
+# - halt    : the audit daemon will shut down the system
+#
+# The admin_space_left_action parameter tells the system what action to take when the
+# system has detected that it is low on disk space. Valid values are ignore , syslog ,
+# rotate , email , exec , suspend , single , and halt .
+#
+# - ignore  : the audit daemon does nothing
+# - syslog  : the audit daemon will issue a warning to syslog
+# - rotate  : the audit daemon will rotate logs, losing the oldest to free up space
+# - email   : the audit daemon will send a warning to the email account specified in
+#             action_mail_acct as well as sending the message to syslog
+# - exec    : /path-to-script will execute the script. You cannot pass parameters to the
+#             script. The script is also responsible for telling the auditd daemon to resume
+#             logging once its completed its action
+# - suspend : the audit daemon will stop writing records to the disk
+# - single  : the audit daemon will put the computer system in single user mode
+# - halt    : the audit daemon will shut down the system
+
+- name: "system_warns_when_audit_logs_low_space | Audit"
+  shell:
+    cmd: |
+      grep -Pq -- '^\h*space_left_action\h*=\h*(email|exec|single|halt)\b' /etc/audit/auditd.conf && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: audit_space_left_action_status_check
+
+# system_warns_when_audit_logs_low_space | Audit
+- name: "system_warns_when_audit_logs_low_space | Audit"
+  shell:
+    cmd: |
+      grep -Pq -- '^\h*admin_space_left_action\h*=\h*(single|halt)\b' /etc/audit/auditd.conf && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  register: audit_admin_space_left_action_action_status_check
+
+# Extract audit result
+- set_fact:
+    audit_disk_warning_action_check:
+      remediation_status: "{{ true if (audit_space_left_action_status_check.stdout == 'configured' and audit_admin_space_left_action_action_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "system_warns_when_audit_logs_low_space | Remediation"
+  lineinfile: 
+    path: /etc/audit/auditd.conf
+    regexp: "{{ item }}"
+    state: absent
+  loop:
+  - '^\s*space_left_action\s*='
+  - '^\s*admin_space_left_action\s*='
+  when: not audit_only and not audit_disk_warning_action_check.remediation_status
+
+# system_warns_when_audit_logs_low_space | Remediation
+- name: "system_warns_when_audit_logs_low_space | Remediation"
+  lineinfile: 
+    path: /etc/audit/auditd.conf
+    regexp: "{{ item.regex }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+  - line: "space_left_action = single"
+    regex: '^(space_left_action = single)'
+  - line: "admin_space_left_action = single"
+    regex: '^(admin_space_left_action = single)'
+  when: not audit_only and not audit_disk_warning_action_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_disk_warning_action_check.remediation_status }}"

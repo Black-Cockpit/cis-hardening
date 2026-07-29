@@ -1,0 +1,37 @@
+# selinux_not_disabled_bootloader_configuration
+#
+# SELinux provides Mandatory Access Control.
+
+- name: "selinux_not_disabled_bootloader_configuration | Audit"
+  shell:
+    cmd: grubby --info=ALL | grep -Pqo '(selinux|enforcing)=0\b' && echo disabled || echo not_disabled
+  changed_when: false
+  register: selinux_status_check
+
+# Extract audit result
+- set_fact:
+    selinux_check:
+      remediation_status: "{{ true if selinux_status_check.stdout == 'not_disabled' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "selinux_not_disabled_bootloader_configuration | Remediation"
+  replace:
+    path: /etc/default/grub
+    regexp: '(selinux|enforcing)\s*=\s*0\s*'
+    replace: ''
+  ignore_errors: true # noqa ignore-errors
+  when: not audit_only and not selinux_check.remediation_status
+
+# selinux_not_disabled_bootloader_configuration | Remediation
+- name: "selinux_not_disabled_bootloader_configuration | Remediation"
+  shell:
+    cmd: |
+      grep -Prsq -- '\h*([^#\n\r]+\h+)?kernelopts=([^#\n\r]+\h+)?(selinux|enforcing)=0\b' /boot/grub2/boot/efi && \
+      grub2-mkconfig -o "$(grep -Prl --'\h*([^#\n\r]+\h+)?kernelopts=([^#\n\r]+\h+)?(selinux|enforcing)=0\b' /boot/grub2/boot/efi)"
+  when: not audit_only and not selinux_check.remediation_status and is_uefi_boot
+  ignore_errors: true
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ selinux_check.remediation_status }}"

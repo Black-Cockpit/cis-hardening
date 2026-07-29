@@ -1,0 +1,42 @@
+# sshd_crypto_policy_not_set
+#
+# System-wide Crypto policy can be over-ridden or opted out of for openSSH
+
+- name: "sshd_crypto_policy_not_set | Audit"
+  shell:
+    cmd: |
+      if [ -d /etc/sysconfig/sshd ]; then
+          # Check openssh crypto policy is enabled
+          grep -Pi '^\h*CRYPTO_POLICY\h*=' /etc/sysconfig/sshd && echo 'enabled' || echo 'disabled'
+      else
+          echo 'disabled'
+      fi
+  changed_when: false
+  register: ssh_crypto_policy_status_check
+
+# Extract audit result
+- set_fact:
+    ssh_crypto_policy_config_check:
+      remediation_status: "{{ true if ssh_crypto_policy_status_check.stdout == 'disabled' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "sshd_crypto_policy_not_set | Remediation"
+  shell:
+    cmd: |
+      if [ -d /etc/sysconfig/sshd ]; then
+          # Disable openssh crypto policy
+          sed -ri "s/^\s*(CRYPTO_POLICY\s*=.*)$/# \1/" /etc/sysconfig/sshd
+      fi
+  when: not audit_only and not ssh_crypto_policy_config_check.remediation_status
+
+# sshd_crypto_policy_not_set | Remediation
+- name: "sshd_crypto_policy_not_set | Remediation"
+  systemd:
+    name: sshd
+    state: reloaded
+  when: not audit_only and not ssh_crypto_policy_config_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ssh_crypto_policy_config_check.remediation_status }}"

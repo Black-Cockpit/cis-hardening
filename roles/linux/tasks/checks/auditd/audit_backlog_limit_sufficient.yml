@@ -1,0 +1,35 @@
+# audit_backlog_limit_sufficient
+#
+# The backlog limit has a default setting of 64
+
+- name: "audit_backlog_limit_sufficient | Audit"
+  shell:
+    cmd: |
+      audit='configured'
+
+      while read -r value; do
+          if [[ "$value" -lt 8191 ]]; then
+              audit='not_configured'
+              break
+          fi
+      done <<<$(awk -F '=' '{print $2}' <<<$(grubby --info=ALL | grep -Po "\baudit_backlog_limit=\d+\b" || echo 'audit_backlog_limit=0'))
+
+      echo "$audit"
+  changed_when: false
+  register: audit_backlog_limit_status_check
+
+# Extract audit result
+- set_fact:
+    audit_backlog_limit_check:
+      remediation_status: "{{ true if audit_backlog_limit_status_check.stdout == 'configured' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "audit_backlog_limit_sufficient | Remediation"
+  shell:
+    cmd: grubby --update-kernel ALL --args 'audit_backlog_limit=8192'
+  when: not audit_only and not audit_backlog_limit_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_backlog_limit_check.remediation_status }}"

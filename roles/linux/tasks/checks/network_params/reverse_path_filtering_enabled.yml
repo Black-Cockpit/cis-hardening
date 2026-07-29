@@ -1,0 +1,193 @@
+# reverse_path_filtering_enabled
+#
+# Setting net.ipv4.conf.all.rp_filter and net.ipv4.conf.default.rp_filter to 1
+# forces the Linux kernel to utilize reverse path filtering on a received packet to determine
+# if the packet was valid. Essentially, with reverse path filtering, if the return packet does
+# not go out the same interface that the corresponding source packet came from, the
+# packet is dropped (and logged if log_martians is set).
+
+- name: "reverse_path_filtering_enabled | Audit"
+  block:
+  # Check current net.ipv4.conf.all.rp_filter status
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.all.rp_filter" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_reverse_path_filter_all_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if ipv4_reverse_path_filter_all_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.conf.all.rp_filter is disabled on sysctl.conf file
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.all.rp_filter\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_reverse_path_filter_all_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_all_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_reverse_path_filter_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.all.rp_filter configuration
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.all.rp_filter\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_reverse_path_filter_all_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_reverse_path_filter_all_conf_check.results | list }}"
+    when: ipv4_reverse_path_filter_remediation_status
+
+  # Check if net.ipv4.conf.all.rp_filter is configured in one of the UFW sysctl configuration files
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.all.rp_filter\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_reverse_path_filter_all_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_reverse_path_filter_remediation_status
+
+# Audit net.ipv4.conf.default.rp_filter status
+- name: "reverse_path_filtering_enabled | Audit"
+  block:
+  # Check current net.ipv4.conf.default.rp_filter status
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.default.rp_filter" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '1' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_reverse_path_filter_default_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_reverse_path_filter_remediation_status
+
+  # Check net.ipv4.conf.default.rp_filter is disabled on sysctl.conf file
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}=\s{0,}1" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_reverse_path_filter_default_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_reverse_path_filter_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.default.rp_filter configuration
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: ipv4_reverse_path_filter_default_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_reverse_path_filter_default_conf_check.results | list }}"
+    when: ipv4_reverse_path_filter_remediation_status
+
+  # Check if net.ipv4.conf.default.rp_filter is configured in one of the UFW sysctl configuration files
+  - name: "reverse_path_filtering_enabled | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.rp_filter\s{0,}=\s{0,}1" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_reverse_path_filter_default_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ipv4_reverse_path_filter_remediation_status: "{{ true if (ipv4_reverse_path_filter_remediation_status and ipv4_reverse_path_filter_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ipv4_reverse_path_filter_remediation_status
+
+# Extract audit result
+- set_fact:
+    reverse_path_filter_check:
+      remediation_status: "{{ true if ipv4_reverse_path_filter_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "reverse_path_filtering_enabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.rp_filter
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not reverse_path_filter_check.remediation_status
+
+# reverse_path_filtering_enabled | Remediation
+- name: "reverse_path_filtering_enabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.rp_filter
+    value: 1
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not reverse_path_filter_check.remediation_status
+
+# reverse_path_filtering_enabled | Remediation
+- name: "reverse_path_filtering_enabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not reverse_path_filter_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ reverse_path_filter_check.remediation_status }}"

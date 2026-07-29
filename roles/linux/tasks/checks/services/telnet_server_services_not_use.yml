@@ -1,0 +1,39 @@
+# telnet_server_services_not_use
+#
+# The telnet-server package contains the telnet daemon, which accepts connections
+# from users from other systems via the telnet protocol.
+
+- name: "telnet_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q "telnet-server" && echo installed || echo not_installed
+  changed_when: false
+  register: telnet_server_status_check
+
+# telnet_server_services_not_use | Audit
+- name: "telnet_server_services_not_use | Audit"
+  systemd:
+    name: telnet.socket
+  ignore_errors: yes
+  changed_when: false
+  register: telnet_socket_service_status_check
+  when: telnet_server_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    telnet_server_check:
+      remediation_status: "{{ true if (telnet_server_status_check.stdout == 'not_installed' or (telnet_socket_service_status_check.status.ActiveState == 'inactive' and (telnet_socket_service_status_check.status.UnitFileState is not defined or telnet_socket_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "telnet_server_services_not_use | Remediation"
+  systemd:
+    name: telnet.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not telnet_server_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ telnet_server_check.remediation_status }}"

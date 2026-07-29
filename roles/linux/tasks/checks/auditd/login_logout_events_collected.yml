@@ -1,0 +1,101 @@
+# login_logout_events_collected
+#
+# Monitor login and logout events. The parameters below track changes to files
+# associated with login/logout events.
+#
+# - /var/log/lastlog : maintain records of the last time a user successfully loggedin.
+# - var/run/faillock : directory maintains records of login failures via the pam_faillock module.
+
+- name: "login_logout_events_collected | Audit"
+  shell:
+    cmd: |
+      LOGIN_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      awk "/^ *-w/ \
+      &&/"${LOGIN_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l
+  changed_when: false
+  loop:
+  - "/var/log/lastlog"
+  - "/var/run/faillock"
+  register: audit_login_rule_status_check
+
+# login_logout_events_collected | Audit
+- name: "login_logout_events_collected | Audit"
+  shell:
+    cmd: |
+      LOGIN_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      auditctl -l | awk "/^ *-w/ \
+      &&/"${LOGIN_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
+  changed_when: false
+  loop:
+  - "/var/log/lastlog"
+  - "/var/run/faillock"
+  register: audit_login_running_rule_status_check
+
+# Define remediation status
+- set_fact:
+    remediation_status: true
+  changed_when: false
+
+# Check if all login and logout events rules are configured
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_login_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Check if all login and logout events rules are loaded
+- set_fact:
+    remediation_status: "{{ true if (remediation_status and (item.stdout | int) > 0) else false}}"
+  loop: "{{ audit_login_running_rule_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
+
+# Extract audit result
+- set_fact:
+    audit_login_rule_check:
+      remediation_status: "{{ true if remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "login_logout_events_collected | Remediation"
+  copy:
+    dest: /etc/audit/rules.d/00-cis-login.rules
+    content: ''
+    mode: "0600"
+    owner: root
+  when: not audit_only and not audit_login_rule_check.remediation_status
+
+# login_logout_events_collected | Remediation
+- name: "login_logout_events_collected | Remediation"
+  shell:
+    cmd: |
+      LOGIN_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
+
+      rule_count=$(awk "/^ *-w/ \
+      &&/"${LOGIN_FILE_ESCAPED}"/ \
+      &&/ +-p *wa/ \
+      &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" /etc/audit/rules.d/*.rules | wc -l)
+
+      [[ "$rule_count" -gt 0 ]] || echo '-w {{ item }} -p wa -k logins' >> /etc/audit/rules.d/00-cis-login.rules
+  loop:
+  - "/var/log/lastlog"
+  - "/var/run/faillock"
+  when: not audit_only and not audit_login_rule_check.remediation_status
+
+ # login_logout_events_collected | Remediation
+- name: "login_logout_events_collected | Remediation"
+  shell:
+    cmd: augenrules --load
+  when: not audit_only and not audit_login_rule_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_login_rule_check.remediation_status }}"

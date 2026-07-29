@@ -37,13 +37,15 @@
 # Check if IPv6 is disabled
 - name: "Pre Audit | Check if IPv6 is disabled"
   block:
+  # Read the ipv6 module disable parameter (missing file means disabled)
   - name: "Pre Audit | Check if IPv6 is disabled"
     shell:
-      cmd: echo $([[ -f /sys/module/ipv6/parameters/disable ]] && cat /sys/module/ipv6/parameters/disable || 0)
+      cmd: echo $([[ -f /sys/module/ipv6/parameters/disable ]] && cat /sys/module/ipv6/parameters/disable || echo 1)
     changed_when: false
     register: ipv6_status
+  # Define the ipv6 disabled tracker used by ipv6 dependent checks
   - set_fact:
-      is_ipv6_disabled: "{{ true if ((ipv6_status.stdout | int) == 0) else false }}"
+      is_ipv6_disabled: "{{ true if ((ipv6_status.stdout | int) == 1) else false }}"
     changed_when: false
   tags:
   - always
@@ -51,11 +53,13 @@
 # List sysconf files:
 - name: "Pre Audit | List sysconf files"
   block:
+  # List the sysctl configuration files systemd-sysctl evaluates
   - name: "Pre Audit | List sysconf files"
     shell:
         cmd: "[[ -f /usr/lib/systemd/systemd-sysctl ]] && /usr/lib/systemd/systemd-sysctl --cat-config | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
     changed_when: false
     register: sysctl_conf_files_list
+  # Define the sysctl configuration files list used by sysctl checks
   - set_fact:
       sysctl_conf_files: "{{ sysctl_conf_files_list.stdout_lines | list }}"
     changed_when: false
@@ -63,6 +67,7 @@
   - always
 
 
+# Collect the sudoers files referenced by privilege escalation checks
 - name: "Pre Audit | List sudoers files"
   block:
   # Pre Audit | List /etc/sudoers.d files

@@ -1,0 +1,18 @@
+# Reboot the target and wait for it to come back.
+#
+# Used between harden and verify so kernel parameters, SELinux mode and
+# GRUB changes take effect. Rebooting through Ansible (with become) instead
+# of `vagrant reload` is required because the hardening role removes
+# passwordless sudo, which Vagrant's own graceful-shutdown relies on.
+#
+# Expected extra-vars (supplied by run.sh from the platforms.yml entry):
+#   entry_name  matrix entry name (used only for play naming)
+- name: "Reboot {{ entry_name }}"
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    # Reboot and block until the host is reachable again
+    - name: "Reboot and wait for the host to come back"
+      reboot:
+        reboot_timeout: 600

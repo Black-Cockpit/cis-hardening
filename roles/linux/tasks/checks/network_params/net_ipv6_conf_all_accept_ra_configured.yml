@@ -1,0 +1,36 @@
+# net_ipv6_conf_all_accept_ra_configured
+#
+# Routers periodically multicast Router Advertisement messages to announce their
+# availability and convey information to neighboring nodes that enable them to be
+# automatically configured on the network.
+# net.ipv6.conf.all.accept_ra controls accepting any IPv6 RA messages on any
+
+- name: "net_ipv6_conf_all_accept_ra_configured | Audit"
+  shell:
+    cmd: |
+      running="$(sysctl -n net.ipv6.conf.all.accept_ra 2>/dev/null)"
+      persisted="$(grep -hEs "^\s*net[.]ipv6[.]conf[.]all[.]accept_ra\s*=" {{ sysctl_conf_files | join(' ') }} 2>/dev/null | tail -1 | awk -F= '{print $2}' | tr -d "[:space:]")"
+      [ "$running" = "0" ] && [ "$persisted" = "0" ] && echo configured || echo not_configured
+  changed_when: false
+  register: net_ipv6_conf_all_accept_ra_status
+  when: not is_ipv6_disabled
+
+# Extract audit result
+- set_fact:
+    net_ipv6_conf_all_accept_ra_check:
+      remediation_status: "{{ true if (is_ipv6_disabled or (net_ipv6_conf_all_accept_ra_status.stdout | default('')) == 'configured') else false }}"
+  changed_when: false
+
+# Remediation | Enforce the required kernel parameter
+- name: "net_ipv6_conf_all_accept_ra_configured | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.accept_ra
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not net_ipv6_conf_all_accept_ra_check.remediation_status and not is_ipv6_disabled
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ net_ipv6_conf_all_accept_ra_check.remediation_status }}"

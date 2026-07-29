@@ -1,0 +1,363 @@
+# source_routed_packets_not_accepted
+#
+# In networking, source routing allows a sender to partially or fully specify the route
+# packets take through a network. In contrast, non-source routed packets travel a path
+# determined by routers in the network. In some cases, systems may not be routable or
+# reachable from some locations (e.g. private addresses vs. Internet routable), and so
+# source routed packets would need to be used.
+
+- name: "source_routed_packets_not_accepted | Audit"
+  block:
+  # Check current net.ipv4.conf.all.accept_source_route status
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.all.accept_source_route" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_source_routed_packet_all_current_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if ipv4_source_routed_packet_all_current_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.conf.all.accept_source_route is disabled on sysctl.conf file
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.all.accept_source_route\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_source_routed_packet_all_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_all_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.all.accept_source_route configuration
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.all.accept_source_route\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_source_routed_packet_all_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_source_routed_packet_all_conf_check.results | list }}"
+    when: source_routed_packet_remediation_status
+
+  # Check if net.ipv4.conf.all.accept_source_route is configured in one of the UFW sysctl configuration files
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.all.accept_source_route\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_source_routed_packet_all_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+# Audit net.ipv4.conf.default.accept_source_route status
+- name: "source_routed_packets_not_accepted | Audit"
+  block:
+  # Check current net.ipv4.conf.default.accept_source_route status
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.conf.default.accept_source_route" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_source_routed_packet_default_current_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if ipv4_source_routed_packet_default_current_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.conf.default.accept_source_route is disabled on sysctl.conf file
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.conf.default.accept_source_route\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_source_routed_packet_default_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_default_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.conf.default.accept_source_route configuration
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.conf.default.accept_source_route\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_source_routed_packet_default_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout | default() }}"
+    loop: "{{ ipv4_source_routed_packet_default_conf_check.results | default([]) | list }}"
+    when: source_routed_packet_remediation_status
+
+  # Check if net.ipv4.conf.default.accept_source_route is configured in one of the UFW sysctl configuration files
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.conf.default.accept_source_route\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_source_routed_packet_default_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv4_source_routed_packet_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+  when: source_routed_packet_remediation_status
+
+# Audit net.ipv6.conf.all.accept_source_route
+- name: "source_routed_packets_not_accepted | Audit"
+  block:
+  # Check current net.ipv6.conf.all.accept_source_route status
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv6="$(sysctl "net.ipv6.conf.all.accept_source_route" | awk -F= '{print $2}')";
+        echo $ipv6 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv6_source_routed_packet_all_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check net.ipv6.conf.all.accept_source_route is disabled on sysctl.conf file
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv6_source_routed_packet_all_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv6.conf.all.accept_source_route configuration
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: ipv6_source_routed_packet_all_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout | default() }}"
+    loop: "{{ ipv6_source_routed_packet_all_conf_check.results | default([]) | list }}"
+    when: source_routed_packet_remediation_status
+
+  # Check if net.ipv6.conf.all.accept_source_route is configured in one of the UFW sysctl configuration files
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv6_source_routed_packet_all_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_all_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+  when: not is_ipv6_disabled
+
+# Audit net.ipv6.conf.default.accept_source_route
+- name: "source_routed_packets_not_accepted | Audit"
+  block:
+  # Check current net.ipv6.conf.default.accept_source_route status
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ipv6="$(sysctl "net.ipv6.conf.default.accept_source_route" | awk -F= '{print $2}')";
+        echo $ipv6 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv6_source_routed_packet_default_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check net.ipv6.conf.default.accept_source_route is disabled on sysctl.conf file
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv6_source_routed_packet_default_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv6.conf.default.accept_source_route configuration
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: ipv6_source_routed_packet_default_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout | default() }}"
+    loop: "{{ ipv6_source_routed_packet_default_conf_check.results | default([]) | list }}"
+    when: source_routed_packet_remediation_status
+
+  # Check if net.ipv6.conf.default.accept_source_route is configured in one of the UFW sysctl configuration files
+  - name: "source_routed_packets_not_accepted | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.default.accept_source_route\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv6_source_routed_packet_default_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      source_routed_packet_remediation_status: "{{ true if (source_routed_packet_remediation_status and ipv6_source_routed_packet_default_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: source_routed_packet_remediation_status
+  when: not is_ipv6_disabled
+
+# Extract audit result
+- set_fact:
+    source_routed_packet_check:
+      remediation_status: "{{ true if source_routed_packet_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "source_routed_packets_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.accept_source_route
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not source_routed_packet_check.remediation_status
+
+# source_routed_packets_not_accepted | Remediation
+- name: "source_routed_packets_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.default.accept_source_route
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not source_routed_packet_check.remediation_status
+
+# source_routed_packets_not_accepted | Remediation
+- name: "source_routed_packets_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.accept_source_route
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not is_ipv6_disabled and not source_routed_packet_check.remediation_status
+
+# source_routed_packets_not_accepted | Remediation
+- name: "source_routed_packets_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.default.accept_source_route
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not source_routed_packet_check.remediation_status
+
+# source_routed_packets_not_accepted | Remediation
+- name: "source_routed_packets_not_accepted | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not is_ipv6_disabled and not source_routed_packet_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ source_routed_packet_check.remediation_status }}"

@@ -1,0 +1,71 @@
+# print_server_services_not_use
+#
+# The Common Unix Print System (CUPS) provides the ability to print to both local and
+# network printers. A system running CUPS can also accept print jobs from remote
+# systems and print them to local printers. It also provides a web based remote
+# administration capability.
+
+- name: "print_server_services_not_use | Audit"
+  shell:
+    cmd: rpm -qa | grep -q cups && echo installed || echo not_installed
+  changed_when: false
+  register: cups_status_check
+
+# print_server_services_not_use | Audit
+- name: "print_server_services_not_use | Audit"
+  systemd:
+    name: cups
+  ignore_errors: yes
+  changed_when: false
+  register: cups_service_status_check
+  when: cups_status_check.stdout == 'installed'
+
+# Define remediation status
+- set_fact:
+    cups_remediation_status: "{{ true if (cups_status_check.stdout == 'not_installed' or (cups_service_status_check.status.ActiveState == 'inactive' and (cups_service_status_check.status.UnitFileState is not defined or cups_service_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+
+# print_server_services_not_use | Audit
+- name: "print_server_services_not_use | Audit"
+  systemd:
+    name: cups.socket
+  ignore_errors: yes
+  changed_when: false
+  register: cups_socket_status_check
+  when: cups_status_check.stdout == 'installed'
+
+# Append to remediation status
+- set_fact:
+    cups_remediation_status: "{{ true if (cups_remediation_status and (cups_socket_status_check.status.ActiveState == 'inactive' and (cups_socket_status_check.status.UnitFileState is not defined or cups_socket_status_check.status.UnitFileState != 'enabled'))) else false }}"
+  changed_when: false
+  when: cups_status_check.stdout == 'installed'
+
+# Extract audit result
+- set_fact:
+    cups_check:
+      remediation_status: "{{ true if cups_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "print_server_services_not_use | Remediation"
+  systemd:
+    name: cups
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not cups_check.remediation_status
+
+# print_server_services_not_use | Remediation
+- name: "print_server_services_not_use | Remediation"
+  systemd:
+    name: cups.socket
+    state: stopped
+    enabled: false
+    masked: true
+    force: true
+  when: not audit_only and not cups_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ cups_check.remediation_status }}"

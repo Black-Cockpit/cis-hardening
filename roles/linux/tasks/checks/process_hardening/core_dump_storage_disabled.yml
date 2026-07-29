@@ -1,0 +1,63 @@
+# core_dump_storage_disabled
+#
+# A core dump is the memory of an executable program. It is generally used to determine
+# why a program aborted. It can also be used to glean confidential information from a core
+# file.
+
+- name: "core_dump_storage_disabled | Audit"
+  shell:
+    cmd: "[[ -f /usr/bin/systemd-analyze ]] &&  /usr/bin/systemd-analyze cat-config /etc/systemd/coredump.conf | grep -E \"^#\\s\/.*\\.conf\" | awk '{print $2}'"
+  changed_when: false
+  register: core_dump_conf_files_list
+
+# Check if one of core dump configuration files has Storage configuration
+- name: "core_dump_storage_disabled | Audit"
+  shell:
+    cmd: 'grep -Eq "^\s{0,}Storage\s{0,}=\s{0,}none" {{ item }} && echo exists || echo not_exists'
+  changed_when: false
+  register: core_dump_storage_conf_files_check
+  loop: "{{ core_dump_conf_files_list.stdout_lines | list }}"
+
+# Set core dump storage configuration compliance tracker
+- set_fact:
+    core_dump_storage_configured: false
+  changed_when: false
+
+# Check if core dump storage is configured in one of the core dump listed files
+- set_fact:
+    core_dump_storage_configured: "{{ true if (core_dump_storage_configured or item.stdout == 'exists') else false }}"
+  changed_when: false
+  loop_control:
+    label: "{{ item.stdout }}"
+  loop: "{{ core_dump_storage_conf_files_check.results | list }}"
+
+# Extract audit result
+- set_fact:
+    core_dump_storage_configured_check: 
+      remediation_status: "{{ true if core_dump_storage_configured  else false }}" 
+  changed_when: false
+
+# Appending audit result
+- name: "core_dump_storage_disabled | Remediation"
+  replace:
+    name: "/etc/systemd/coredump.conf"
+    regexp: "^[#]{0,}(Storage=).+"
+    replace: "Storage=none"
+  when: not audit_only and not core_dump_storage_configured_check.remediation_status
+
+# core_dump_storage_disabled | Remediation
+- name: "core_dump_storage_disabled | Remediation"
+  lineinfile:
+    path: "/etc/systemd/coredump.conf"
+    line: "Storage=none"
+    state: present
+    regexp: "^Storage=none"
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not core_dump_storage_configured_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ core_dump_storage_configured_check.remediation_status }}"

@@ -1,0 +1,191 @@
+# ip_forwarding_disabled
+#
+# The net.ipv4.ip_forward and net.ipv6.conf.all.forwarding flags are used to tell the
+# system whether it can forward packets or not.
+
+- name: "ip_forwarding_disabled | Audit"
+  block:
+  # Check current net.ipv4.ip_forward status
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        ipv4="$(sysctl "net.ipv4.ip_forward" | awk -F= '{print $2}')";
+        echo $ipv4 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv4_forwarding_current_status_conf_check
+
+  # Define remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if ipv4_forwarding_current_status_conf_check.stdout == 'configured' else false }}"
+    changed_when: false
+
+  # Check net.ipv4.ip_forward is disabled on sysctl.conf file
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv4.ip_forward\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv4_forwarding_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv4_forwarding_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ip_forwarding_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv4.ip_forward configuration
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv4.ip_forward\s{0,}" {{ item }}';
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.ip_forward\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_forwarding_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status or item.stdout == 'configured') else false }}"
+    # Update remediation status
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout }}"
+    loop: "{{ ipv4_forwarding_conf_check.results | list }}"
+    when: ip_forwarding_remediation_status
+
+  # Check if net.ipv4.ip_forward is configured in one of the UFW sysctl configuration files
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv4.ip_forward\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv4.ip_forward\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv4_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv4_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ip_forwarding_remediation_status
+
+# Audit net.ipv6.conf.all.forwarding status
+- name: "ip_forwarding_disabled | Audit"
+  block:
+  # Check current net.ipv6.conf.all.forwarding status
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        ipv6="$(sysctl "net.ipv6.conf.all.forwarding" | awk -F= '{print $2}')";
+        echo $ipv6 | grep -q '0' && echo 'configured' || echo 'not_configured'
+    changed_when: false
+    register: ipv6_forwarding_current_status_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_forwarding_current_status_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ip_forwarding_remediation_status
+
+  # Check net.ipv6.conf.all.forwarding is disabled on sysctl.conf file
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: 'grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" /etc/sysctl.conf && echo configured || echo not_configured'
+    changed_when: false
+    register: ipv6_forwarding_sysctl_conf_check
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_forwarding_sysctl_conf_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ip_forwarding_remediation_status
+
+  # Check if one of sysctl configuration files has net.ipv6.conf.all.forwarding configuration
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        'item_exists=$(grep -E "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}" {{ item }}';
+         if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+           echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" && echo configured || echo not_configured
+         else
+           echo configured
+         fi;
+    changed_when: false
+    register: ipv6_forwarding_conf_check
+    loop: "{{ sysctl_conf_files }}"
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status or item.stdout == 'configured') else false }}"
+    changed_when: false
+    loop_control:
+      label: "{{ item.stdout | default() }}"
+    loop: "{{ ipv6_forwarding_conf_check.results | default([]) | list }}"
+    when: ip_forwarding_remediation_status
+
+  # Check if net.ipv6.conf.all.forwarding is configured in one of the UFW sysctl configuration files
+  - name: "ip_forwarding_disabled | Audit"
+    shell:
+      cmd: |
+        ufw_conf="$([[ -f /etc/default/ufw ]] && awk -F= '/^\s*IPT_SYSCTL=/ {print $2}' /etc/default/ufw)"; \
+        item_exists=$([[ -f $ufw_conf ]] && grep -E "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}" $(echo $ufw_conf))
+        if [ $? == 0 ] && [ ! -z $"item_exists" ]; then
+          echo $item_exists | grep -Eq "^\s{0,}net.ipv6.conf.all.forwarding\s{0,}=\s{0,}0" && echo configured || echo not_configured
+        else
+          echo configured
+        fi;
+    changed_when: false
+    register: ipv6_ufw_sysctl_conf_files_check
+
+  # Update remediation status
+  - set_fact:
+      ip_forwarding_remediation_status: "{{ true if (ip_forwarding_remediation_status and ipv6_ufw_sysctl_conf_files_check.stdout == 'configured') else false }}"
+    changed_when: false
+    when: ip_forwarding_remediation_status
+  when: not is_ipv6_disabled
+
+# Extract audit result
+- set_fact:
+    ip_forwarding_check:
+      remediation_status: "{{ true if ip_forwarding_remediation_status else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "ip_forwarding_disabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not ip_forwarding_check.remediation_status
+
+# ip_forwarding_disabled | Remediation
+- name: "ip_forwarding_disabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: 0
+    state: present
+    sysctl_set: true
+    reload: true
+  when: not audit_only and not is_ipv6_disabled and not ip_forwarding_check.remediation_status
+
+# ip_forwarding_disabled | Remediation
+- name: "ip_forwarding_disabled | Remediation"
+  ansible.posix.sysctl:
+    name: net.ipv4.route.flush
+    value: 1
+    sysctl_set: false
+    reload: true
+  when: not audit_only and not ip_forwarding_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ ip_forwarding_check.remediation_status }}"

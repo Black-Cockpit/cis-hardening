@@ -1,0 +1,131 @@
+# gdm_automatic_mounting_removable_media_disabled
+#
+# By default GNOME automatically mounts removable media when inserted as a
+# convenience to the user.
+
+# Shared discovery for this rule (host state read fresh each run)
+- name: Pre Audit | Check if gdm or gdm3 is installed
+  block:
+  # Pre Audit | Check if gdm is installed
+  - name: Pre Audit | Check if gdm is installed
+    shell:
+      cmd: rpm -qa | grep -q gdm && echo installed || echo not_installed
+    changed_when: false
+    register: gdm_status_check
+
+  # Define gdm package tracker
+  - set_fact:
+      gdm_installed: "{{ true if (gdm_status_check.stdout == 'installed') else false }}"
+
+# Audit | Collect the current configuration state
+- name: "gdm_automatic_mounting_removable_media_disabled | Audit"
+  shell:
+    cmd: |
+      profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+      l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+      [[ -z $profile_conf ]] || echo $profile_conf | awk -F\/ '{split($(NF-1),a,".");print a[1]}' || echo ''
+  changed_when: false
+  register: banner_profile_status_check
+
+# Define compliace status
+- set_fact:
+    gdm_automount_rule_status: "{{ true if banner_profile_status_check.stdout != '' else false }}"
+  changed_when: false
+
+# Check profile exists
+- name: "gdm_automatic_mounting_removable_media_disabled | Audit"
+  shell:
+    cmd: 'cat /etc/dconf/profile/{{ banner_profile_status_check.stdout }} | grep -Pq "^\h*system-db:{{ banner_profile_status_check.stdout }}" && echo configured || echo not_configured'
+  changed_when: false
+  register: banner_profile_exist_status_check
+  when: gdm_login_banner_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and banner_profile_exist_status_check.stdout == 'configured') else false }}"
+  changed_when: false
+  when: gdm_login_banner_rule_status
+
+# Check if automount is disabled
+- name: "gdm_automatic_mounting_removable_media_disabled | Audit"
+  shell:
+    cmd: |
+      profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+      l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+      grep -Pqrs -- '^\h*automount\h*=\h*false\b' $profile_conf && echo disabled || echo not_disabled
+  changed_when: false
+  register: gdm_automount_status_check
+  when: gdm_login_banner_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and gdm_automount_status_check.stdout == 'disabled') else false }}"
+  changed_when: false
+  when: gdm_login_banner_rule_status
+
+# Audit | Collect the current configuration state
+- name: "gdm_automatic_mounting_removable_media_disabled | Audit"
+  # Check if automount-open is disabled
+  shell:
+    cmd: |
+      profile_conf=$(l_kfile="$(grep -Prils -- '^\h*automount\b' /etc/dconf/db/*.d)" && echo $l_kfile || \
+      l_kfile2="$(grep -Prils -- '^\h*automount-open\b' /etc/dconf/db/*.d)" && echo $l_kfile2 || echo '');
+      grep -Pqrs -- '^\h*automount-open\h*=\h*false\b' $profile_conf && echo disabled || echo not_disabled
+  changed_when: false
+  register: gdm_automount_open_status_check
+  when: gdm_login_banner_rule_status
+
+# Update compliace status
+- set_fact:
+    gdm_automount_rule_status: "{{ true if (gdm_login_banner_rule_status and gdm_automount_open_status_check.stdout == 'disabled') else false }}"
+  changed_when: false
+  when: gdm_login_banner_rule_status
+
+# Extract audit result
+- set_fact:
+    gdm_automount_check:
+      remediation_status: "{{ true if (not gdm_installed or (gdm_installed and gdm_automount_rule_status)) else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "gdm_automatic_mounting_removable_media_disabled | Remediation"
+  template:
+    dest: /etc/dconf/profile/gdm
+    src: rhel/etc/gdm.d/gdm.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_automount_check.remediation_status
+
+# gdm_automatic_mounting_removable_media_disabled | Remediation
+- name: "gdm_automatic_mounting_removable_media_disabled | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/01-banner-message
+    src: rhel/etc/gdm.d/01-banner-message.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_automount_check.remediation_status
+
+# gdm_automatic_mounting_removable_media_disabled | Remediation
+- name: "gdm_automatic_mounting_removable_media_disabled | Remediation"
+  template:
+    dest: /etc/dconf/db/gdm.d/00-media-automount
+    src: rhel/etc/gdm.d/00-media-automount.j2
+    mode: "0644"
+    owner: root
+    group: root
+    force: true
+  when: not audit_only and not gdm_automount_check.remediation_status
+
+# gdm_automatic_mounting_removable_media_disabled | Remediation
+- name: "gdm_automatic_mounting_removable_media_disabled | Remediation"
+  shell:
+    cmd: dconf update
+  when: not audit_only and not gdm_automount_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ gdm_automount_check.remediation_status }}"

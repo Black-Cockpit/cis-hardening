@@ -1,7 +1,7 @@
 galaxy_info:
   author: Hasni Mehdi
   description: Nginx CIS hardening
-  company: Black Cockpit
+  company: Black Cockpit LLC
   license: MIT
   min_ansible_version: 2.1
 

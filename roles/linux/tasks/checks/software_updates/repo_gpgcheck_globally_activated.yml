@@ -1,0 +1,54 @@
+# repo_gpgcheck_globally_activated
+#
+# The repo_gpgcheck option, found in the main section of the /etc/dnf/dnf.conf and
+# individual /etc/yum.repos.d/* files, will perform a GPG signature check on the
+# repodata.
+
+- name: "repo_gpgcheck_globally_activated | Audit"
+  shell:
+    cmd: grep -q ^repo_gpgcheck /etc/dnf/dnf.conf && echo compliant || echo not_compliant
+  changed_when: false
+  register: yum_repos_gpgcheck_check_status
+
+# Extract audit result
+- set_fact:
+    yum_repos_gpgcheck_check:
+      remediation_status: "{{ true if yum_repos_gpgcheck_check_status.stdout == 'compliant' else false }}"
+  changed_when: false
+
+# Appending audit result
+- name: "repo_gpgcheck_globally_activated | Remediation"
+  find:
+    paths: /etc/yum.repos.d
+    patterns: "*.repo"
+  ignore_errors: true
+  register: yum_repos_list
+
+# repo_gpgcheck_globally_activated | Remediation
+- name: "repo_gpgcheck_globally_activated | Remediation"
+  replace:
+    name: "{{ item.path }}"
+    regexp: "^repo_gpgcheck=0"
+    replace: "repo_gpgcheck=1"
+  with_items:
+  - "{{ yum_repos_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only and not yum_repos_gpgcheck_check.remediation_status
+
+# Ensure that repo_gpgcheck is added to all the repo
+- name: "repo_gpgcheck_globally_activated | Remediation"
+  lineinfile:
+    path: "{{ item.path }}"
+    regexp: "^repo_gpgcheck=0"
+    line: "repo_gpgcheck=1"
+    state: present
+  with_items:
+  - "{{ yum_repos_list.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not audit_only
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ yum_repos_gpgcheck_check.remediation_status }}"
