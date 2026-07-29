@@ -39,7 +39,7 @@ distribution and major version:
 Each benchmark is evaluated at the requested CIS profile: `server_level_1`,
 `server_level_2`, `workstation_level_1`, or `workstation_level_2`.
 
-The `nginx` role covers the CIS NGINX Benchmark (v2.0.1) on Enterprise Linux
+The `nginx` role covers the CIS NGINX Benchmark (v3.0.0) on Enterprise Linux
 and Debian-family systems, including containerized NGINX, at the web-server,
 load-balancer and reverse-proxy profiles.
 
@@ -90,12 +90,37 @@ Remediate, after reviewing the audit report:
           - server_level_1
 ```
 
+Audit an NGINX host at the web-server, load-balancer and reverse-proxy
+profiles, then flip `audit_only` to `false` to remediate:
+
+```yaml
+- name: Audit NGINX against CIS
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - name: hasnimehdi91.cis_hardening.nginx
+      vars:
+        audit_only: true
+        levels:
+          - web_server_level_2
+          - load_balancer_level_2
+          - reverse_proxy_level_2
+        # Set to true when NGINX runs inside a container
+        container: false
+```
+
+Remediation installs NGINX from the official nginx.org repository when it is
+missing, then applies the prescribed configuration. Timeouts, body and header
+limits, TLS ciphers, HSTS max-age and the browser-security headers are all
+tunable — see the [nginx role](roles/nginx/README.md) for the full list.
+
 ```bash
 ansible-playbook playbook.yml
 ```
 
-Per-role variables, profiles and examples (including NGINX) are documented
-in each role: the [linux role](roles/linux/README.md) and the
+Per-role variables, profiles and further examples are documented in each
+role: the [linux role](roles/linux/README.md) and the
 [nginx role](roles/nginx/README.md).
 
 ## Testing

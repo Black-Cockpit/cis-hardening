@@ -1,0 +1,87 @@
+# Build the collection and publish it to Ansible Galaxy.
+#
+# Triggers
+#   release (published)  publish the version declared in galaxy.yml, after
+#                        checking it matches the release tag
+#   workflow_dispatch    publish on demand from the Actions tab
+#
+# Requirements
+#   GALAXY_TOKEN  repository secret holding an Ansible Galaxy API token with
+#                 rights on the collection namespace
+#                 (https://galaxy.ansible.com/ui/token)
+#
+# The job drives the same make targets used locally, so the artifact and its
+# build_ignore exclusions are identical to a developer build.
+name: Publish collection
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+# A published version cannot be replaced, so never let two publish runs race
+concurrency:
+  group: publish-collection
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish to Galaxy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # The Makefile builds its virtual environment with python3.12
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Fail before building rather than at the upload step
+      - name: Verify the Galaxy token is configured
+        env:
+          GALAXY_TOKEN: ${{ secrets.GALAXY_TOKEN }}
+        run: |
+          if [ -z "${GALAXY_TOKEN}" ]; then
+            echo "::error::The GALAXY_TOKEN repository secret is not set."
+            exit 1
+          fi
+
+      # Galaxy rejects a version that already exists, so a tag that disagrees
+      # with galaxy.yml means the wrong version is about to be published
+      - name: Check galaxy.yml matches the release tag
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          collection_version="$(awk '/^version:/ {print $2}' galaxy.yml)"
+          tag_version="${RELEASE_TAG#v}"
+          if [ "${collection_version}" != "${tag_version}" ]; then
+            echo "::error::galaxy.yml declares ${collection_version} but the release tag is ${RELEASE_TAG}."
+            exit 1
+          fi
+          echo "Publishing version ${collection_version}"
+
+      # Creates the virtual environment on demand, then packages the artifact
+      # into dist/ using the galaxy.yml build_ignore list
+      - name: Build the collection
+        run: make build_collection
+
+      # Keep the exact artifact that was published attached to the run
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: collection-artifact
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+      - name: Publish to Galaxy
+        env:
+          GALAXY_TOKEN: ${{ secrets.GALAXY_TOKEN }}
+        run: make publish_collection

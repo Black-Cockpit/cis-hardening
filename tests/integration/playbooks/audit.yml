@@ -6,7 +6,8 @@
 #
 # Expected extra-vars (supplied by run.sh from the platforms.yml entry):
 #   entry_name         matrix entry name, used for the report file name
-#   benchmark_mapping  benchmark mapping the role should load
+#   target_role        role to run: linux (default) or nginx
+#   benchmark_mapping  benchmark mapping (linux role only)
 #   levels             CIS levels to request
 - name: "Audit {{ entry_name }}"
   hosts: all
@@ -15,7 +16,7 @@
   vars:
     audit_only: true
   roles:
-    - linux
+    - "{{ target_role | default('linux') }}"
 
   post_tasks:
     # Persist the collected report next to the harness for inspection

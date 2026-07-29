@@ -20,16 +20,129 @@
       insertafter: '^([^#.]){0,}http\s{0,}\{'
   when: (security_best_practices.xss_protection_header | default(false))
 
-
-
 # Hide server header
+#
+# more_clear_headers comes from the third-party headers-more module, which the
+# vendor packages do not ship. Writing the directive on a build without that
+# module makes nginx fail to start with an unknown directive error, so it is
+# only applied when the module is actually present.
 - name: "Ensure the Server Header is hidden"
   block:
-  # Add new X-Xss-Protection configuration
-  - name: Ensure the X-XSS-Protection Header is enabled and configured properly
+  # Determine whether the headers-more module is available to this build
+  - name: "Ensure the Server Header is hidden | Audit"
+    shell:
+      cmd: |
+        if nginx -V 2>&1 | grep -q 'headers-more'; then
+            echo available
+        elif nginx -T 2>/dev/null | grep -qE '^[[:space:]]*load_module.*headers_more'; then
+            echo available
+        else
+            echo unavailable
+        fi
+    changed_when: false
+    register: nginx_headers_more_module_status
+
+  # The Debian family packages the module for the distribution build, so try
+  # the package manager before compiling anything
+  - name: "Ensure the Server Header is hidden"
+    apt:
+      name: libnginx-mod-http-headers-more-filter
+      state: present
+      update_cache: true
+    failed_when: false
+    when:
+    - nginx_headers_more_module_status.stdout != 'available'
+    - target_platform == 'debian'
+
+  # Re-probe: the packaged module only loads into the build it was compiled
+  # against, so a successful install still has to be confirmed
+  - name: "Ensure the Server Header is hidden | Audit"
+    shell:
+      cmd: |
+        if nginx -V 2>&1 | grep -q 'headers-more'; then
+            echo available
+        elif nginx -T 2>/dev/null | grep -qE '^[[:space:]]*load_module.*headers_more'; then
+            echo available
+        elif find /usr/lib64/nginx/modules /usr/lib/nginx/modules -name 'ngx_http_headers_more_filter_module.so' 2>/dev/null | grep -q .; then
+            echo present_not_loaded
+        else
+            echo unavailable
+        fi
+    changed_when: false
+    register: nginx_headers_more_package_status
+    when: nginx_headers_more_module_status.stdout != 'available'
+
+  # Compile the module against the running NGINX when no usable one is present
+  - include_tasks:
+      file: "common/install_headers_more_module.yml"
+    vars:
+      rule: "Ensure the Server Header is hidden"
+    when:
+    - nginx_headers_more_module_status.stdout != 'available'
+    - (nginx_headers_more_package_status.stdout | default('unavailable')) == 'unavailable'
+
+  # A shared object left by an earlier run or by a distribution package is
+  # only usable once it is loaded, so reference it ahead of every other
+  # directive, which is where NGINX requires load_module to appear
+  - name: "Ensure the Server Header is hidden"
+    shell:
+      cmd: |
+        module_path="$(find /usr/lib64/nginx/modules /usr/lib/nginx/modules -name 'ngx_http_headers_more_filter_module.so' 2>/dev/null | head -n 1)"
+        [ -n "$module_path" ] && printf '%s\n' "$module_path"
+        exit 0
+    changed_when: false
+    register: nginx_headers_more_module_object
+    when: (nginx_headers_more_package_status.stdout | default('')) == 'present_not_loaded'
+
+  # Load the module that was found on disk
+  - name: "Ensure the Server Header is hidden"
+    lineinfile:
+      path: /etc/nginx/nginx.conf
+      regexp: '^load_module .*ngx_http_headers_more_filter_module\.so;'
+      line: "load_module {{ nginx_headers_more_module_object.stdout | trim }};"
+      insertbefore: BOF
+    when:
+    - (nginx_headers_more_package_status.stdout | default('')) == 'present_not_loaded'
+    - (nginx_headers_more_module_object.stdout | default('') | trim) != ''
+    notify:
+    - config test
+    - restart nginx
+
+  # Final probe deciding whether the directive can be applied at all
+  - name: "Ensure the Server Header is hidden | Audit"
+    shell:
+      cmd: |
+        if nginx -V 2>&1 | grep -q 'headers-more'; then
+            echo available
+        elif grep -rqE '^[[:space:]]*load_module.*headers_more' /etc/nginx 2>/dev/null; then
+            echo available
+        else
+            echo unavailable
+        fi
+    changed_when: false
+    register: nginx_headers_more_final_status
+
+  # Clear the Server header once the module is in place
+  - name: "Ensure the Server Header is hidden"
     lineinfile:
       dest: "/etc/nginx/nginx.conf"
-      regexp: "^more_clear_headers 'Server';"
+      regexp: "^[\\s]{0,}more_clear_headers 'Server';"
       line: "\tmore_clear_headers 'Server';"
       insertafter: '^([^#.]){0,}http\s{0,}\{'
+    when: nginx_headers_more_final_status.stdout == 'available'
+    notify:
+    - config test
+    - restart nginx
+
+  # Drop the directive when no module could be provided, so a configuration
+  # written by an earlier run cannot keep nginx from starting
+  - name: "Ensure the Server Header is hidden"
+    lineinfile:
+      path: /etc/nginx/nginx.conf
+      regexp: "^[\\s]{0,}more_clear_headers 'Server';"
+      state: absent
+    when: nginx_headers_more_final_status.stdout != 'available'
+    notify:
+    - config test
+    - restart nginx
   when: (security_best_practices.hide_server_header | default(false))

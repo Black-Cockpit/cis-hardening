@@ -3,24 +3,51 @@
   block:
   # 5.1.1 Ensure allow and deny filters limit access to specific IP addresses
   #
-  # IP-based restrictions act as a defense in depth mechanism. They allow you to allowlist
-  # legitimate paths to your applications and explicitly deny IP addresses you believe to be
-  # malicious.
+  # Access control based on IP addresses is a fundamental defense-in-depth
+  # mechanism. The allow and deny directives restrict access to the entire
+  # server or specific location blocks to trusted network sources, which is
+  # particularly effective for protecting non-public administrative
+  # interfaces or internal APIs from the public internet.
   - name: "5.1.1 Ensure allow and deny filters limit access to specific IP addresses"
-    block:    
+    block:
+    # 5.1.1 Ensure allow and deny filters limit access to specific IP addresses | Audit
+    - name: "5.1.1 Ensure allow and deny filters limit access to specific IP addresses | Audit"
+      shell:
+        cmd: |
+          filters=$(nginx -T 2>/dev/null | grep -E '^[[:space:]]*(allow|deny)[[:space:]]')
+          if [ -n "$filters" ] && echo "$filters" | grep -qE 'deny[[:space:]]+all'; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_ip_filter_status
+
     # Extract audit result
     - set_fact:
         nginx_access_control_ip_check:
+          id: nginx_ip_allow_deny_filters
           name: 5.1.1 Ensure allow and deny filters limit access to specific IP addresses
-          scored: false
+          scored: true
           automated: false
-          remediation: Consider to configure only the allowed IP addresses to access the configured domains.
+          remediation_status: "{{ true if nginx_ip_filter_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_access_control_ip_check] }}"
       changed_when: false
+
+    # 5.1.1 Ensure allow and deny filters limit access to specific IP addresses | Remediation
+    - name: "5.1.1 Ensure allow and deny filters limit access to specific IP addresses | Remediation"
+      debug:
+        msg:
+        - "Identify each location block you wish to protect (e.g. an admin login page or internal stats)."
+        - "Compile the documented list of trusted source IP addresses and network ranges."
+        - "Add one allow directive per trusted source, followed by a final 'deny all;' directive to enforce a default-deny policy."
+        - "NGINX processes the rules in order and stops at the first match, for example:"
+        - "location /admin_login/ { allow 192.168.1.100; allow 10.20.30.0/24; deny all; }"
+      when: not audit_only and not nginx_access_control_ip_check.remediation_status
     tags:
     - "web_server_level_2"
     - "load_balancer_level_2"
@@ -31,28 +58,55 @@
 
   # 5.1.2 Ensure only approved HTTP methods are allowed
   #
-  # HTTP methods (also known as verbs) allow different actions to be requested from the
-  # web server at a specified path. Only the necessary methods should be enabled.
+  # Following the principle of least functionality, an NGINX server should be
+  # configured to reject any HTTP methods that are not explicitly required by
+  # the application. While standard web browsing typically only needs GET,
+  # POST, and HEAD, any method not essential for the application's
+  # functionality should be blocked at the web server level.
   - name: "5.1.2 Ensure only approved HTTP methods are allowed"
-    block:    
+    block:
+    # 5.1.2 Ensure only approved HTTP methods are allowed | Audit
+    - name: "5.1.2 Ensure only approved HTTP methods are allowed | Audit"
+      shell:
+        cmd: |
+          if nginx -T 2>/dev/null | grep -qE '(\$request_method|limit_except)'; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_http_methods_status
+
     # Extract audit result
     - set_fact:
         nginx_access_control_methods_check:
+          id: nginx_approved_http_methods_only
           name: 5.1.2 Ensure only approved HTTP methods are allowed
-          scored: false
+          scored: true
           automated: false
-          remediation: Consider to check the HHTP methods on the configured domains.
+          remediation_status: "{{ true if nginx_http_methods_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_access_control_methods_check] }}"
       changed_when: false
+
+    # 5.1.2 Ensure only approved HTTP methods are allowed | Remediation
+    - name: "5.1.2 Ensure only approved HTTP methods are allowed | Remediation"
+      debug:
+        msg:
+        - "Method 1 (preferred): add a limit_except block to each relevant location, e.g."
+        - "location /api_login/ { limit_except GET HEAD POST { deny all; } }"
+        - "Method 2 (alternative): close the connection for non-approved methods, e.g."
+        - "location / { if ($request_method !~ ^(GET|HEAD|POST)$) { return 444; } }"
+        - "Verify with an active test such as 'curl -X OPTIONS -I https://<host>/' and confirm the server answers 405 Not Allowed or 444 Connection Closed Without Response."
+      when: not audit_only and not nginx_access_control_methods_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-        ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-        or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
-
+    when: |
+        ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+        or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+        or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)

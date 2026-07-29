@@ -1,10 +1,10 @@
 # Select which benchmark mapping applies to this host and load it.
 # benchmark_mapping can be set by the user to force a specific benchmark.
 # The mapping is keyed by distribution and major version, because RHEL 8 and
-# RHEL 10 (and Rocky 8 and 10) share the same ansible_distribution value.
-- name: "Select benchmark | Resolve mapping for {{ ansible_distribution }} {{ ansible_distribution_major_version }}"
+# RHEL 10 (and Rocky 8 and 10) share the same ansible_facts['distribution'] value.
+- name: "Select benchmark | Resolve mapping for {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_major_version'] }}"
   set_fact:
-    benchmark_mapping: "{{ benchmark_mapping | default((default_benchmark_mapping[ansible_distribution] | default({}))[ansible_distribution_major_version] | default('rocky8_v2')) }}"
+    benchmark_mapping: "{{ benchmark_mapping | default((default_benchmark_mapping[ansible_facts['distribution']] | default({}))[ansible_facts['distribution_major_version']] | default('rocky8_v2')) }}"
 
 # Load the selected benchmark mapping (rules, numbers, titles, levels). Each
 # benchmark lives under its owning distribution's directory; first_found locates

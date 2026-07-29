@@ -1,4 +1,4 @@
-# Remove nginx
+# Remove nginx installed from an untrusted repository
 - name: "{{ rule }} | Remediation"
   apt:
     name: nginx
@@ -7,16 +7,52 @@
     force: true
   when: uninstall_nginx | default(false)
 
-# Enable nginx stable version
+# Install the nginx.org package signing key
+- name: "{{ rule }} | Remediation"
+  get_url:
+    url: https://nginx.org/keys/nginx_signing.key
+    dest: /usr/share/keyrings/nginx_signing.key
+    owner: root
+    group: root
+    mode: "0644"
+
+# Configure the official nginx.org stable repository
 - name: "{{ rule }} | Remediation"
   apt_repository:
-    repo: "ppa:nginx/stable"
+    repo: "deb [signed-by=/usr/share/keyrings/nginx_signing.key] http://nginx.org/packages/{{ 'ubuntu' if ansible_facts['distribution'] == 'Ubuntu' else 'debian' }} {{ ansible_facts['distribution_release'] }} nginx"
+    filename: nginx
     update_cache: yes
     state: present
     mode: "0644"
 
-# Install stable version of nginx
+# Install nginx from the trusted repository
 - name: "{{ rule }} | Remediation"
   apt:
     name: nginx
     state: latest
+
+# Clear a stale PID file left by a configuration test before starting: it
+# carries the label of the process that ran the test, which the nginx domain
+# is denied, and a fresh one is created by the service itself
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: |
+      pid_file_path="$(nginx -V 2>&1 | tr ' ' '\n' | grep -- '--pid-path=' | head -n 1 | cut -d= -f2)"
+      pid_file_path="${pid_file_path:-/run/nginx.pid}"
+      if [ -e "$pid_file_path" ] && [ ! -s "$pid_file_path" ]; then
+          rm -f "$pid_file_path"
+      fi
+      true
+  changed_when: false
+  when: not container
+
+# Enable and start the service, otherwise the package manager leaves it
+# installed but inactive on platforms whose presets do not enable it, and the
+# hardened configuration never takes effect
+- name: "{{ rule }} | Remediation"
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not container

@@ -1,8 +1,9 @@
-# Check if the latest software package of nginx is installed
-- name: "{{ rule}} | Audit"
+# Check if the latest software package of nginx is installed; the grep matches
+# the nginx package exactly (name/suite), not packages merely containing "nginx"
+- name: "{{ rule }} | Audit"
   shell:
     cmd: |
-      audit=$(apt list --upgradable)
-      echo "$audit" | grep -q nginx && echo out_dated || echo latest
+      audit="$(apt list --upgradable 2>/dev/null)"
+      echo "$audit" | grep -Eq '^nginx/' && echo out_dated || echo latest
   changed_when: false
   register: nginx_latest_status

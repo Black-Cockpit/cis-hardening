@@ -1,11 +1,15 @@
 # NGINX CIS hardening
 
 Audit and remediate an NGINX installation against the
-[CIS NGINX Benchmark](https://www.cisecurity.org/cis-benchmarks) (v2.0.1,
-2023-06-15). The role assesses each rule and, when enabled, applies the
-remediation — installing or building NGINX, tightening permissions and
-ownership, configuring TLS, request limits, logging and browser-security
-headers.
+[CIS NGINX Benchmark](https://www.cisecurity.org/cis-benchmarks) (v3.0.0).
+The role assesses each rule and, when enabled, applies the remediation —
+installing NGINX from the official repositories (version 1.28.0 or later),
+tightening permissions and ownership, configuring TLS, request limits,
+logging and browser-security headers. Every rule in the v3 benchmark is
+classified Manual by CIS, so the role reports each rule's state and
+remediates the ones with concrete prescribed configuration; site-specific
+decisions (certificates, IP allowlists, port policy) are reported with the
+prescribed steps instead of guessed.
 
 > **Test before you enforce.** Remediation rewrites the NGINX
 > configuration and can restart the service. Run in audit-only mode first,
@@ -15,9 +19,9 @@ headers.
 ## Supported platforms
 
 Enterprise Linux (CentOS, Red Hat, Rocky, AlmaLinux) and Debian family
-(Debian, Ubuntu). The role detects the platform and uses the matching
-package or from-source installation path. It also supports hardening NGINX
-inside a container by setting `container: true`.
+(Debian, Ubuntu). The role detects the platform and installs NGINX from
+the official nginx.org repository for that platform. It also supports
+hardening NGINX inside a container by setting `container: true`.
 
 ## Profiles (levels)
 

@@ -1,8 +1,16 @@
-# Check if package manager repositories are configured correctly
-- name: "{{ rule}} | Audit"
+# Check that every enabled repository serving nginx points to a trusted domain
+# (nginx.org or the OS vendor); no nginx-named repository means nginx comes
+# from the OS vendor repositories, which are trusted
+- name: "{{ rule }} | Audit"
   shell:
     cmd: |
-      audit=$(dnf repolist -v nginx-stable)
-      echo "$audit" | grep -q nginx-stable && echo stable || echo unstable
+      nginx_repos="$(dnf repolist -v 2>/dev/null | grep -i nginx)"
+      if [ -z "$nginx_repos" ]; then
+        echo trusted
+      elif echo "$nginx_repos" | grep -Eq 'https?://([^/ ]*\.)?(nginx\.org|redhat\.com|centos\.org|rockylinux\.org|almalinux\.org)/'; then
+        echo trusted
+      else
+        echo untrusted
+      fi
   changed_when: false
   register: nginx_stable_repo_status

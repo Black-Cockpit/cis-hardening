@@ -32,9 +32,6 @@
     file: "tasks/5_1_access_control.yml"
 
 - include_tasks:
-    file: "tasks/5_1_access_control.yml"
-
-- include_tasks:
     file: "tasks/5_2_request_limits.yml"
 
 - include_tasks:

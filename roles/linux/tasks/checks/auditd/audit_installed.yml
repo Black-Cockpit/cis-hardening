@@ -42,7 +42,7 @@
   package:
     name: audit-rules
     state: present
-  when: not audit_only and not auditd_check.remediation_status and ansible_distribution_major_version == "10"
+  when: not audit_only and not auditd_check.remediation_status and ansible_facts['distribution_major_version'] == "10"
 
 # Record the verdict for this check
 - set_fact:

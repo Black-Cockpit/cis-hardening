@@ -86,6 +86,9 @@ venv.bak/
 venv
 env
 Vagrantfile
+# The integration harness Vagrantfile is part of the test suite, not a local
+# scratch environment: run.sh cannot boot a matrix entry without it.
+!tests/integration/Vagrantfile
 .vagrant
 # Backwards compatibility with `stable-2.9` and earlier branches.
 # Also used in the `devel` branch during early Ansible 2.10 development.

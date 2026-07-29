@@ -1,0 +1,8 @@
+# Remove the toolchain packages that the module build added, so a hardened
+# host is not left carrying a compiler. Packages that were already installed
+# before the build are not in this list and stay untouched.
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: "{{ headers_more_added_packages }}"
+    state: absent
+    autoremove: true

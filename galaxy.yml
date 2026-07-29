@@ -1,6 +1,6 @@
 namespace: hasnimehdi91
 name: cis_hardening
-version: 1.1.1
+version: 2.0.0
 readme: README.md
 authors:
 - Hasni Mehdi hasnimehdi@outlook.com
@@ -21,6 +21,7 @@ homepage: https://github.com/Black-Cockpit/cis-hardening
 issues: https://github.com/Black-Cockpit/cis-hardening/issues
 build_ignore:
 - .git
+- .github
 - .gitignore
 - .build_ignore
 - .vscode
@@ -29,6 +30,8 @@ build_ignore:
 - .vagrant
 - tests/integration
 - build.venv
+- ops.venv
+- dist
 - .pytest_cache
 - .tox
 - .cache
@@ -63,6 +66,8 @@ build_ignore:
 - venv.bak
 - Vagrantfile
 - requirements.txt
+- Makefile
+- 00_install_pipeline_dependencies.sh
 - credentials.yml
 - results.xml
 - coverage.xml
