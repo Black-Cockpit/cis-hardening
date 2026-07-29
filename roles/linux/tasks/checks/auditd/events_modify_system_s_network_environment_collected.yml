@@ -31,7 +31,7 @@
 - name: "events_modify_system_s_network_environment_collected | Audit"
   shell:
     cmd: |
-      auditctl -l | awk '/^ *-a *always,exit/ \
+      /sbin/auditctl -l | awk '/^ *-a *always,exit/ \
       &&/ -F *arch=b({{ item }})/ \
       &&/ -S/ \
       &&(/sethostname,setdomainname/) \
@@ -62,7 +62,7 @@
 - name: "events_modify_system_s_network_environment_collected | Audit"
   shell:
     cmd: |
-      auditctl -l | awk '/^ *-w/ \
+      /sbin/auditctl -l | awk '/^ *-w/ \
       &&(/{{ item }}/) \
       &&/ +-p *wa/ \
       &&(/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)' | wc -l
@@ -162,7 +162,9 @@
  # events_modify_system_s_network_environment_collected | Remediation
 - name: "events_modify_system_s_network_environment_collected | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_network_rule_check.remediation_status
 
 # Record the verdict for this check

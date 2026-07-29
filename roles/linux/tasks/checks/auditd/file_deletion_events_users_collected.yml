@@ -38,7 +38,7 @@
 - name: "file_deletion_events_users_collected | Audit"
   shell:
     cmd: |
-      auditctl -l | awk "/^ *-a *always,exit/ \
+      /sbin/auditctl -l | awk "/^ *-a *always,exit/ \
       &&/ -F *arch=b{{ item.arch }}/ \
       &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
       &&/ -F *auid>={{ system_min_uid.stdout }}/ \
@@ -112,7 +112,9 @@
  # file_deletion_events_users_collected | Remediation
 - name: "file_deletion_events_users_collected | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_delete_file_rule_check.remediation_status
 
 # Record the verdict for this check

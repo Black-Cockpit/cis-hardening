@@ -1,46 +1,68 @@
 # journald_not_configured_send_logs_rsyslog
 #
-# The system includes the capability of rotating log files regularly to avoid filling up the
-# system with logs or making the logs unmanageably large. The file
-# /etc/logrotate.d/syslog is the configuration file used to rotate log files created by
-# syslog or rsyslog .
+# Data from journald should be kept in the confines of the service and not forwarded to
+# other services.
+#
+# This recommendation is the alternative to forwarding journald logs to rsyslog:
+# it applies only when journald is the preferred log-capture method. When rsyslog
+# is the preferred method (the default assumed by the rsyslog section, which sets
+# ForwardToSyslog=yes), this recommendation is skipped. The check is therefore
+# advisory: it reports the current state and applies no change, so it never
+# conflicts with journald_configured_send_logs_rsyslog.
 
+# Enumerate the effective journald config files (main file plus any drop-ins)
 - name: "journald_not_configured_send_logs_rsyslog | Audit"
   shell:
-    cmd: grep -q ^\s*ForwardToSyslog /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+    cmd: |
+      while IFS= read -r file_name; do
+          echo "${file_name//# /}"
+      done <<<$(/usr/bin/systemd-analyze cat-config "/etc/systemd/journald.conf" | grep -E '[#]{0,}\/.*conf')
   changed_when: false
-  register: systemd_journal_remote_log_forward_status_check
+  register: journald_conf_files_list
 
-# Extract audit result
+# Determine whether ForwardToSyslog is enabled in any effective config file
+- name: "journald_not_configured_send_logs_rsyslog | Audit"
+  shell:
+    cmd: |
+      grep -E '^ForwardToSyslog' "{{ item }}" | awk -F '=' '{print $2}' | grep -q 'yes' && \
+      echo 'forward_enabled' || echo 'forward_disabled'
+  changed_when: false
+  loop: "{{ journald_conf_files_list.stdout_lines | default([]) }}"
+  register: journald_forward_status_check
+
+# Reset the accumulator before evaluating the per-file results
 - set_fact:
-    systemd_journal_remote_log_forward_check:
-      remediation_status: "{{ true if systemd_journal_remote_log_forward_status_check.stdout == 'configured' else false }}"
+    journald_forward_enabled: false
   changed_when: false
 
-# Appending audit result
-- name: "journald_not_configured_send_logs_rsyslog | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[#]{0,}[\s]{0,}ForwardToSyslog.*'
-    state: absent
-  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+# Forwarding is considered enabled if any effective config file sets it to yes
+- set_fact:
+    journald_forward_enabled: "{{ true if (journald_forward_enabled or item.stdout == 'forward_enabled') else false }}"
+  loop: "{{ journald_forward_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
 
-# journald_not_configured_send_logs_rsyslog | Remediation
-- name: "journald_not_configured_send_logs_rsyslog | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[\s]{0,}ForwardToSyslog=yes'
-    line: "ForwardToSyslog=yes"
-    state: present
-  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+# Compliant (forwarding disabled) when no effective config forwards to syslog
+- set_fact:
+    journald_forward_disabled_check:
+      remediation_status: "{{ true if not journald_forward_enabled else false }}"
+  changed_when: false
 
-# journald_not_configured_send_logs_rsyslog | Remediation
+# Advisory only: this recommendation is skipped when rsyslog is the preferred
+# log method, so no change is applied here
 - name: "journald_not_configured_send_logs_rsyslog | Remediation"
-  systemd:
-    name: systemd-journald
-    state: restarted
-  when: not audit_only and not systemd_journal_remote_log_forward_check.remediation_status
+  debug:
+    msg: "Skipped: rsyslog is the preferred log method (ForwardToSyslog=yes). To harden a journald-only host, set ForwardToSyslog=no in the [Journal] section of /etc/systemd/journald.conf or a drop-in under /etc/systemd/journald.conf.d/"
+  when: not audit_only and not journald_forward_disabled_check.remediation_status
+  changed_when: false
+
+# Expose the advisory to the report
+- set_fact:
+    check_extra: "{{ {'remediation': 'Not applicable when rsyslog is the preferred log method (ForwardToSyslog=yes per the rsyslog section). For a journald-only host, set ForwardToSyslog=no in the [Journal] section of /etc/systemd/journald.conf or a drop-in under /etc/systemd/journald.conf.d/.'} }}"
+  changed_when: false
+  when: not journald_forward_disabled_check.remediation_status
 
 # Record the verdict for this check
 - set_fact:
-    check_compliant: "{{ systemd_journal_remote_log_forward_check.remediation_status }}"
+    check_compliant: "{{ journald_forward_disabled_check.remediation_status }}"

@@ -1,0 +1,60 @@
+# Rules allowed to remain non-compliant on the oracle8_l2 entry.
+#
+# Level 2 adds 60 rules on top of level 1 (auditd, extra kernel modules,
+# GNOME removal, etc.). Almost all of those are expected to pass after
+# hardening and a reboot, so they are NOT listed here.
+#
+# The only rules that genuinely cannot pass on the stock single-partition
+# cloud-image/oracle-linux-8 box are the separate-partition rules under 1.1.2.x (level 2
+# adds a few more of them). They are allow-listed by check id so that a
+# regression in any OTHER rule still fails the run.
+#
+# On the first run, expect a few additional level-2 rule ids to be
+# reported: read them from reports/rocky8_l2-verify.json, and add only the
+# genuine "cannot pass on this box" ones here. Do not pad this list with
+# rules that should pass — that would hide real regressions.
+expected_failures:
+  # 1.1.2.1.x /tmp
+  - tmp_separate_partition
+  - nodev_option_set_tmp_partition
+  - nosuid_option_set_tmp_partition
+  - noexec_option_set_tmp_partition
+  # 1.1.2.2.x /dev/shm
+  - dev_shm_separate_partition
+  - nodev_option_set_dev_shm_partition
+  - nosuid_option_set_dev_shm_partition
+  - noexec_option_set_dev_shm_partition
+  # 1.1.2.3.x /home
+  - separate_partition_exists_home
+  - nodev_option_set_home_partition
+  - nosuid_option_set_home_partition
+  # 1.1.2.4.x /var
+  - separate_partition_exists_var
+  - nodev_option_set_var_partition
+  - nosuid_option_set_var_partition
+  # 1.1.2.5.x /var/tmp
+  - separate_partition_exists_var_tmp
+  - nodev_option_set_var_tmp_partition
+  - nosuid_option_set_var_tmp_partition
+  - noexec_option_set_var_tmp_partition
+  # 1.1.2.6.x /var/log
+  - separate_partition_exists_var_log
+  - nodev_option_set_var_log_partition
+  - nosuid_option_set_var_log_partition
+  - noexec_option_set_var_log_partition
+  # 1.1.2.7.x /var/log/audit
+  - separate_partition_exists_var_log_audit
+  - nodev_option_set_var_log_audit_partition
+  - nosuid_option_set_var_log_audit_partition
+  - noexec_option_set_var_log_audit_partition
+  # advisory twin of the enforced rsyslog-forward rule: the role sets
+  # ForwardToSyslog=yes, so the disable-forwarding rule reports non-compliant
+  - journald_not_configured_send_logs_rsyslog
+  # advisory: set only when site_policy.root_password is provided; cloud
+  # images ship the root account locked
+  - root_password_set
+  # advisory rules (need a site decision; role only reports)
+  - bootloader_password_set
+  - sshd_access_configured
+  - root_path_integrity
+  - all_logfiles_have_appropriate_access_configured

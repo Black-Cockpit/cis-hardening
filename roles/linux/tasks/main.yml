@@ -2,9 +2,9 @@
 - include_tasks:
     file: "rhel_platforms/rhel_pre_audit.yml"
 
-# OS specific settings (rpm keys, packager identity)
+# OS specific settings (rpm keys, packager identity), resolved per major version
 - include_vars:
-    file: "{{ ansible_distribution }}.yml"
+    file: "{{ ansible_distribution }}/keys.yml"
 
 # Resolve and load the benchmark mapping for this host
 - include_tasks:

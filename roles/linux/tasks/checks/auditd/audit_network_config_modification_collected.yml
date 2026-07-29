@@ -1,0 +1,72 @@
+# audit_network_config_modification_collected
+#
+# Record events that modify the network configuration.
+
+# Audit | Verify the audit rule for path /etc/sysconfig/network exists on disk
+- name: "audit_network_config_modification_collected | Audit"
+  shell:
+    cmd: "grep -rhE -- 'path=/etc/sysconfig/network([[:space:]]|$)' /etc/audit/rules.d/*.rules 2>/dev/null | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_sysconfig_network_ondisk
+
+# Audit | Verify the audit rule for path /etc/sysconfig/network is loaded in the kernel
+- name: "audit_network_config_modification_collected | Audit"
+  shell:
+    cmd: "/sbin/auditctl -l 2>/dev/null | grep -E -- 'path=/etc/sysconfig/network([[:space:]]|$)' | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_sysconfig_network_loaded
+
+# Remediation | Add the audit rule for path /etc/sysconfig/network when missing
+- name: "audit_network_config_modification_collected | Remediation"
+  lineinfile:
+    path: "/etc/audit/rules.d/50-cis-v10.rules"
+    line: "-a always,exit -F arch=b64 -S all -F path=/etc/sysconfig/network -F perm=wa -k system-locale"
+    create: true
+    mode: "0640"
+    owner: root
+    group: root
+  when: not audit_only and not etc_sysconfig_network_ondisk.stdout | int > 0
+
+# Audit | Verify the audit rule for dir /etc/NetworkManager/system-connections exists on disk
+- name: "audit_network_config_modification_collected | Audit"
+  shell:
+    cmd: "grep -rhE -- 'dir=/etc/NetworkManager/system-connections([[:space:]]|$)' /etc/audit/rules.d/*.rules 2>/dev/null | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_networkmanager_system_connections_ondisk
+
+# Audit | Verify the audit rule for dir /etc/NetworkManager/system-connections is loaded in the kernel
+- name: "audit_network_config_modification_collected | Audit"
+  shell:
+    cmd: "/sbin/auditctl -l 2>/dev/null | grep -E -- 'dir=/etc/NetworkManager/system-connections([[:space:]]|$)' | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_networkmanager_system_connections_loaded
+
+# Remediation | Add the audit rule for dir /etc/NetworkManager/system-connections when missing
+- name: "audit_network_config_modification_collected | Remediation"
+  lineinfile:
+    path: "/etc/audit/rules.d/50-cis-v10.rules"
+    line: "-a always,exit -F arch=b64 -S all -F dir=/etc/NetworkManager/system-connections -F perm=wa -k system-locale"
+    create: true
+    mode: "0640"
+    owner: root
+    group: root
+  when: not audit_only and not etc_networkmanager_system_connections_ondisk.stdout | int > 0
+
+# Audit | Derive the overall compliance of this rule
+- set_fact:
+    audit_network_config_modification_collected_check:
+      remediation_status: "{{ true if ((etc_sysconfig_network_ondisk.stdout | int > 0 and etc_sysconfig_network_loaded.stdout | int > 0) and (etc_networkmanager_system_connections_ondisk.stdout | int > 0 and etc_networkmanager_system_connections_loaded.stdout | int > 0)) else false }}"
+  changed_when: false
+
+# Remediation | Load the audit rules into the kernel
+- name: "audit_network_config_modification_collected | Remediation"
+  shell:
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
+  when: not audit_only and not audit_network_config_modification_collected_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_network_config_modification_collected_check.remediation_status }}"
+

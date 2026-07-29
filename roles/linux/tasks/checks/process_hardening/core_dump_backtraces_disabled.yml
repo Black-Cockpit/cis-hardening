@@ -10,10 +10,12 @@
   changed_when: false
   register: core_dump_conf_files_list
 
-# Check if one of core dump configuration files has ProcessSizeMax configuration
+# Check if one of core dump configuration files has ProcessSizeMax=0 inside
+# its [Coredump] section; directives outside the section are ignored by
+# systemd, so only lines within the block count
 - name: "core_dump_backtraces_disabled | Audit"
   shell:
-    cmd: 'grep -Eq "^\s{0,}ProcessSizeMax\s{0,}=\s{0,}0" {{ item }} && echo exists || echo not_exists'
+    cmd: 'awk "/\[Coredump\]/{a=1;next}/\[/{a=0}a" {{ item }} 2>/dev/null | grep -Eq "^\s{0,}ProcessSizeMax\s{0,}=\s{0,}0" && echo exists || echo not_exists'
   changed_when: false
   register: process_size_max_conf_files_check
   loop: "{{ core_dump_conf_files_list.stdout_lines | list }}"
@@ -37,13 +39,55 @@
       remediation_status: "{{ true if process_size_max_configured  else false }}" 
   changed_when: false
 
+# Remediation | Comment out ProcessSizeMax lines in coredump drop-ins whose
+# [Coredump] block sets a value other than 0, so no drop-in overrides the
+# enforced value
+- name: "core_dump_backtraces_disabled | Remediation"
+  shell:
+    cmd: |
+      if [ -d /etc/systemd/coredump.conf.d ]; then
+          for conf_file in /etc/systemd/coredump.conf.d/*.conf; do
+              [ -e "$conf_file" ] || continue
+              awk '/\[Coredump\]/{a=1;next}/\[/{a=0}a' "$conf_file" 2>/dev/null | \
+              grep -Poi '\h*ProcessSizeMax\h*=\h*\H+\b' | \
+              grep -Pivq '^\h*ProcessSizeMax\h*=\h*0\b' && \
+              sed -ri '/^\s*[Pp]rocess[Ss]ize[Mm]ax\s*=/s/^/# /' "$conf_file"
+          done
+      fi
+      true
+  when: not audit_only and not process_size_max_configured_check.remediation_status
+
+# Remediation | Ensure the [Coredump] section header opens the file, otherwise
+# systemd ignores every directive written below
+- name: "core_dump_backtraces_disabled | Remediation"
+  lineinfile:
+    path: "/etc/systemd/coredump.conf"
+    line: "[Coredump]"
+    regexp: '^\[Coredump\]'
+    insertbefore: BOF
+    state: present
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not process_size_max_configured_check.remediation_status
+
+# Stat the coredump config so the in-place replace is skipped when the
+# file does not exist (the lineinfile below creates it)
+- name: "core_dump_backtraces_disabled | Remediation"
+  stat:
+    path: "/etc/systemd/coredump.conf"
+  changed_when: false
+  register: coredump_conf_stat
+  when: not audit_only and not process_size_max_configured_check.remediation_status
+
 # Appending audit result
 - name: "core_dump_backtraces_disabled | Remediation"
   replace:
     name: "/etc/systemd/coredump.conf"
     regexp: '^[#]{0,}(ProcessSizeMax=)[\s]{0,}[\d]{0,}.+'
     replace: "ProcessSizeMax=0"
-  when: not audit_only and not process_size_max_configured_check.remediation_status
+  when: not audit_only and not process_size_max_configured_check.remediation_status and coredump_conf_stat.stat.exists
 
 # core_dump_backtraces_disabled | Remediation
 - name: "core_dump_backtraces_disabled | Remediation"

@@ -1,9 +1,41 @@
-Role Name
-=========
+# NGINX CIS hardening
 
-This role is to harden NGINX server following the Center of Internet Security CIS v2.0.1 - 06-15-2023
+Audit and remediate an NGINX installation against the
+[CIS NGINX Benchmark](https://www.cisecurity.org/cis-benchmarks) (v2.0.1,
+2023-06-15). The role assesses each rule and, when enabled, applies the
+remediation — installing or building NGINX, tightening permissions and
+ownership, configuring TLS, request limits, logging and browser-security
+headers.
 
-# Variables:
+> **Test before you enforce.** Remediation rewrites the NGINX
+> configuration and can restart the service. Run in audit-only mode first,
+> review the result, and validate on a disposable machine before applying
+> to production.
+
+## Supported platforms
+
+Enterprise Linux (CentOS, Red Hat, Rocky, AlmaLinux) and Debian family
+(Debian, Ubuntu). The role detects the platform and uses the matching
+package or from-source installation path. It also supports hardening NGINX
+inside a container by setting `container: true`.
+
+## Profiles (levels)
+
+Request any combination of role and level through the `levels` variable:
+
+- `web_server_level_1`, `web_server_level_2`
+- `load_balancer_level_1`, `load_balancer_level_2`
+- `reverse_proxy_level_1`, `reverse_proxy_level_2`
+
+Level 1 is a conservative baseline; level 2 is stricter defense-in-depth.
+
+## Requirements
+
+- A control node with Ansible (see the collection requirements).
+- The target runs a supported platform.
+- `become` privileges on the target.
+
+## Role variables
 
 ```yaml
 # Remediation will not be applied unless the audit_only is set to false
@@ -16,6 +48,9 @@ levels:
 - web_server_level_2
 - load_balancer_level_2
 - reverse_proxy_level_2
+
+# Set to true when hardening NGINX inside a container
+container: false
 
 # Server configuration
 
@@ -56,9 +91,16 @@ security_best_practices:
   hide_server_header: true
 ```
 
-# Example:
+## Results
 
-The example bellow harden NGINX web server, load balancer and reverse proxy with level 2:
+Every rule appends an entry to `audit_result`, which the role prints at the
+end of the run — the rule name, whether it is scored and automated, and its
+compliance status. Review this report before enabling remediation.
+
+## Usage
+
+The example below hardens an NGINX web server, load balancer and reverse
+proxy at level 2:
 
 ```yaml
 - name: Nginx hardening
@@ -75,3 +117,5 @@ The example bellow harden NGINX web server, load balancer and reverse proxy with
       - load_balancer_level_2
       - reverse_proxy_level_2
 ```
+
+Set `audit_only: true` for a non-destructive assessment first.

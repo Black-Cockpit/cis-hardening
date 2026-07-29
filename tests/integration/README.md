@@ -79,18 +79,6 @@ Add an entry to `platforms.yml` and a matching
 versions and levels are all just matrix rows — no changes to `run.sh` or
 the playbooks.
 
-## Layout
-
-| Path | Purpose |
-| --- | --- |
-| `platforms.yml` | the test matrix — one entry per VM |
-| `Vagrantfile` | one machine per matrix entry |
-| `provision/set_password.sh` | give the vagrant user a password (see note) |
-| `playbooks/` | `audit.yml`, `harden.yml`, `verify.yml` |
-| `expected_failures/` | rules allowed to stay non-compliant, per entry |
-| `run.sh` | the entry point |
-| `reports/` | audit and verify reports (generated) |
-
 ## Why the vagrant password
 
 The role removes `NOPASSWD` from sudoers, so after hardening `sudo`

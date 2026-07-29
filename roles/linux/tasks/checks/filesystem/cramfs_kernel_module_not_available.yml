@@ -36,7 +36,7 @@
     line: "install cramfs /bin/true"
     create: true
     mode: "0600"
-  when: not audit_only and not cramfs_check.remediation_status
+  when: not audit_only and cramfs_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "cramfs_kernel_module_not_available | Remediation"
@@ -46,7 +46,7 @@
     line: "blacklist cramfs"
     create: true
     mode: "0600"
-  when: not audit_only and not cramfs_check.remediation_status
+  when: not audit_only and cramfs_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable cramfs filesystems
 - name: Disabling cramfs filesystems

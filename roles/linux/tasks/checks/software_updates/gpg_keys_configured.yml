@@ -5,7 +5,7 @@
 
 - name: "gpg_keys_configured | Audit"
   shell:
-    cmd: "PKG=`rpm -qf {{ rpm_gpg_key }}` && rpm -q --queryformat \"%{PACKAGER} %{SIGPGP:pgpsig}\\n\" \"${PKG}\" | grep \"^{{ rpm_packager }}.*Key.ID.{{ rpm_key }}\""
+    cmd: "PKG=`rpm -qf $(ls {{ rpm_gpg_key }}* 2>/dev/null | head -1)` && rpm -q --queryformat \"%{PACKAGER} %{SIGPGP:pgpsig} %{RSAHEADER:pgpsig}\\n\" \"${PKG}\" | grep \"^{{ rpm_packager }}.*Key.ID.{{ rpm_key }}\""
   changed_when: false
   ignore_errors: true
   register: gpg_key_check_status

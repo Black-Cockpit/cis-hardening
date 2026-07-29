@@ -1,0 +1,47 @@
+# audit_networkmanager_dir_modification_collected
+#
+# Record events that modify the NetworkManager configuration directory.
+
+# Audit | Verify the audit rule for dir /etc/NetworkManager exists on disk
+- name: "audit_networkmanager_dir_modification_collected | Audit"
+  shell:
+    cmd: "grep -rhE -- 'dir=/etc/NetworkManager([[:space:]]|$)' /etc/audit/rules.d/*.rules 2>/dev/null | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_networkmanager_ondisk
+
+# Audit | Verify the audit rule for dir /etc/NetworkManager is loaded in the kernel
+- name: "audit_networkmanager_dir_modification_collected | Audit"
+  shell:
+    cmd: "/sbin/auditctl -l 2>/dev/null | grep -E -- 'dir=/etc/NetworkManager([[:space:]]|$)' | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_networkmanager_loaded
+
+# Remediation | Add the audit rule for dir /etc/NetworkManager when missing
+- name: "audit_networkmanager_dir_modification_collected | Remediation"
+  lineinfile:
+    path: "/etc/audit/rules.d/50-cis-v10.rules"
+    line: "-a always,exit -F arch=b64 -S all -F dir=/etc/NetworkManager -F perm=wa -k system-locale"
+    create: true
+    mode: "0640"
+    owner: root
+    group: root
+  when: not audit_only and not etc_networkmanager_ondisk.stdout | int > 0
+
+# Audit | Derive the overall compliance of this rule
+- set_fact:
+    audit_networkmanager_dir_modification_collected_check:
+      remediation_status: "{{ true if ((etc_networkmanager_ondisk.stdout | int > 0 and etc_networkmanager_loaded.stdout | int > 0)) else false }}"
+  changed_when: false
+
+# Remediation | Load the audit rules into the kernel
+- name: "audit_networkmanager_dir_modification_collected | Remediation"
+  shell:
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
+  when: not audit_only and not audit_networkmanager_dir_modification_collected_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_networkmanager_dir_modification_collected_check.remediation_status }}"
+

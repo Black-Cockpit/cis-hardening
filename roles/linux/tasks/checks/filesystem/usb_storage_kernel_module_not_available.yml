@@ -35,7 +35,7 @@
     regexp: "^(#)?install usb-storage(\\s|$)"
     line: "install usb-storage /bin/true"
     create: true
-  when: not audit_only and not usb_storage_check.remediation_status
+  when: not audit_only and usb_storage_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "usb_storage_kernel_module_not_available | Remediation"
@@ -45,7 +45,7 @@
     line: "blacklist usb-storage"
     create: true
     mode: "0600"
-  when: not audit_only and not usb_storage_check.remediation_status
+  when: not audit_only and usb_storage_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable usb-storage filesystems
 - name: Disabling usb-storage filesystems

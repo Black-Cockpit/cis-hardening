@@ -70,11 +70,12 @@
     remediation_status: true
   changed_when: false
 
-# audit_tools_owned_root | Audit
+# Audit | Verify ownership of every audit tool present on the host; tools
+# absent on the platform are skipped (autrace does not ship with audit 4 on EL10)
 - name: "audit_tools_owned_root | Audit"
   set_fact:
     remediation_status: "{{ true if (remediation_status and (item.stat.pw_name == 'root')) }}"
-  loop: "{{ audit_tools_status.results | default([]) | list }}"
+  loop: "{{ audit_tools_status.results | default([]) | selectattr('stat.exists') | list }}"
   no_log: yes
   changed_when: false
 
@@ -84,12 +85,12 @@
       remediation_status: "{{ true if remediation_status else false }}"
   changed_when: false
 
-# Appending audit result
+# Remediation | Set root ownership on every audit tool present on the host
 - name: "audit_tools_owned_root | Remediation"
   file:
     path: "{{ item }}"
     owner: root
-  loop: "{{ cis_defaults.audit_tools | default([]) | list }}"
+  loop: "{{ audit_tools_status.results | default([]) | selectattr('stat.exists') | map(attribute='item') | list }}"
   when: not audit_only and not audit_tools_owner_check.remediation_status
 
 # Record the verdict for this check

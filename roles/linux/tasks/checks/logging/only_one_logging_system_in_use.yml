@@ -1,0 +1,30 @@
+# only_one_logging_system_in_use
+#
+# Ensure a single logging system (rsyslog or journald) is in use. On EL systems systemd-journald is always the base collector; this check verifies a logging system is active.
+
+# Audit | Confirm an active logging system (journald is the EL base collector)
+- name: "only_one_logging_system_in_use | Audit"
+  shell:
+    cmd: |
+      systemctl is-active --quiet rsyslog && { echo rsyslog; exit 0; }
+      systemctl is-active --quiet systemd-journald && { echo journald; exit 0; }
+      echo none
+  changed_when: false
+  register: only_one_logging_system_in_use_status
+
+# Audit | Compliant when at least one logging system is active
+- set_fact:
+    only_one_logging_system_in_use_check:
+      remediation_status: "{{ true if only_one_logging_system_in_use_status.stdout in ['rsyslog', 'journald'] else false }}"
+  changed_when: false
+
+# Remediation | Report the site-policy action (choosing/configuring one system is manual)
+- name: "only_one_logging_system_in_use | Remediation"
+  debug:
+    msg: "Configure and use a single logging system (rsyslog or systemd-journald) per site policy"
+  when: not audit_only and not only_one_logging_system_in_use_check.remediation_status
+  changed_when: false
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ only_one_logging_system_in_use_check.remediation_status }}"

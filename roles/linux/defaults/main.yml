@@ -14,10 +14,21 @@ levels:
 # Benchmark mapping per distribution. Each entry names a file under
 # vars/benchmarks/. Override benchmark_mapping directly to force one.
 default_benchmark_mapping:
-  RedHat: rhel8_v4
-  Rocky: rocky8_v2
-  AlmaLinux: rocky8_v2
-  OracleLinux: rocky8_v2
+  RedHat:
+    "8": rhel8_v4
+    "10": rhel10_v1
+  Rocky:
+    "8": rocky8_v2
+    "10": rocky10_v1
+  AlmaLinux:
+    "8": almalinux8_v4
+    "10": almalinux10_v1
+  OracleLinux:
+    "8": oracle8_v4
+    "10": oracle10_v1
+  CentOS:
+    "8": centos8_v2
+    "10": centos10_v1
 
 # Warning Banner Content (issue, issue.net, motd)
 warning_banner: "Authorized uses only. All activity may be monitored and reported."

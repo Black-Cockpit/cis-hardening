@@ -26,7 +26,10 @@
       remediation_status: "{{ true if (sha1_sign_status_check.stdout == 'compliant' and sha1_certs_status_check.stdout == 'compliant') else false }}"
   changed_when: false
 
-# Appending audit result
+# Ensure the NO-SHA1 subpolicy module exists whenever remediating. Later
+# crypto-policy rules list NO-SHA1 in their update-crypto-policies --set,
+# which fails unless the module file is already present, so it is created
+# even when this rule is already compliant.
 - name: "system_wide_crypto_policy_disables_sha1_hash_signature | Remediation"
   blockinfile:
     path: /etc/crypto-policies/policies/modules/NO-SHA1.pmod
@@ -40,7 +43,7 @@
       sha1_in_certs = 0
     state: present
     create: true
-  when: not audit_only and not sha1_check.remediation_status
+  when: not audit_only
 
 # system_wide_crypto_policy_disables_sha1_hash_signature | Remediation
 - name: "system_wide_crypto_policy_disables_sha1_hash_signature | Remediation"

@@ -33,7 +33,7 @@
     cmd: |
       SUDO_LOG_FILE_ESCAPED="$(echo '{{ item }}' | sed -e 's|/|\\/|g')[\/]{0,1}" # Configure the path (item) to be a valid regex
 
-      [ -n "${SUDO_LOG_FILE_ESCAPED}" ] && auditctl -l | awk "/^ *-w/ \
+      [ -n "${SUDO_LOG_FILE_ESCAPED}" ] && /sbin/auditctl -l | awk "/^ *-w/ \
       && /"${SUDO_LOG_FILE_ESCAPED}"/ \
       && / +-p *wa/ \
       && (/ key= *[!-~]* *$/||/ -k *[!-~]* *$/)" | wc -l
@@ -95,7 +95,9 @@
  # events_modify_sudo_log_file_collected | Remediation
 - name: "events_modify_sudo_log_file_collected | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_sudo_events_rule_check.remediation_status
 
 # Record the verdict for this check

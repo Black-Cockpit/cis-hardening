@@ -36,7 +36,7 @@
     line: "install rds /bin/true"
     create: true
     mode: "0600"
-  when: not audit_only and not rds_check.remediation_status
+  when: not audit_only and rds_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "rds_kernel_module_not_available | Remediation"
@@ -46,7 +46,7 @@
     line: "blacklist rds"
     create: true
     mode: "0600"
-  when: not audit_only and not rds_check.remediation_status
+  when: not audit_only and rds_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable rds filesystems
 - name: Disabling rds filesystems

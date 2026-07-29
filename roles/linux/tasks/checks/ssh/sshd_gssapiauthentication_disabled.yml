@@ -50,6 +50,17 @@
     state: present
   when: not audit_only and not ssh_gssapi_auth_config_check.remediation_status
 
+# Remediation | Drop-in configs are read at the Include directive before the
+# line appended to the main file and sshd keeps the first value it obtains, so
+# a GSSAPIAuthentication yes shipped in a drop-in must be flipped as well
+- name: "sshd_gssapiauthentication_disabled | Remediation"
+  shell:
+    cmd: |
+      if [ -d /etc/ssh/sshd_config.d ]; then
+          find /etc/ssh/sshd_config.d -name '*.conf' -exec sed -ri 's/^\s*(GSSAPIAuthentication)\s+"?yes"?\s*$/\1 no/I' {} +
+      fi
+  when: not audit_only and not ssh_gssapi_auth_config_check.remediation_status
+
 # Record the verdict for this check
 - set_fact:
     check_compliant: "{{ ssh_gssapi_auth_config_check.remediation_status }}"

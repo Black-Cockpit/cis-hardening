@@ -1,0 +1,17 @@
+---
+# Oracle Linux package-signing key material, selected by major version. The key
+# file is /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle on every release; the key id
+# differs between OL8 and OL10. The OL10 value is the release-key primary from
+# the official RPM-GPG-KEY-oracle-ol10 key file and should be confirmed on a
+# real OL10 host.
+
+rpm_gpg_key: /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+rpm_packager: "(none)"
+
+# GPG key id reported by rpm SIGPGP, per major version (lower case)
+rpm_keys:
+  "8": "82562ea9ad986da3"
+  "10": "bc4d06a08d8b756f"
+
+# Resolve the key id for the running major version
+rpm_key: "{{ rpm_keys[ansible_distribution_major_version] | default('') }}"

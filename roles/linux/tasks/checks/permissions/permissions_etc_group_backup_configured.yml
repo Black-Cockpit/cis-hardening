@@ -1,15 +1,15 @@
-# permissions_etc_group_configured_6_1_5
+# permissions_etc_group_backup_configured
 #
 # The /etc/group- file contains a backup list of all the valid groups defined in the system.
 
-- name: "permissions_etc_group_configured_6_1_5 | Audit"
+- name: "permissions_etc_group_backup_configured | Audit"
   stat:
     path: "/etc/group-"
   changed_when: false
   register: group_backup_file_status
 
-# permissions_etc_group_configured_6_1_5 | Audit
-- name: "permissions_etc_group_configured_6_1_5 | Audit"
+# permissions_etc_group_backup_configured | Audit
+- name: "permissions_etc_group_backup_configured | Audit"
   shell:
     cmd: |
       [ $(({{ group_backup_file_status.stat.mode }} & {{ expected_file_mask }})) -gt 0 ] && 
@@ -26,7 +26,7 @@
   changed_when: false
 
 # Appending audit result
-- name: "permissions_etc_group_configured_6_1_5 | Remediation"
+- name: "permissions_etc_group_backup_configured | Remediation"
   file:
     path: "/etc/group-"
     mode: "0644"

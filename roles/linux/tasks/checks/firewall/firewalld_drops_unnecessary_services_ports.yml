@@ -19,6 +19,9 @@
       systemctl is-enabled firewalld.service | grep -q 'enabled' && \
       firewall-cmd --list-all --zone="$(firewall-cmd --list-all | awk '/\(active\)/ { print $1}')" | grep -P -- '^\h*(services:|ports:)'
   changed_when: false
+  # Informational only (this rule is manual): a non-zero exit just means
+  # firewalld is not enabled, so it must not fail the play.
+  failed_when: false
   register: unnecessary_services_status_check
 
 # Extract audit result

@@ -1,0 +1,72 @@
+# audit_issue_files_modification_collected
+#
+# Record events that modify the pre-login banner files.
+
+# Audit | Verify the audit rule for path /etc/issue exists on disk
+- name: "audit_issue_files_modification_collected | Audit"
+  shell:
+    cmd: "grep -rhE -- 'path=/etc/issue([[:space:]]|$)' /etc/audit/rules.d/*.rules 2>/dev/null | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_issue_ondisk
+
+# Audit | Verify the audit rule for path /etc/issue is loaded in the kernel
+- name: "audit_issue_files_modification_collected | Audit"
+  shell:
+    cmd: "/sbin/auditctl -l 2>/dev/null | grep -E -- 'path=/etc/issue([[:space:]]|$)' | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_issue_loaded
+
+# Remediation | Add the audit rule for path /etc/issue when missing
+- name: "audit_issue_files_modification_collected | Remediation"
+  lineinfile:
+    path: "/etc/audit/rules.d/50-cis-v10.rules"
+    line: "-a always,exit -F arch=b64 -S all -F path=/etc/issue -F perm=wa -k system-locale"
+    create: true
+    mode: "0640"
+    owner: root
+    group: root
+  when: not audit_only and not etc_issue_ondisk.stdout | int > 0
+
+# Audit | Verify the audit rule for path /etc/issue.net exists on disk
+- name: "audit_issue_files_modification_collected | Audit"
+  shell:
+    cmd: "grep -rhE -- 'path=/etc/issue[.]net([[:space:]]|$)' /etc/audit/rules.d/*.rules 2>/dev/null | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_issue_net_ondisk
+
+# Audit | Verify the audit rule for path /etc/issue.net is loaded in the kernel
+- name: "audit_issue_files_modification_collected | Audit"
+  shell:
+    cmd: "/sbin/auditctl -l 2>/dev/null | grep -E -- 'path=/etc/issue[.]net([[:space:]]|$)' | grep 'perm=wa' | wc -l"
+  changed_when: false
+  register: etc_issue_net_loaded
+
+# Remediation | Add the audit rule for path /etc/issue.net when missing
+- name: "audit_issue_files_modification_collected | Remediation"
+  lineinfile:
+    path: "/etc/audit/rules.d/50-cis-v10.rules"
+    line: "-a always,exit -F arch=b64 -S all -F path=/etc/issue.net -F perm=wa -k system-locale"
+    create: true
+    mode: "0640"
+    owner: root
+    group: root
+  when: not audit_only and not etc_issue_net_ondisk.stdout | int > 0
+
+# Audit | Derive the overall compliance of this rule
+- set_fact:
+    audit_issue_files_modification_collected_check:
+      remediation_status: "{{ true if ((etc_issue_ondisk.stdout | int > 0 and etc_issue_loaded.stdout | int > 0) and (etc_issue_net_ondisk.stdout | int > 0 and etc_issue_net_loaded.stdout | int > 0)) else false }}"
+  changed_when: false
+
+# Remediation | Load the audit rules into the kernel
+- name: "audit_issue_files_modification_collected | Remediation"
+  shell:
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
+  when: not audit_only and not audit_issue_files_modification_collected_check.remediation_status
+
+# Record the verdict for this check
+- set_fact:
+    check_compliant: "{{ audit_issue_files_modification_collected_check.remediation_status }}"
+

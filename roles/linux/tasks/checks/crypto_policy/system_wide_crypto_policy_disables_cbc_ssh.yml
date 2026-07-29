@@ -55,7 +55,8 @@
       remediation_status: "{{ true if cbc_rule_remediation_status else false }}"
   changed_when: false
 
-# Appending audit result
+# Ensure the NO-SSHCBC subpolicy module exists whenever remediating, so the
+# cumulative set below always has its module file present
 - name: "system_wide_crypto_policy_disables_cbc_ssh | Remediation"
   blockinfile:
     path: /etc/crypto-policies/policies/modules/NO-SSHCBC.pmod
@@ -68,12 +69,13 @@
       cipher = -*-CBC
     state: present
     create: true
-  when: not audit_only and not cbc_check.remediation_status
+  when: not audit_only
 
-# system_wide_crypto_policy_disables_cbc_ssh | Remediation
+# Apply the cumulative subpolicy list up to and including NO-SSHCBC; the set
+# references only modules created by this rule or an earlier crypto rule
 - name: "system_wide_crypto_policy_disables_cbc_ssh | Remediation"
   shell:
-    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-SSHCBC"
+    cmd: "update-crypto-policies --set {{ rhel8.crypto_policy }}:NO-SHA1:NO-WEAKMAC:NO-SSHCBC"
   when: not audit_only and not cbc_check.remediation_status
 
 # Record the verdict for this check

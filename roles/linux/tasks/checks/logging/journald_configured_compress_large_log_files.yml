@@ -2,43 +2,79 @@
 #
 # The journald system includes the capability of compressing overly large files to avoid
 # filling up the system with logs or making the logs unmanageably large.
+#
+# The setting is written to a drop-in under /etc/systemd/journald.conf.d/ with a
+# [Journal] section, which the benchmark allows and which works when the main
+# /etc/systemd/journald.conf file is absent (as on EL10).
 
+# Enumerate the effective journald config files (main file plus any drop-ins)
 - name: "journald_configured_compress_large_log_files | Audit"
   shell:
-    cmd: grep -q ^\s*Compress /etc/systemd/journald.conf && echo 'configured' || echo 'not_configured'
+    cmd: |
+      while IFS= read -r file_name; do
+          echo "${file_name//# /}"
+      done <<<$(/usr/bin/systemd-analyze cat-config "/etc/systemd/journald.conf" | grep -E '[#]{0,}\/.*conf')
   changed_when: false
-  register: systemd_journal_remote_log_compress_status_check
+  register: journald_conf_files_list
+
+# Determine whether Compress=yes is set in any effective config file
+- name: "journald_configured_compress_large_log_files | Audit"
+  shell:
+    cmd: |
+      grep -E '^\s*Compress' "{{ item }}" | awk -F '=' '{print $2}' | grep -q 'yes' && \
+      echo 'configured' || echo 'not_configured'
+  changed_when: false
+  loop: "{{ journald_conf_files_list.stdout_lines | default([]) }}"
+  register: journald_compress_status_check
+
+# Reset the accumulator before evaluating the per-file results
+- set_fact:
+    journald_compress_configured: false
+  changed_when: false
+
+# Compress is configured when any effective config file sets it to yes
+- set_fact:
+    journald_compress_configured: "{{ true if (journald_compress_configured or item.stdout == 'configured') else false }}"
+  loop: "{{ journald_compress_status_check.results | default([]) | list }}"
+  loop_control:
+    label: "{{ item.stdout | default() }}"
+  changed_when: false
 
 # Extract audit result
 - set_fact:
-    systemd_journal_remote_log_compress_check:
-      remediation_status: "{{ true if systemd_journal_remote_log_compress_status_check.stdout == 'configured' else false }}"
+    journald_compress_check:
+      remediation_status: "{{ true if journald_compress_configured else false }}"
   changed_when: false
 
-# Appending audit result
+# Ensure the journald drop-in directory exists
 - name: "journald_configured_compress_large_log_files | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[#]{0,}[\s]{0,}Compress.*'
-    state: absent
-  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+  file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  when: not audit_only and not journald_compress_check.remediation_status
 
-# journald_configured_compress_large_log_files | Remediation
+# Write the setting to a drop-in with a [Journal] section
 - name: "journald_configured_compress_large_log_files | Remediation"
-  lineinfile:
-    path: /etc/systemd/journald.conf
-    regexp: '^[\s]{0,}Compress=yes'
-    line: "Compress=yes"
-    state: present
-  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+  copy:
+    dest: /etc/systemd/journald.conf.d/60-cis-compress.conf
+    content: |
+      [Journal]
+      Compress=yes
+    mode: "0644"
+    owner: root
+    group: root
+  when: not audit_only and not journald_compress_check.remediation_status
 
-# journald_configured_compress_large_log_files | Remediation
+# Restart journald to apply the change
 - name: "journald_configured_compress_large_log_files | Remediation"
   systemd:
     name: systemd-journald
     state: restarted
-  when: not audit_only and not systemd_journal_remote_log_compress_check.remediation_status
+  when: not audit_only and not journald_compress_check.remediation_status
 
 # Record the verdict for this check
 - set_fact:
-    check_compliant: "{{ systemd_journal_remote_log_compress_check.remediation_status }}"
+    check_compliant: "{{ journald_compress_check.remediation_status }}"

@@ -23,11 +23,22 @@ check_topics:
   audit_configuration_files_owned_root: auditd
   audit_configuration_immutable: auditd
   audit_configuration_loaded_regardless_errors: auditd
+  audit_hosts_hostname_modification_collected: auditd
   audit_installed: auditd
+  audit_issue_files_modification_collected: auditd
   audit_log_directory_0750_more_restrictive: auditd
   audit_log_files_mode_0640_less_permissive: auditd
   audit_log_storage_size_configured: auditd
   audit_logs_not_automatically_deleted: auditd
+  audit_network_config_modification_collected: auditd
+  audit_networkmanager_dir_modification_collected: auditd
+  audit_nsswitch_modification_collected: auditd
+  audit_opasswd_modification_collected: auditd
+  audit_pam_modification_collected: auditd
+  audit_passwd_modification_collected: auditd
+  audit_sethostname_setdomainname_collected: auditd
+  audit_shadow_gshadow_modification_collected: auditd
+  audit_sudoers_modification_collected: auditd
   audit_system_file_permissions: permissions
   audit_tools_755_more_restrictive: auditd
   audit_tools_belong_group_root: auditd
@@ -190,6 +201,7 @@ check_topics:
   only_approved_services_listening_network_interface: services
   only_authorized_groups_assigned_ownership_audit_log_files: auditd
   only_authorized_users_own_audit_log_files: auditd
+  only_one_logging_system_in_use: logging
   overlay_kernel_module_not_available: filesystem
   package_manager_repositories_configured: software_updates
   packet_redirect_sending_disabled: network_params
@@ -224,14 +236,14 @@ check_topics:
   permissions_etc_cron_weekly_configured: cron
   permissions_etc_crontab_configured: cron
   permissions_etc_group_configured: permissions
-  permissions_etc_group_configured_6_1_5: permissions
+  permissions_etc_group_backup_configured: permissions
   permissions_etc_gshadow_configured: permissions
-  permissions_etc_gshadow_configured_6_1_9: permissions
+  permissions_etc_gshadow_backup_configured: permissions
   permissions_etc_opasswd_configured: permissions
   permissions_etc_passwd_configured: permissions
-  permissions_etc_passwd_configured_6_1_2: permissions
+  permissions_etc_passwd_backup_configured: permissions
   permissions_etc_shadow_configured: permissions
-  permissions_etc_shadow_configured_6_1_7: permissions
+  permissions_etc_shadow_backup_configured: permissions
   permissions_etc_shells_configured: permissions
   permissions_etc_ssh_sshd_config_configured: ssh
   permissions_ssh_private_host_key_files_configured: ssh

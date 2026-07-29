@@ -27,7 +27,7 @@
 - name: "successful_unsuccessful_attempts_use_usermod_command_recorded | Audit"
   shell:
     cmd: |
-      auditctl -l | awk "/^ *-a *always,exit/ \
+      /sbin/auditctl -l | awk "/^ *-a *always,exit/ \
       &&(/ -F *auid!=unset/||/ -F *auid!=-1/||/ -F *auid!=4294967295/) \
       &&/ -F *auid>={{ system_min_uid.stdout }}/ \
       &&/ -F *perm=x/ \
@@ -68,7 +68,9 @@
  # successful_unsuccessful_attempts_use_usermod_command_recorded | Remediation
 - name: "successful_unsuccessful_attempts_use_usermod_command_recorded | Remediation"
   shell:
-    cmd: augenrules --load
+    cmd: |
+      /sbin/auditctl -D > /dev/null 2>&1
+      /sbin/augenrules --load
   when: not audit_only and not audit_usermod_rule_check.remediation_status
 
 # Record the verdict for this check

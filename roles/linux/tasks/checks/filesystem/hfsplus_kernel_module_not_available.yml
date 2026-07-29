@@ -34,7 +34,7 @@
     regexp: "^(#)?install hfsplus(\\s|$)"
     line: "install hfsplus /bin/true"
     create: true
-  when: not audit_only and not hfsplus_check.remediation_status
+  when: not audit_only and hfsplus_check_disabled_result.stdout == 'not_disabled'
 
 # Remediation | Enforce the required configuration line
 - name: "hfsplus_kernel_module_not_available | Remediation"
@@ -44,7 +44,7 @@
     line: "blacklist hfsplus"
     create: true
     mode: "0600"
-  when: not audit_only and not hfsplus_check.remediation_status
+  when: not audit_only and hfsplus_check_blacklisted_result.stdout == 'not_blacklisted'
 
 # Disable hfsplus filesystems
 - name: Disabling hfsplus filesystems

@@ -2,25 +2,47 @@
 #
 # auditd is the userspace component to the Linux Auditing System. It's responsible for
 # writing audit records to the disk.
+#
+# On EL10 the auditctl and augenrules tools ship in the separate audit-rules
+# package, which the audit package only recommends. Weak dependencies are
+# disabled by the hardening (install_weak_deps=0), so audit-rules must be
+# checked and installed explicitly or every audit-rule check breaks.
 
+# Audit | Verify the audit package is installed
 - name: "audit_installed | Audit"
   shell:
     cmd: rpm -q audit | grep -Eq 'audit[\-][0-9]' && echo 'installed' || echo 'not_installed'
   changed_when: false
   register: auditd_status_check
 
+# Audit | Verify the rule tooling is present (augenrules ships with audit on
+# EL8 and with audit-rules on EL10, so the binary is the reliable signal)
+- name: "audit_installed | Audit"
+  shell:
+    cmd: "[ -e /sbin/augenrules ] && echo 'installed' || echo 'not_installed'"
+  changed_when: false
+  register: augenrules_status_check
+
 # Extract audit result
 - set_fact:
     auditd_check:
-      remediation_status: "{{ true if auditd_status_check.stdout == 'installed' else false }}"
+      remediation_status: "{{ true if (auditd_status_check.stdout == 'installed' and augenrules_status_check.stdout == 'installed') else false }}"
   changed_when: false
 
-# Appending audit result
+# Remediation | Install the audit package
 - name: "audit_installed | Remediation"
   package:
     name: audit
     state: present
   when: not audit_only and not auditd_check.remediation_status
+
+# Remediation | Install the audit-rules package that provides auditctl and
+# augenrules on EL10 (on EL8 these tools are part of the audit package)
+- name: "audit_installed | Remediation"
+  package:
+    name: audit-rules
+    state: present
+  when: not audit_only and not auditd_check.remediation_status and ansible_distribution_major_version == "10"
 
 # Record the verdict for this check
 - set_fact:

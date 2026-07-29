@@ -40,3 +40,11 @@ expected_failures:
   - nodev_option_set_var_log_audit_partition
   - nosuid_option_set_var_log_audit_partition
   - noexec_option_set_var_log_audit_partition
+  # advisory twin of the enforced rsyslog-forward rule: the role sets
+  # ForwardToSyslog=yes, so the disable-forwarding rule reports non-compliant
+  - journald_not_configured_send_logs_rsyslog
+  # advisory rules (need a site decision; role only reports)
+  - bootloader_password_set
+  - sshd_access_configured
+  - root_path_integrity
+  - all_logfiles_have_appropriate_access_configured

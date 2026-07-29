@@ -3,10 +3,19 @@ galaxy_info:
   description: Nginx CIS hardening
   company: Black Cockpit LLC
   license: MIT
-  min_ansible_version: 2.1
+  min_ansible_version: 2.15.8
 
   platforms:
   - name: Ubuntu
+    versions:
+    - all
+  - name: Rocky
+    versions:
+    - all
+  - name: AlmaLinux
+    versions:
+    - all
+  - name: OracleLinux
     versions:
     - all
 
