@@ -20,6 +20,7 @@
 # /etc/at.deny means that every user may use at. If neither file exists, only the superuser
 # is allowed to use at.
 
+# Audit | The rule only applies when the at package is installed
 - name: "at_restricted_authorized_users | Audit"
   shell:
     cmd: rpm -qa | grep -qE "^at-[0-9]" && echo installed || echo not_installed
@@ -31,31 +32,47 @@
     is_at_installed: "{{ true if at_installation_status_check.stdout == 'installed' else false }}"
   changed_when: false
 
-# at_restricted_authorized_users | Audit
+# Audit | /etc/at.allow must exist, be mode 640 or more restrictive, owned by
+# root, and group owned by daemon or root
 - name: "at_restricted_authorized_users | Audit"
-  stat:
-    path: /etc/at.allow
+  shell:
+    cmd: |
+      if [ -e /etc/at.allow ]; then
+          read -r mode owner group <<< "$(stat -Lc '%a %U %G' /etc/at.allow)"
+          [ $(( 0$mode & 0137 )) -eq 0 ] && [ "$owner" = "root" ] && { [ "$group" = "root" ] || [ "$group" = "daemon" ]; } \
+          && echo configured || echo not_configured
+      else
+          echo not_configured
+      fi
   changed_when: false
-  register: at_allow_stat
+  register: at_allow_status_check
   when: is_at_installed
 
 # Audit /etc/at.allow
 - set_fact:
-    at_allow_check: "{{ true if (at_allow_stat.stat.exists and at_allow_stat.stat.mode == '0640' and at_allow_stat.stat.pw_name == 'root' and at_allow_stat.stat.gr_name == 'root') else false}}"
+    at_allow_check: "{{ true if at_allow_status_check.stdout == 'configured' else false }}"
   changed_when: false
   when: is_at_installed
 
-# at_restricted_authorized_users | Audit
+# Audit | /etc/at.deny either does not exist or is mode 640 or more
+# restrictive, owned by root, and group owned by daemon or root
 - name: "at_restricted_authorized_users | Audit"
-  stat:
-    path: /etc/at.deny
+  shell:
+    cmd: |
+      if [ -e /etc/at.deny ]; then
+          read -r mode owner group <<< "$(stat -Lc '%a %U %G' /etc/at.deny)"
+          [ $(( 0$mode & 0137 )) -eq 0 ] && [ "$owner" = "root" ] && { [ "$group" = "root" ] || [ "$group" = "daemon" ]; } \
+          && echo configured || echo not_configured
+      else
+          echo configured
+      fi
   changed_when: false
-  register: at_deny_stat
+  register: at_deny_status_check
   when: is_at_installed
 
 # Audit /etc/at.deny
 - set_fact:
-    at_deny_check: "{{ true if ((at_allow_stat.stat.exists and not at_deny_stat.stat.exists) or (at_deny_stat.stat.exists and at_deny_stat.stat.mode == '0640' and at_deny_stat.stat.pw_name == 'root' and at_deny_stat.stat.gr_name == 'root')) else false}}"
+    at_deny_check: "{{ true if at_deny_status_check.stdout == 'configured' else false }}"
   changed_when: false
   when: is_at_installed
 
@@ -70,7 +87,7 @@
 # Set remediation status
 - set_fact:
     at_authorization_remediation_status:
-      remediation_status: "{{ true if  at_allow_check and at_deny_check else false }}"
+      remediation_status: "{{ true if at_allow_check and at_deny_check else false }}"
   changed_when: false
   when: is_at_installed
 
@@ -80,25 +97,19 @@
   changed_when: false
   when: is_at_installed
 
-# Appending audit result
+# Remediation | Create /etc/at.allow when missing and restrict both files to
+# root with group daemon when that group exists, root otherwise
 - name: "at_restricted_authorized_users | Remediation"
-  file:
-    path: /etc/at.allow
-    owner: root
-    group: root
-    mode: "0640"
-    state: file
-  when: not audit_only and is_at_installed and not at_authorization_check.remediation_status and at_allow_stat.stat.exists
-
-# at_restricted_authorized_users | Remediation
-- name: "at_restricted_authorized_users | Remediation"
-  file:
-    path: /etc/at.deny
-    owner: root
-    group: root
-    mode: "0640"
-    state: file
-  when: not audit_only and is_at_installed and not at_authorization_check.remediation_status and not at_allow_stat.stat.exists and not at_deny_check
+  shell:
+    cmd: |
+      grep -Pq -- '^daemon\b' /etc/group && l_group="daemon" || l_group="root"
+      [ ! -e "/etc/at.allow" ] && touch /etc/at.allow
+      chown root:"$l_group" /etc/at.allow
+      chmod u-x,g-wx,o-rwx /etc/at.allow
+      [ -e "/etc/at.deny" ] && chown root:"$l_group" /etc/at.deny
+      [ -e "/etc/at.deny" ] && chmod u-x,g-wx,o-rwx /etc/at.deny
+      true
+  when: not audit_only and is_at_installed and not at_authorization_check.remediation_status
 
 # Record the verdict for this check
 - set_fact:

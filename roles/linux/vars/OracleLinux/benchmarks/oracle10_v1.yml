@@ -1,9 +1,9 @@
-# CIS benchmark mapping: CIS Oracle Linux 10 Benchmark v1.0.1
+# CIS benchmark mapping: CIS Oracle Linux 10 Benchmark v1.0.0
 # Rule titles are copied verbatim from the benchmark document.
 # This benchmark mirrors the CIS Red Hat Enterprise Linux 10 Benchmark v1.0.1 content: the rule set is
 # identical across these binary-compatible distributions.
 benchmark: 'CIS Oracle Linux 10 Benchmark'
-benchmark_version: '1.0.1'
+benchmark_version: '1.0.0'
 benchmark_rules:
 - id: cramfs_kernel_module_not_available
   number: '1.1.1.1'

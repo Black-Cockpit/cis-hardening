@@ -8,6 +8,8 @@
 # Fields:
 #   box                VirtualBox Vagrant box (ships a 20 GB root disk,
 #                      which is enough for the hardening upgrades)
+#   firmware           efi (default) or bios — must match how the box's
+#                      disk image boots
 #   memory / cpus      VM resources
 #   benchmark_mapping  which vars/benchmarks/<name>.yml the role loads
 #   levels             CIS levels requested for this run
@@ -72,6 +74,48 @@ platforms:
     cpus: 2
     disk_size: 20GB
     benchmark_mapping: rocky10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+      - server_level_2
+
+  oracle8_l1:
+    box: bento/oraclelinux-8
+    firmware: bios
+    memory: 2048
+    cpus: 2
+    benchmark_mapping: oracle8_v4
+    become_password: vagrant
+    levels:
+      - server_level_1
+
+  oracle8_l2:
+    box: bento/oraclelinux-8
+    firmware: bios
+    memory: 2048
+    cpus: 2
+    benchmark_mapping: oracle8_v4
+    become_password: vagrant
+    levels:
+      - server_level_1
+      - server_level_2
+
+  oracle10_l1:
+    box: bento/oraclelinux-10
+    firmware: bios
+    memory: 2048
+    cpus: 2
+    benchmark_mapping: oracle10_v1
+    become_password: vagrant
+    levels:
+      - server_level_1
+
+  oracle10_l2:
+    box: bento/oraclelinux-10
+    firmware: bios
+    memory: 2048
+    cpus: 2
+    benchmark_mapping: oracle10_v1
     become_password: vagrant
     levels:
       - server_level_1

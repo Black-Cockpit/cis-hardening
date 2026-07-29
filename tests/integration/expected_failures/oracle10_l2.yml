@@ -1,0 +1,54 @@
+# Rules allowed to remain non-compliant on the oracle10_l2 entry.
+#
+# Same rationale as the alma10 entries: the stock single-partition
+# cloud-image/oracle-linux-10 box cannot pass the separate-partition rules
+# (1.1.2.x), and a few rules are advisory-only (the role deliberately does
+# not auto-change them because they need a site decision):
+#   - bootloader_password_set  : GRUB password is site-specific
+#   - sshd_access_configured   : needs a site AllowUsers/Groups policy
+#   - root_path_integrity      : root's default PATH includes /root/bin
+#   - all_logfiles_...         : box artifacts + OS-recreated wtmp/lastlog
+#
+# First run will reveal any additional genuine "cannot pass on this box"
+# rules to add here (and remove any that actually pass). Do not pad this
+# list with rules that should pass.
+expected_failures:
+
+  # separate-partition rules (stock box has a single root partition)
+  - tmp_separate_partition
+  - nodev_option_set_tmp_partition
+  - nosuid_option_set_tmp_partition
+  - noexec_option_set_tmp_partition
+  - dev_shm_separate_partition
+  - nodev_option_set_dev_shm_partition
+  - nosuid_option_set_dev_shm_partition
+  - noexec_option_set_dev_shm_partition
+  - separate_partition_exists_home
+  - nodev_option_set_home_partition
+  - nosuid_option_set_home_partition
+  - separate_partition_exists_var
+  - nodev_option_set_var_partition
+  - nosuid_option_set_var_partition
+  - separate_partition_exists_var_tmp
+  - nodev_option_set_var_tmp_partition
+  - nosuid_option_set_var_tmp_partition
+  - noexec_option_set_var_tmp_partition
+  - separate_partition_exists_var_log
+  - nodev_option_set_var_log_partition
+  - nosuid_option_set_var_log_partition
+  - noexec_option_set_var_log_partition
+  - separate_partition_exists_var_log_audit
+  - nodev_option_set_var_log_audit_partition
+  - nosuid_option_set_var_log_audit_partition
+  - noexec_option_set_var_log_audit_partition
+  # advisory rules (need a site decision; role only reports)
+  - bootloader_password_set
+  - sshd_access_configured
+  - root_path_integrity
+  - all_logfiles_have_appropriate_access_configured
+  # advisory: set only when site_policy.root_password is provided; cloud
+  # images ship the root account locked
+  - root_password_set
+  # advisory twin of the enforced rsyslog-forward rule: the role sets
+  # ForwardToSyslog=yes, so the disable-forwarding rule reports non-compliant
+  - journald_not_configured_send_logs_rsyslog
