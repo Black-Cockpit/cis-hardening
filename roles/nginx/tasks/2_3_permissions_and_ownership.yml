@@ -3,7 +3,8 @@
   block:
   # 2.3.1 Ensure NGINX directories and files are owned by root
   #
-  # The owner and group of the /etc/nginx directory and its files should be root.
+  # The NGINX configuration directory and all contained files must be owned by the
+  # root user and group to prevent unauthorized modification.
   - name: "2.3.1 Ensure NGINX directories and files are owned by root"
     block:
     # 2.3.1 Ensure NGINX directories and files are owned by root | Audit
@@ -11,202 +12,253 @@
       stat:
         path: "/etc/nginx"
       changed_when: false
-      register: nginx_directory_status
-    
+      register: nginx_config_directory_status
+
+    # 2.3.1 Ensure NGINX directories and files are owned by root | Audit
+    - name: "2.3.1 Ensure NGINX directories and files are owned by root | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ]; then echo not_configured; exit 0; fi
+          non_root_entries="$(find /etc/nginx -name '*' \( -not -user root -o -not -group root \) 2>/dev/null)"
+          if [ -z "$non_root_entries" ]; then echo configured; else echo not_configured; fi
+          exit 0
+      changed_when: false
+      register: nginx_config_ownership_status
+
     # Extract audit result
     - set_fact:
-        nginx_directory_check:
-          name: 2.3.1 Ensure NGINX directories and files are owned by root
+        nginx_files_owned_by_root_check:
+          id: nginx_files_owned_by_root
+          name: "2.3.1 Ensure NGINX directories and files are owned by root"
           scored: true
-          automated: true
-          remediation_status: "{{ true if (not nginx_directory_status.stat.exists or (nginx_directory_status.stat.pw_name == 'root' and nginx_directory_status.stat.gr_name == 'root')) else false }}"
+          automated: false
+          remediation_status: "{{ true if (nginx_config_ownership_status.stdout | default('not_configured')) == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [nginx_directory_check] }}"
+        audit_result: "{{ (audit_result | default([])) + [nginx_files_owned_by_root_check] }}"
       changed_when: false
-    
+
     # 2.3.1 Ensure NGINX directories and files are owned by root | Remediation
     - name: "2.3.1 Ensure NGINX directories and files are owned by root | Remediation"
       file:
         path: "/etc/nginx"
         owner: root
         group: root
-        recurse: true
         state: directory
-      when: not audit_only and not nginx_directory_check.remediation_status and nginx_directory_status.stat.exists
+        recurse: true
+      when: not audit_only and not nginx_files_owned_by_root_check.remediation_status and nginx_config_directory_status.stat.exists
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
 
 
 
   # 2.3.2 Ensure access to NGINX directories and files is restricted
   #
-  # Permissions on the /etc/nginx directory should enforce the principle of least privilege.
+  # The NGINX configuration directory and its contents enforce the principle of least
+  # privilege. Directories are 750 or stricter, so nothing outside the owning user and
+  # group can traverse or read them. Files are 640 or stricter, so the group keeps read
+  # access only and no access is granted to others.
   - name: "2.3.2 Ensure access to NGINX directories and files is restricted"
     block:
     # 2.3.2 Ensure access to NGINX directories and files is restricted | Audit
     - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Audit"
-      shell:
-        cmd: find /etc/nginx -type d ! -perm 0755
+      stat:
+        path: "/etc/nginx"
       changed_when: false
-      register: nginx_directories_acess_status
+      register: nginx_config_directory_status
 
     # 2.3.2 Ensure access to NGINX directories and files is restricted | Audit
+    #
+    # Emits the path of every directory carrying a bit outside the 750 envelope, that is
+    # any group write bit or any bit granted to others. Modes already stricter than 750
+    # clear the mask and are never reported.
     - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Audit"
       shell:
-        cmd: find /etc/nginx -type f ! -perm 0660
+        cmd: |
+          if [ ! -d /etc/nginx ]; then exit 0; fi
+          find /etc/nginx -type d -exec stat -Lc '%a %n' {} + 2>/dev/null | while read -r entry_mode entry_path; do
+              if [ $(( 0$entry_mode & 0027 )) -ne 0 ]; then printf '%s\n' "$entry_path"; fi
+          done
+          exit 0
       changed_when: false
-      register: nginx_files_acess_status
-    
+      register: nginx_permissive_directories_status
+
+    # 2.3.2 Ensure access to NGINX directories and files is restricted | Audit
+    #
+    # Emits the path of every file carrying a bit outside the 640 envelope, that is an
+    # owner execute bit, any group write or execute bit, or any bit granted to others.
+    # Modes already stricter than 640 clear the mask and are never reported.
+    - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ]; then exit 0; fi
+          find /etc/nginx -type f -exec stat -Lc '%a %n' {} + 2>/dev/null | while read -r entry_mode entry_path; do
+              if [ $(( 0$entry_mode & 0137 )) -ne 0 ]; then printf '%s\n' "$entry_path"; fi
+          done
+          exit 0
+      changed_when: false
+      register: nginx_permissive_files_status
+
     # Extract audit result
     - set_fact:
-        nginx_acess_permissions_check:
-          name: 2.3.2 Ensure access to NGINX directories and files is restricted
+        nginx_files_access_restricted_check:
+          id: nginx_files_access_restricted
+          name: "2.3.2 Ensure access to NGINX directories and files is restricted"
           scored: true
-          automated: true
-          remediation_status: "{{ true if (nginx_directories_acess_status.stdout == '' and nginx_files_acess_status.stdout == '' ) else false }}"
+          automated: false
+          remediation_status: "{{ true if (nginx_config_directory_status.stat.exists and (nginx_permissive_directories_status.stdout | default('')) == '' and (nginx_permissive_files_status.stdout | default('')) == '') else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [nginx_acess_permissions_check] }}"
+        audit_result: "{{ (audit_result | default([])) + [nginx_files_access_restricted_check] }}"
       changed_when: false
-    
+
     # 2.3.2 Ensure access to NGINX directories and files is restricted | Remediation
+    #
+    # Clears only the offending bits instead of assigning an absolute mode, so a
+    # directory already stricter than 750 is never widened back up to 750.
     - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Remediation"
       file:
         path: "{{ item }}"
-        owner: root
-        group: root
-        mode: "0755"
-        recurse: true
-      loop: "{{ nginx_directories_acess_status.stdout_lines | default([]) }}"
-      when: not audit_only and not nginx_acess_permissions_check.remediation_status and not (nginx_directories_acess_status.stdout == '')
-    
+        state: directory
+        mode: "g-w,o-rwx"
+      loop: "{{ nginx_permissive_directories_status.stdout_lines | default([]) }}"
+      when: not audit_only and not nginx_files_access_restricted_check.remediation_status
+
     # 2.3.2 Ensure access to NGINX directories and files is restricted | Remediation
+    #
+    # Clears only the offending bits instead of assigning an absolute mode, so a file
+    # already stricter than 640, such as a 600 private key, is never widened to 640.
     - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Remediation"
       file:
         path: "{{ item }}"
-        owner: root
-        group: root
-        mode: "0660"
         state: file
-      loop: "{{ nginx_files_acess_status.stdout_lines | default([]) }}"
-      when: not audit_only and not nginx_acess_permissions_check.remediation_status and not (nginx_files_acess_status.stdout == '')
+        mode: "u-x,g-wx,o-rwx"
+      loop: "{{ nginx_permissive_files_status.stdout_lines | default([]) }}"
+      when: not audit_only and not nginx_files_access_restricted_check.remediation_status
+
+    # 2.3.2 Ensure access to NGINX directories and files is restricted | Remediation
+    #
+    # Key material is site specific and is left for the operator to settle.
+    - name: "2.3.2 Ensure access to NGINX directories and files is restricted | Remediation"
+      debug:
+        msg:
+        - "Private keys (e.g. .key files) require even stricter permissions (400 or 600)"
+        - "and should be addressed separately or manually verified here."
+      when: not audit_only and not nginx_files_access_restricted_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
 
 
 
   # 2.3.3 Ensure the NGINX process ID (PID) file is secured
   #
-  # The owner and group of the /etc/nginx directory and its files should be root.
+  # The PID file stores the main process ID of the nginx process. It is owned by
+  # root:root and carries 644 or stricter permissions so that it cannot be modified
+  # by an unprivileged account.
   - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured"
     block:
     # 2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit
+    #
+    # Resolves the compiled-in --pid-path and falls back to the packaged locations when
+    # the binary is unavailable. Emits nothing when no PID file can be located.
     - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit"
-      stat:
-        path: "/var/run/nginx.pid"
-      changed_when: false
-      register: nginx_pid_file_status
-    
-    # Extract audit result
-    - set_fact:
-        nginx_pid_file_check:
-          name: 2.3.3 Ensure the NGINX process ID (PID) file is secured
-          scored: true
-          automated: true
-          remediation_status: "{{ true if (not nginx_pid_file_status.stat.exists or (nginx_pid_file_status.stat.mode == '0644' and nginx_pid_file_status.stat.pw_name == 'root' and nginx_pid_file_status.stat.gr_name == 'root')) else false }}"
-      changed_when: false
-
-    # Appending audit result
-    - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [nginx_pid_file_check] }}"
-      changed_when: false
-    
-    # 2.3.3 Ensure the NGINX process ID (PID) file is secured | Remediation
-    - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Remediation"
-      file:
-        path: "/var/run/nginx.pid"
-        owner: root
-        group: root
-        mode: "0644"
-        recurse: true
-      when: not audit_only and not nginx_pid_file_check.remediation_status
-    tags:
-    - "web_server_level_1"
-    - "load_balancer_level_1"
-    - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
-
-
-
-  # 2.3.4 Ensure the core dump directory is secured
-  #
-  # Core dumps are snapshots of memory. The working_directory directive is used to
-  # specify the directory NGINX attempts to create core dumps in. Core dumps will be
-  # disabled if the directory is not writable by the NGINX user. It is recommended that the
-  # working_directory directive be set to a directory that is owned by the root user and the
-  # group the NGINX process executes as, and is inaccessible to other users. Usually,
-  # production systems should not have this enabled.
-  - name: "2.3.4 Ensure the core dump directory is secured"
-    block:
-    # 2.3.4 Ensure the core dump directory is secured | Audit
-    - name: "2.3.4 Ensure the core dump directory is secured | Audit"
       shell:
         cmd: |
-          grep -Pi -- '^\h*working_directory\h+[^;\n\r]+\h*;.*$' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/;//g' | sed -e 's/\s*//g' || echo ''
+          pid_file_path="$(nginx -V 2>&1 | tr ' ' '\n' | grep -- '--pid-path=' | head -n 1 | cut -d= -f2)"
+          if [ -n "$pid_file_path" ]; then
+              printf '%s\n' "$pid_file_path"
+          elif [ -e /run/nginx.pid ]; then
+              echo /run/nginx.pid
+          elif [ -e /var/run/nginx.pid ]; then
+              echo /var/run/nginx.pid
+          fi
+          exit 0
       changed_when: false
-      register: nginx_working_directory_status
-    
+      register: nginx_pid_file_path_status
+
+    # 2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit
+    #
+    # A mode is compliant when it clears the 0133 mask, that is no owner execute bit, no
+    # group write or execute bit, and no write or execute bit for others.
+    - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit"
+      shell:
+        cmd: |
+          pid_file_path='{{ nginx_pid_file_path_status.stdout }}'
+          if [ -z "$pid_file_path" ] || [ ! -e "$pid_file_path" ]; then echo not_configured; exit 0; fi
+          pid_file_ownership="$(stat -Lc '%U:%G' "$pid_file_path" 2>/dev/null)"
+          pid_file_mode="$(stat -Lc '%a' "$pid_file_path" 2>/dev/null)"
+          if [ -z "$pid_file_mode" ]; then echo not_configured; exit 0; fi
+          if [ "$pid_file_ownership" = "root:root" ] && [ $(( 0$pid_file_mode & 0133 )) -eq 0 ]; then
+              echo configured
+          else
+              echo not_configured
+          fi
+          exit 0
+      changed_when: false
+      register: nginx_pid_file_status
+
     # Extract audit result
     - set_fact:
-        nginx_working_directory_check:
-          name: 2.3.4 Ensure the core dump directory is secured
-          scored: false
+        nginx_pid_file_secured_check:
+          id: nginx_pid_file_secured
+          name: "2.3.3 Ensure the NGINX process ID (PID) file is secured"
+          scored: true
           automated: false
-          remediation_status: "{{ true if nginx_working_directory_status.stdout == '' else false }}"
+          remediation_status: "{{ true if (nginx_pid_file_status.stdout | default('not_configured')) == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [nginx_working_directory_check] }}"
+        audit_result: "{{ (audit_result | default([])) + [nginx_pid_file_secured_check] }}"
       changed_when: false
-    
-    # 2.3.4 Ensure the core dump directory is secured | Remediation
-    - name: "2.3.4 Ensure the core dump directory is secured | Remediation"
+
+    # 2.3.3 Ensure the NGINX process ID (PID) file is secured | Remediation
+    #
+    # Clears only the offending bits instead of assigning an absolute mode, so a PID file
+    # already stricter than 644 is never widened back up to 644.
+    - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Remediation"
       file:
-        path: "/var/run/nginx.pid"
+        path: "{{ nginx_pid_file_path_status.stdout }}"
         owner: root
         group: root
-        mode: "0644"
-        recurse: true
-      when: not audit_only and not nginx_working_directory_check.remediation_status
+        state: file
+        mode: "u-x,g-wx,o-wx"
+      when: not audit_only and not nginx_pid_file_secured_check.remediation_status and nginx_pid_file_path_status.stdout != ''
 
-    # 2.3.4 Ensure the core dump directory is secured | Remediation
-    - name: 2.3.4 Ensure the core dump directory is secured | Remediation
-      lineinfile:
-        path: "{{ nginx_working_directory_status.stdout }}"
-        state: absent
-      when: not audit_only and not nginx_working_directory_check.remediation_status
+    # Restoring the file context: relabelling the PID file from the control
+    # process leaves it as var_run_t, which the nginx domain is denied, so the
+    # policy default is put back wherever restorecon is available
+    - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Remediation"
+      shell:
+        cmd: |
+          pid_file_path='{{ nginx_pid_file_path_status.stdout }}'
+          if [ -n "$pid_file_path" ] && [ -e "$pid_file_path" ] && command -v restorecon >/dev/null 2>&1; then
+              restorecon -F "$pid_file_path" 2>/dev/null || true
+          fi
+          true
+      changed_when: false
+      when: not audit_only and not nginx_pid_file_secured_check.remediation_status and nginx_pid_file_path_status.stdout != ''
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)

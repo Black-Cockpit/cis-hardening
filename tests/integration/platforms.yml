@@ -11,7 +11,8 @@
 #   firmware           efi (default) or bios — must match how the box's
 #                      disk image boots
 #   memory / cpus      VM resources
-#   benchmark_mapping  which vars/benchmarks/<name>.yml the role loads
+#   role               which role the entry exercises: linux (default) or nginx
+#   benchmark_mapping  which vars/benchmarks/<name>.yml the linux role loads
 #   levels             CIS levels requested for this run
 #   become_password    password set on the vagrant user (default 'vagrant')
 #                      so become survives the sudoers NOPASSWD strip
@@ -120,3 +121,39 @@ platforms:
     levels:
       - server_level_1
       - server_level_2
+
+  nginx_alma10_l2:
+    box: almalinux/10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    role: nginx
+    become_password: vagrant
+    levels:
+      - web_server_level_2
+      - load_balancer_level_2
+      - reverse_proxy_level_2
+
+  nginx_alma10_l1:
+    box: almalinux/10
+    memory: 2048
+    cpus: 2
+    disk_size: 20GB
+    role: nginx
+    become_password: vagrant
+    levels:
+      - web_server_level_1
+      - load_balancer_level_1
+      - reverse_proxy_level_1
+
+  nginx_ubuntu2404_l2:
+    box: bento/ubuntu-24.04
+    firmware: bios
+    memory: 2048
+    cpus: 2
+    role: nginx
+    become_password: vagrant
+    levels:
+      - web_server_level_2
+      - load_balancer_level_2
+      - reverse_proxy_level_2

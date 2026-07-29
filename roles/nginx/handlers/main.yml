@@ -1,4 +1,28 @@
 # handlers file for cis_hardening
+
+# Restore the PID file label before any restart.
+#
+# nginx -t and nginx -T create the PID file as a side effect, carrying the
+# SELinux label of whichever process ran them. Executed from the control
+# process that label is unconfined_u:object_r:var_run_t, which the nginx
+# domain is denied when systemd later starts the service, so the start fails
+# and eventually times out. Putting the policy default back before the restart
+# keeps the service startable regardless of which command created the file.
+#
+# Handlers run in the order they are defined here, and this one listens on the
+# same notification as the restart, so it always runs first.
+- name: restore nginx pid context
+  shell:
+    cmd: |
+      pid_file_path="$(nginx -V 2>&1 | tr ' ' '\n' | grep -- '--pid-path=' | head -n 1 | cut -d= -f2)"
+      pid_file_path="${pid_file_path:-/run/nginx.pid}"
+      if [ -e "$pid_file_path" ] && command -v restorecon >/dev/null 2>&1; then
+          restorecon -F "$pid_file_path" 2>/dev/null || true
+      fi
+      true
+  changed_when: false
+  listen: restart nginx
+
 - name: restart nginx
   service:
     name: "nginx"
@@ -11,3 +35,16 @@
 
 - name: config test
   command: nginx -t
+
+# The configuration test recreates the PID file with the control process's
+# label, so the policy default is put back once the test has run
+- name: config test
+  shell:
+    cmd: |
+      pid_file_path="$(nginx -V 2>&1 | tr ' ' '\n' | grep -- '--pid-path=' | head -n 1 | cut -d= -f2)"
+      pid_file_path="${pid_file_path:-/run/nginx.pid}"
+      if [ -e "$pid_file_path" ] && command -v restorecon >/dev/null 2>&1; then
+          restorecon -F "$pid_file_path" 2>/dev/null || true
+      fi
+      true
+  changed_when: false

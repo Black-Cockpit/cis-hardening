@@ -1,0 +1,33 @@
+# Rules allowed to remain non-compliant on the nginx_alma10_l2 entry.
+#
+# The nginx benchmark rules are all Manual; the assertion keys on scored
+# rules. These entries cannot pass on a disposable test VM:
+#   - trusted certificate / OCSP need a CA-issued certificate
+#   - HTTP/3 requires site enablement of QUIC (service-affecting advisory)
+#   - IP allow/deny filters and listen-port policy are site decisions
+#
+# First run will reveal any additional genuine "cannot pass on this box"
+# rules to add here (and remove any that actually pass). Do not pad this
+# list with rules that should pass.
+expected_failures:
+
+  # certificate-dependent rules (test VM has a self-signed certificate)
+  - nginx_trusted_certificate_installed
+  - nginx_ocsp_stapling_enabled
+  # service-affecting advisory (QUIC/HTTP-3 enablement is a site decision)
+  - nginx_http3_used
+  # site-policy rules (role reports, never invents site values)
+  - nginx_ip_allow_deny_filters
+  - nginx_authorized_ports_only
+  # proxy/upstream rules need a real upstream topology and certificates
+  - nginx_upstream_client_certificate_auth
+  - nginx_upstream_server_certificate_trusted
+  - nginx_proxies_pass_source_ip
+  # advisory rules: the role reports these because the value is a site
+  # decision (which modules are required, the redirect target, the permitted
+  # methods, and the connection/rate limit sizing), so it never invents one
+  - nginx_only_required_dynamic_modules_loaded
+  - nginx_http_redirected_to_https
+  - nginx_approved_http_methods_only
+  - nginx_connections_per_ip_limited
+  - nginx_rate_limits_by_ip

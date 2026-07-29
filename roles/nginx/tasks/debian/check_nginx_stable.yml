@@ -1,8 +1,16 @@
-# Check if package manager repositories are configured correctly
-- name: "{{ rule}} | Audit"
+# Check that every repository able to serve the nginx package points to a
+# trusted domain (nginx.org or the OS vendor); no candidate repository at all
+# fails the audit so remediation can configure a trusted one
+- name: "{{ rule }} | Audit"
   shell:
     cmd: |
-      audit=$(apt policy nginx)
-      echo "$audit" | grep -q stable && echo stable || echo unstable
+      repo_sources="$(apt-cache policy nginx 2>/dev/null | grep -Eo 'https?://[^ ]+')"
+      if [ -z "$repo_sources" ]; then
+        echo untrusted
+      elif echo "$repo_sources" | grep -Evq 'https?://([^/ ]*\.)?(nginx\.org|ubuntu\.com|debian\.org)/'; then
+        echo untrusted
+      else
+        echo trusted
+      fi
   changed_when: false
   register: nginx_stable_repo_status

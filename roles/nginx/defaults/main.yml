@@ -3,10 +3,30 @@
 # Audit result
 audit_result: []
 
+# Remediation will not be applied unless the audit_only is set to false
+audit_only: true
+
+# Benchmark level
+# Allowed values are `web_server_level_1`, `web_server_level_2`,
+# `load_balancer_level_1`, `load_balancer_level_2`, `reverse_proxy_level_1`
+# or `reverse_proxy_level_2`
+levels:
+- web_server_level_2
+- load_balancer_level_2
+- reverse_proxy_level_2
+
+# Security best practices applied outside the benchmark rule set
+security_best_practices:
+  enable: true
+  # Configures X-XSS-Protection
+  xss_protection_header: true
+  # Hide 'Server' header
+  hide_server_header: true
+
 # Container mode: Set to true when hardening nginx inside a container
 container: false
 
-# Target platform: Set later on the pre-audit tasks 
+# Target platform: Set later on the pre-audit tasks
 target_platform: ''
 
 # Supported platforms
@@ -20,14 +40,22 @@ supported_distribution:
 
 # Nginx CIS server configuration defaults
 cis_defaults:
+  # Minimum NGINX version required by the benchmark install rule
+  nginx_minimum_version: "1.28.0"
   keepalive_timeout: 10
   send_timeout: 10
   ssl_ciphers:
     enforce_remediation: true
     value: EECDH:EDH:!NULL:!SSLv2:!RC4:!aNULL:!3DES:!IDEA
-  strict_transport_security_max_age: 15768000
+  # TLS protocols accepted as modern; anything older is remediated away
+  tls_protocols: "TLSv1.3"
+  # HSTS max-age written by remediation (the audit floor is 31536000)
+  strict_transport_security_max_age: 63072000
   client_body_timeout: 10
   client_header_timeout: 10
   client_max_body_size: "100K"
-  large_client_header_buffers: "2 1k"
-
+  # Content-Security-Policy baseline; frame-ancestors also provides the
+  # clickjacking protection previously carried by X-Frame-Options
+  csp_policy: "default-src 'self'; frame-ancestors 'self'; form-action 'self'"
+  # Referrer-Policy value written by remediation
+  referrer_policy: "no-referrer"

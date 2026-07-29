@@ -3,96 +3,215 @@
   block:
   # 2.4.1 Ensure NGINX only listens for network connections on authorized ports
   #
-  # NGINX can be configured to listen on any port, but it should be configured to listen on
-  # authorized ports only.
+  # NGINX should be configured to listen only on authorized ports and protocols.
+  # While traditional HTTP/1.1 and HTTP/2 use TCP ports 80 and 443, modern HTTP/3
+  # (QUIC) utilizes UDP port 443. Ensuring that NGINX binds only to approved
+  # interfaces and ports minimizes the attack surface.
   - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
     block:
     # 2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit
     - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit"
       shell:
         cmd: |
-          grep -ir "listen[^;]*;" /etc/nginx | awk -F ':' '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d'
+          if [ ! -d /etc/nginx ]; then exit 0; fi
+          nginx -T 2>/dev/null | grep -E '^[[:space:]]*listen[[:space:]]+' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | sort -u || true
       changed_when: false
-      register: nginx_ports_status
-    
+      register: nginx_listen_directives_status
+
+    # 2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit
+    - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ]; then echo 'not_configured'; exit 0; fi
+          ports=$(nginx -T 2>/dev/null | grep -E '^[[:space:]]*listen[[:space:]]+' | awk '{print $2}' | sed -e 's/;$//' -e 's/.*://' | grep -E '^[0-9]+$' | sort -u || true)
+          if [ -z "$ports" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          unauthorized=$(echo "$ports" | grep -vE '^(80|443)$' || true)
+          if [ -z "$unauthorized" ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_authorized_ports_status
+
     # Extract audit result
     - set_fact:
         nginx_ports_check:
+          id: nginx_authorized_ports_only
           name: 2.4.1 Ensure NGINX only listens for network connections on authorized ports
-          scored: false
+          scored: true
           automated: false
-          remediation: "Consider to review the list of nginx listening ports bellow: \n{% for item in (nginx_ports_status.stdout_lines | default([] | unique)) %}- {{ item + '\n'}}{% endfor %}"
+          remediation_status: "{{ true if nginx_authorized_ports_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_ports_check] }}"
       changed_when: false
+
+    # 2.4.1 Ensure NGINX only listens for network connections on authorized ports | Remediation
+    - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports | Remediation"
+      debug:
+        msg:
+        - "Review every listen directive of the effective configuration against the authorized port policy of this site."
+        - "Listen directives currently loaded: {{ nginx_listen_directives_status.stdout_lines | default([]) | unique | join(' | ') | default('none', true) }}"
+        - "Remove or comment out any listen directive that binds to an unauthorized port such as 8080 or 8443."
+        - "A modern configuration typically exposes 'listen 80;' (TCP, usually only to redirect to HTTPS), 'listen 443 ssl;' (TCP, HTTP/1.1 and HTTP/2) and 'listen 443 quic reuseport;' (UDP, HTTP/3)."
+        - "When HTTP/3 is required, explicitly authorize UDP port 443 in addition to TCP port 443."
+        - "Verify the bindings the process actually holds with 'netstat -tulpen | grep -i nginx' and check both the tcp lines and the udp lines."
+      when: not audit_only and not nginx_ports_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
+
 
 
   # 2.4.2 Ensure requests for unknown host names are rejected
   #
-  # Your host header should be part of a predefined allowlist of known good hosts, which
-  # enables blocking access to other hosts. You should treat the host header as another
-  # input to be validated, as it is defined by the user agent.
-  - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
-    block:    
+  # NGINX routes incoming requests to the appropriate virtual host by matching the
+  # Host header (HTTP/1.1) or the :authority pseudo-header (HTTP/2, HTTP/3) against
+  # the server_name directives. When no explicit match is found NGINX falls back to
+  # the first defined server block or to the one marked default_server. Without a
+  # catch-all block that rejects unknown host names the server answers arbitrary
+  # domain names pointing at its address, which exposes internal applications and
+  # enables Host header attacks.
+  - name: "2.4.2 Ensure requests for unknown host names are rejected"
+    block:
+    # 2.4.2 Ensure requests for unknown host names are rejected | Audit
+    - name: "2.4.2 Ensure requests for unknown host names are rejected | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ]; then echo 'not_configured'; exit 0; fi
+          effective_config=$(nginx -T 2>/dev/null || true)
+          if [ -z "$effective_config" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          default_server_count=$(echo "$effective_config" | grep -cE '^[[:space:]]*listen[[:space:]]+[^;]*default_server' || true)
+          reject_handshake_count=$(echo "$effective_config" | grep -cE '^[[:space:]]*ssl_reject_handshake[[:space:]]+on[[:space:]]*;' || true)
+          return_444_count=$(echo "$effective_config" | grep -cE '^[[:space:]]*return[[:space:]]+444[[:space:]]*;' || true)
+          if [ "$default_server_count" -gt 0 ] && [ "$reject_handshake_count" -gt 0 ] && [ "$return_444_count" -gt 0 ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_unknown_host_status
+
+    # 2.4.2 Ensure requests for unknown host names are rejected | Audit
+    - name: "2.4.2 Ensure requests for unknown host names are rejected | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ]; then echo 'not_configured'; exit 0; fi
+          effective_config=$(nginx -T 2>/dev/null || true)
+          if [ -z "$effective_config" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          if echo "$effective_config" | grep -qE '^[[:space:]]*listen[[:space:]]+[^;]*default_server'; then
+              echo 'present'
+          else
+              echo 'absent'
+          fi
+      changed_when: false
+      register: nginx_default_server_presence_status
+
     # Extract audit result
     - set_fact:
         nginx_host_check:
+          id: nginx_unknown_hostnames_rejected
           name: 2.4.2 Ensure requests for unknown host names are rejected
-          scored: false
+          scored: true
           automated: false
-          remediation: "Consider to review all the configured hosts and a 4xx status code for the unknown hosts"
+          remediation_status: "{{ true if nginx_unknown_host_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_host_check] }}"
       changed_when: false
+
+    # 2.4.2 Ensure requests for unknown host names are rejected | Remediation
+    - name: "2.4.2 Ensure requests for unknown host names are rejected | Remediation"
+      copy:
+        dest: "/etc/nginx/conf.d/00-cis-default-server.conf"
+        owner: root
+        group: root
+        mode: "0640"
+        content: |
+          server {
+              server_name _;
+              listen 80 default_server;
+              listen 443 ssl default_server;
+              ssl_reject_handshake on;
+              return 444;
+          }
+      notify:
+      - "config test"
+      - "restart nginx"
+      when: not audit_only and not nginx_host_check.remediation_status and nginx_default_server_presence_status.stdout == 'absent'
+
+    # 2.4.2 Ensure requests for unknown host names are rejected | Remediation
+    - name: "2.4.2 Ensure requests for unknown host names are rejected | Remediation"
+      debug:
+        msg:
+        - "A server block already claims default_server, so the catch-all drop-in was not written to avoid a duplicate default_server binding."
+        - "Update the existing default server block so it rejects unknown host names, or hand the role of default server over to a dedicated catch-all block."
+        - "The catch-all block must carry 'server_name _;', 'listen 80 default_server;', 'listen 443 ssl default_server;', 'ssl_reject_handshake on;' and 'return 444;'."
+        - "ssl_reject_handshake on; prevents certificate leakage for unknown domains and return 444; closes the connection without a response."
+        - "When IPv6 or HTTP/3 are served, add the matching 'listen [::]:80 default_server;', 'listen [::]:443 ssl default_server;' and 'listen 443 quic default_server;' bindings to the same block."
+        - "Ensure every valid application keeps its own server block with an explicit server_name directive."
+        - "Verify with 'curl -k -v https://127.0.0.1 -H \"Host: invalid.example.com\"' and confirm the connection is reset or a 4xx status is returned."
+      when: not audit_only and not nginx_host_check.remediation_status and nginx_default_server_presence_status.stdout != 'absent'
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
 
 
 
   # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0
   #
-  # Persistent connections are leveraged by all modern browsers to facilitate greater web
-  # performance. The keep-alive timeout limits the time a persistent connection may remain
-  # open. Setting the keep-alive timeout allows this timeout to be controlled on the server
-  # side.
+  # Persistent connections are leveraged by all modern browsers to facilitate
+  # greater web performance. The keep-alive timeout limits the time a persistent
+  # connection may remain open. Setting the keep-alive timeout allows this timeout
+  # to be controlled on the server side.
   - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0"
     block:
     # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Audit
     - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Audit"
       shell:
         cmd: |
-          for file_path in $(grep -ir keepalive_timeout /etc/nginx | awk -F ':' '{print $1}' | uniq); do
-              value=$(grep -E '^([^#.]){0,}keepalive_timeout*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
-              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo "$file_path"
-          done
+          if [ ! -d /etc/nginx ]; then echo 'not_configured'; exit 0; fi
+          value=$(nginx -T 2>/dev/null | grep -E '^[[:space:]]*keepalive_timeout[[:space:]]+' | head -n 1 | awk '{print $2}' | sed -e 's/[^0-9]//g')
+          if [ -n "$value" ] && [ "$value" -ge 1 ] && [ "$value" -le {{ keepalive_timeout | default(cis_defaults.keepalive_timeout) }} ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
       changed_when: false
       register: nginx_keepalive_timeout_status
-    
+
     # Extract audit result
     - set_fact:
         nginx_keepalive_timeout_check:
+          id: nginx_keepalive_timeout_configured
           name: 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0
           scored: true
-          automated: true
-          remediation_status: "{{ true if nginx_keepalive_timeout_status.stdout == '' else false }}"
+          automated: false
+          remediation_status: "{{ true if nginx_keepalive_timeout_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
@@ -103,55 +222,65 @@
     # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
     - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation"
       lineinfile:
-        path: "{{ item }}"
-        regexp: '[#]{1,}[\s]{0,}keepalive_timeout*.+[;]'
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}\bkeepalive_timeout.+[;]'
         state: absent
-      loop: "{{ nginx_keepalive_timeout_status.stdout_lines | default([]) | list | unique }}"
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_keepalive_timeout_check.remediation_status
 
     # 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
-    - name: 2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation
-      replace:
-        path: "{{ item }}"
-        regexp: 'keepalive_timeout*.+[;]'
-        replace: "keepalive_timeout {{ keepalive_timeout | default(cis_defaults.keepalive_timeout) }};"
-      loop: "{{ nginx_keepalive_timeout_status.stdout_lines | default([]) | list | unique }}"
+    - name: "2.4.3 Ensure keepalive_timeout is 10 seconds or less, but not 0 | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '\bkeepalive_timeout {{ keepalive_timeout | default(cis_defaults.keepalive_timeout) }};'
+        line: "\tkeepalive_timeout {{ keepalive_timeout | default(cis_defaults.keepalive_timeout) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_keepalive_timeout_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
-
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
 
 
 
   # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0
   #
-  # The send_timeout directive sets a timeout for transmitting a response to the client
-  # between two successive write operations.
+  # The send_timeout directive sets a timeout for transmitting a response to the
+  # client between two successive write operations.
   - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0"
     block:
     # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Audit
     - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Audit"
       shell:
         cmd: |
-          for file_path in $(grep -ir send_timeout /etc/nginx | awk -F ':' '{print $1}' | uniq); do
-              value=$(grep -E '^([^#.]){0,}send_timeout*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[^0-9]//g' -e 's/\s//g' -e '/^$/d')
-              [[ "$value" -lt 11 || "$value" -gt 0 ]] || echo "$file_path"
-          done
+          if [ ! -d /etc/nginx ]; then echo 'not_configured'; exit 0; fi
+          value=$(nginx -T 2>/dev/null | grep -E '^[[:space:]]*send_timeout[[:space:]]+' | head -n 1 | awk '{print $2}' | sed -e 's/[^0-9]//g')
+          if [ -n "$value" ] && [ "$value" -ge 1 ] && [ "$value" -le {{ send_timeout | default(cis_defaults.send_timeout) }} ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
       changed_when: false
       register: nginx_send_timeout_status
-    
+
     # Extract audit result
     - set_fact:
         nginx_send_timeout_check:
+          id: nginx_send_timeout_configured
           name: 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0
           scored: true
-          automated: true
-          remediation_status: "{{ true if nginx_send_timeout_status.stdout == '' else false }}"
+          automated: false
+          remediation_status: "{{ true if nginx_send_timeout_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
@@ -162,24 +291,31 @@
     # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
     - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation"
       lineinfile:
-        path: "{{ item }}"
-        regexp: '[#]{1,}[\s]{0,}send_timeout*.+[;]'
+        path: /etc/nginx/nginx.conf
+        regexp: '[#]{0,}[\s]{0,}\bsend_timeout.+[;]'
         state: absent
-      loop: "{{ nginx_send_timeout_status.stdout_lines | default([]) | list | unique }}"
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_send_timeout_check.remediation_status
 
     # 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
-    - name: 2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation
-      replace:
-        path: "{{ item }}"
-        regexp: 'send_timeout*.+[;]'
-        replace: "send_timeout {{ send_timeout | default(cis_defaults.send_timeout) }};"
-      loop: "{{ nginx_send_timeout_status.stdout_lines | default([]) | list | unique }}"
+    - name: "2.4.4 Ensure send_timeout is set to 10 seconds or less, but not 0 | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '\bsend_timeout {{ send_timeout | default(cis_defaults.send_timeout) }};'
+        line: "\tsend_timeout {{ send_timeout | default(cis_defaults.send_timeout) }};"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_send_timeout_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)

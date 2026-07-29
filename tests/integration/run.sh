@@ -38,9 +38,15 @@ entry_field() {
 # extra-vars. Returns the ansible-playbook exit code.
 run_playbook() {
     local entry_name="$1" playbook="$2"
-    local benchmark_mapping levels become_password
+    local benchmark_mapping levels become_password target_role
     benchmark_mapping="$(entry_field "$entry_name" benchmark_mapping | tr -d '"')"
     levels="$(entry_field "$entry_name" levels)"
+
+    # Role selection: entries default to the linux role; nginx entries set
+    # role: nginx in platforms.yml
+    target_role="$(entry_field "$entry_name" role | tr -d '"')"
+    [ "$target_role" = "null" ] && target_role="linux"
+    [ "$benchmark_mapping" = "null" ] && benchmark_mapping=""
 
     # The become password matches the one set on the vagrant user by the
     # set_password provisioner; it keeps become working after the hardening
@@ -60,7 +66,8 @@ run_playbook() {
     ansible-playbook \
         --inventory "$entry_name," \
         --extra-vars "entry_name=$entry_name" \
-        --extra-vars "benchmark_mapping=$benchmark_mapping" \
+        --extra-vars "target_role=$target_role" \
+        ${benchmark_mapping:+--extra-vars "benchmark_mapping=$benchmark_mapping"} \
         --extra-vars "{\"levels\": $levels}" \
         --extra-vars "ansible_become_password=$become_password" \
         --extra-vars "ansible_shell_executable=/bin/bash" \

@@ -9,7 +9,8 @@
 #
 # Expected extra-vars (supplied by run.sh from the platforms.yml entry):
 #   entry_name         matrix entry name, selects the expected_failures file
-#   benchmark_mapping  benchmark mapping the role should load
+#   target_role        role to run: linux (default) or nginx
+#   benchmark_mapping  benchmark mapping (linux role only)
 #   levels             CIS levels to request
 - name: "Verify {{ entry_name }}"
   hosts: all
@@ -17,8 +18,11 @@
   gather_facts: true
   vars:
     audit_only: true
+    # nginx benchmark rules are all Manual (automated: false), so its
+    # assertion keys on scored; the linux assertion keys on automated
+    assert_attribute: "{{ 'scored' if target_role | default('linux') == 'nginx' else 'automated' }}"
   roles:
-    - linux
+    - "{{ target_role | default('linux') }}"
 
   post_tasks:
     # Save the post-hardening report alongside the baseline
@@ -40,7 +44,7 @@
       set_fact:
         unexpected_failures: >-
           {{ audit_result
-             | selectattr('automated')
+             | selectattr(assert_attribute)
              | rejectattr('remediation_status')
              | map(attribute='id')
              | reject('in', expected_failures)

@@ -18,6 +18,9 @@ galaxy_info:
   - name: OracleLinux
     versions:
     - all
+  - name: EL
+    versions:
+    - all
 
   galaxy_tags:
   - secure_web_server

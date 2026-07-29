@@ -1,0 +1,24 @@
+# Rules allowed to remain non-compliant on the nginx_alma10_l1 entry.
+#
+# Level-1 run across all three profiles; level-2-only rules (HTTP/3, CSP,
+# Referrer-Policy, IP filters, connection/rate limits, upstream trust) do
+# not evaluate here and are deliberately absent from this list.
+#
+# First run will reveal any additional genuine "cannot pass on this box"
+# rules to add here (and remove any that actually pass). Do not pad this
+# list with rules that should pass.
+expected_failures:
+
+  # certificate-dependent rules (test VM has a self-signed certificate)
+  - nginx_trusted_certificate_installed
+  - nginx_ocsp_stapling_enabled
+  # site-policy rules (role reports, never invents site values)
+  - nginx_authorized_ports_only
+  # proxy/upstream rules need a real upstream topology and certificates
+  - nginx_upstream_client_certificate_auth
+  - nginx_proxies_pass_source_ip
+  # advisory rules: the role reports these because the value is a site
+  # decision, so it never invents one
+  - nginx_only_required_dynamic_modules_loaded
+  - nginx_http_redirected_to_https
+  - nginx_approved_http_methods_only

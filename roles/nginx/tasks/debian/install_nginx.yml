@@ -1,4 +1,4 @@
-# Remove nginx
+# Remove nginx installed from an untrusted repository
 - name: "{{ rule }} | Remediation"
   apt:
     name: nginx
@@ -7,15 +7,25 @@
     force: true
   when: uninstall_nginx | default(false)
 
-# Enable nginx stable version
+# Install the nginx.org package signing key
+- name: "{{ rule }} | Remediation"
+  get_url:
+    url: https://nginx.org/keys/nginx_signing.key
+    dest: /usr/share/keyrings/nginx_signing.key
+    owner: root
+    group: root
+    mode: "0644"
+
+# Configure the official nginx.org stable repository
 - name: "{{ rule }} | Remediation"
   apt_repository:
-    repo: "ppa:nginx/stable"
+    repo: "deb [signed-by=/usr/share/keyrings/nginx_signing.key] http://nginx.org/packages/{{ 'ubuntu' if ansible_distribution == 'Ubuntu' else 'debian' }} {{ ansible_distribution_release }} nginx"
+    filename: nginx
     update_cache: yes
     state: present
     mode: "0644"
 
-# Install stable version of nginx
+# Install nginx from the trusted repository
 - name: "{{ rule }} | Remediation"
   apt:
     name: nginx

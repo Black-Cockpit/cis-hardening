@@ -3,29 +3,43 @@
   block:
   # 2.5.1 Ensure server_tokens directive is set to `off`
   #
-  # The server_tokens directive is responsible for displaying the NGINX version number
-  # and operating system version on error pages and in the Server HTTP response header
-  # field. This information should not be displayed.
+  # The server_tokens directive is responsible for displaying the NGINX version
+  # number and operating system version on error pages and in the Server HTTP
+  # response header field. This information should not be displayed.
   - name: "2.5.1 Ensure server_tokens directive is set to `off`"
     block:
     # 2.5.1 Ensure server_tokens directive is set to `off` | Audit
     - name: "2.5.1 Ensure server_tokens directive is set to `off` | Audit"
       shell:
         cmd: |
-          for file_path in $(grep -ir server_tokens /etc/nginx | awk -F ':' '{print $1}' | uniq); do
-              value=$(grep -E '^([^#.]){0,}server_tokens*.+[;]' "$file_path" | awk '{print $2}' | sed -e 's/[;]//g' -e 's/\s//g')
-              [[ "$value" == "off" ]] || echo "$file_path"
-          done
+          if [ ! -d /etc/nginx ] || ! command -v nginx >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          loaded_configuration=$(nginx -T 2>/dev/null)
+          if [ -z "$loaded_configuration" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          server_tokens_directives=$(printf '%s\n' "$loaded_configuration" | grep -E '^[[:space:]]*server_tokens[[:space:]]+[^;]+;' || true)
+          if [ -z "$server_tokens_directives" ]; then
+              echo 'not_configured'
+          elif printf '%s\n' "$server_tokens_directives" | grep -qvE '^[[:space:]]*server_tokens[[:space:]]+off[[:space:]]*;'; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
       changed_when: false
       register: nginx_server_tokens_status
 
     # Extract audit result
     - set_fact:
         nginx_server_tokens_check:
-          name: 2.5.1 Ensure server_tokens directive is set to `off`
+          id: nginx_server_tokens_off
+          name: "2.5.1 Ensure server_tokens directive is set to `off`"
           scored: true
-          automated: true
-          remediation_status: "{{ true if nginx_server_tokens_status.stdout == '' else false }}"
+          automated: false
+          remediation_status: "{{ true if nginx_server_tokens_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
@@ -35,56 +49,116 @@
 
     # 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
     - name: "2.5.1 Ensure server_tokens directive is set to `off` | Remediation"
-      lineinfile:
-        path: "{{ item }}"
-        regexp: '[#]{1,}[\s]{0,}server_tokens*.+[;]'
-        state: absent
-      loop: "{{ nginx_server_tokens_status.stdout_lines | default([]) | list | unique }}"
+      replace:
+        path: /etc/nginx/nginx.conf
+        regexp: '^([\s]*)server_tokens\s+[^;\n]+;'
+        replace: '\1server_tokens off;'
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_server_tokens_check.remediation_status
 
     # 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
-    - name: 2.5.1 Ensure server_tokens directive is set to `off` | Remediation
-      replace:
-        path: "{{ item }}"
-        regexp: 'server_tokens*.+[;]'
-        replace: "server_tokens off;"
-      loop: "{{ nginx_server_tokens_status.stdout_lines | default([]) | list | unique }}"
+    - name: "2.5.1 Ensure server_tokens directive is set to `off` | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^\s*server_tokens\s+off\s*;'
+        line: "\tserver_tokens off;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      notify:
+      - "restart nginx"
+      - "config test"
       when: not audit_only and not nginx_server_tokens_check.remediation_status
     tags:
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
     - "web_server_level_1"
     when: |
-      'web_server_level_1' in levels or 'web_server_level_2' in levels
+          ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
+          or ('web_server_level_1' in levels or 'web_server_level_2' in levels)
 
 
 
-  # 2.5.2 Ensure default error and index.html pages do not reference
+  # 2.5.2 Ensure default error and index.html pages do not reference NGINX
   #
-  # The default error and index.html pages for NGINX reveal that the server is NGINX. These
-  # default pages should be removed or modified so they do not advertise the underlying
-  # infrastructure of the server
-  - name: "2.5.2 Ensure default error and index.html pages do not reference"
+  # Default error pages (e.g. 404, 500) and the default welcome page often carry
+  # NGINX branding or signatures. These pages should be removed or replaced with
+  # generic or custom-branded pages that do not disclose the underlying server
+  # technology.
+  - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX"
     block:
-    # 2.5.2 Ensure default error and index.html pages do not reference | Audit
-    - name: "2.5.2 Ensure default error and index.html pages do not reference | Audit"
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit"
       shell:
-        cmd: grep -isq nginx /usr/share/nginx/html/index.html && echo 'not_configured' || echo 'configured'
+        cmd: |
+          if [ ! -d /etc/nginx ] || ! command -v nginx >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          if nginx -T 2>/dev/null | grep -qiE '^[[:space:]]*error_page[[:space:]]+'; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_error_page_directive_status
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit"
+      shell:
+        cmd: |
+          if ! command -v curl >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          index_body=$(curl -sk --max-time 5 -H 'Host: localhost' https://127.0.0.1/ 2>/dev/null)
+          if [ -z "$index_body" ]; then
+              index_body=$(curl -s --max-time 5 -H 'Host: localhost' http://127.0.0.1/ 2>/dev/null)
+          fi
+          if [ -z "$index_body" ]; then
+              curl -s --max-time 5 -o /dev/null http://127.0.0.1/ 2>/dev/null
+              if [ $? -eq 7 ]; then echo 'not_configured'; else echo 'configured'; fi
+          elif printf '%s\n' "$index_body" | grep -qi nginx; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
       changed_when: false
       register: nginx_index_page_status
 
-    # 2.5.2 Ensure default error and index.html pages do not reference | Audit
-    - name: "2.5.2 Ensure default error and index.html pages do not reference | Audit"
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Audit"
       shell:
-        cmd: grep -isq nginx /usr/share/nginx/html/50x.html && echo 'not_configured' || echo 'configured'
+        cmd: |
+          if ! command -v curl >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          error_body=$(curl -sk --max-time 5 -H 'Host: localhost' https://127.0.0.1/cis-non-existent-page 2>/dev/null)
+          if [ -z "$error_body" ]; then
+              error_body=$(curl -s --max-time 5 -H 'Host: localhost' http://127.0.0.1/cis-non-existent-page 2>/dev/null)
+          fi
+          if [ -z "$error_body" ]; then
+              curl -s --max-time 5 -o /dev/null http://127.0.0.1/cis-non-existent-page 2>/dev/null
+              if [ $? -eq 7 ]; then echo 'not_configured'; else echo 'configured'; fi
+          elif printf '%s\n' "$error_body" | grep -qi nginx; then
+              echo 'not_configured'
+          else
+              echo 'configured'
+          fi
       changed_when: false
       register: nginx_error_page_status
 
     # Extract audit result
     - set_fact:
         nginx_pages_check:
-          name: 2.5.2 Ensure default error and index.html pages do not reference
+          id: nginx_default_pages_no_nginx_reference
+          name: "2.5.2 Ensure default error and index.html pages do not reference NGINX"
           scored: true
-          automated: true
-          remediation_status: "{{ true if (nginx_index_page_status.stdout == 'configured' and nginx_error_page_status.stdout == 'configured') else false }}"
+          automated: false
+          remediation_status: "{{ true if (nginx_error_page_directive_status.stdout == 'configured' and nginx_index_page_status.stdout == 'configured' and nginx_error_page_status.stdout == 'configured') else false }}"
       changed_when: false
 
     # Appending audit result
@@ -92,90 +166,257 @@
         audit_result: "{{ (audit_result | default([])) + [nginx_pages_check] }}"
       changed_when: false
 
-    # 2.5.2 Ensure default error and index.html pages do not reference | Remediation
-    - name: "2.5.2 Ensure default error and index.html pages do not reference | Remediation"
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
       copy:
         src: "files/usr/share/nginx/html/index.html"
         dest: "/usr/share/nginx/html/index.html"
         mode: "0644"
         owner: root
         group: root
-      when: not audit_only and not nginx_pages_check.remediation_status and not (nginx_index_page_status.stdout == 'configured')
+      when: not audit_only and not nginx_pages_check.remediation_status
 
-    # 2.5.2 Ensure default error and index.html pages do not reference | Remediation
-    - name: 2.5.2 Ensure default error and index.html pages do not reference | Remediation
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
       copy:
         src: "files/usr/share/nginx/html/50x.html"
         dest: "/usr/share/nginx/html/50x.html"
         mode: "0644"
         owner: root
         group: root
-      when: not audit_only and not nginx_pages_check.remediation_status and not (nginx_error_page_status.stdout == 'configured')
+      when: not audit_only and not nginx_pages_check.remediation_status
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    #
+    # Without a mapping for 404 the built-in not-found body is served, and that
+    # body names the server even when server_tokens is off
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
+      copy:
+        src: "files/usr/share/nginx/html/404.html"
+        dest: "/usr/share/nginx/html/404.html"
+        mode: "0644"
+        owner: root
+        group: root
+      when: not audit_only and not nginx_pages_check.remediation_status
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    #
+    # Point the not-found status at the unbranded page shipped above. This
+    # covers server blocks that declare no error_page of their own.
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
+      lineinfile:
+        dest: "/etc/nginx/nginx.conf"
+        regexp: '^[\s]{0,}error_page[\s]{1,}404[\s]'
+        line: "\terror_page 404 /404.html;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+      when: not audit_only and not nginx_pages_check.remediation_status
+      notify:
+      - config test
+      - restart nginx
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    #
+    # Collect the served configuration files so the mapping can be enabled in
+    # each of them
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
+      find:
+        paths:
+        - /etc/nginx/conf.d
+        - /etc/nginx/sites-enabled
+        patterns: "*.conf,*"
+        file_type: any
+      changed_when: false
+      register: nginx_served_config_files
+      when: not audit_only and not nginx_pages_check.remediation_status
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    #
+    # A server block that declares any error_page stops inheriting the http
+    # level ones, so the packaged not-found mapping is enabled where it ships
+    # commented out, otherwise the built-in body naming the server is returned
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
+      replace:
+        path: "{{ item.path }}"
+        regexp: '^([\s]*)#[\s]*error_page[\s]+404[\s]+/404\.html;'
+        replace: '\1error_page 404 /404.html;'
+      loop: "{{ nginx_served_config_files.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path | default('') }}"
+      when: not audit_only and not nginx_pages_check.remediation_status
+      notify:
+      - config test
+      - restart nginx
+
+    # 2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation
+    - name: "2.5.2 Ensure default error and index.html pages do not reference NGINX | Remediation"
+      debug:
+        msg:
+        - "Do not rely on editing the packaged default pages, they are overwritten by package updates."
+        - "Create a directory such as /var/www/html/errors and place generic HTML files there (404.html, 50x.html) without NGINX branding."
+        - "Add the error_page directives to the http or server blocks that serve the application, for example:"
+        - "error_page 404 /404.html;"
+        - "error_page 500 502 503 504 /50x.html;"
+        - "location = /50x.html { root /var/www/html/errors; internal; }"
+        - "Confirm with 'curl -k https://127.0.0.1/non-existent-page | grep -i nginx' that the response body no longer contains 'nginx'."
+      when: not audit_only and not nginx_pages_check.remediation_status
     tags:
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
     - "web_server_level_1"
     when: |
-      'web_server_level_1' in levels or 'web_server_level_2' in levels
+          ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
+          or ('web_server_level_1' in levels or 'web_server_level_2' in levels)
 
 
 
   # 2.5.3 Ensure hidden file serving is disabled
   #
-  # Disabling hidden files is a defense-in-depth mechanism to help prevent accidentally
-  # exposing sensitive information.
-  - name: "2.4.1 Ensure NGINX only listens for network connections on authorized ports"
+  # Hidden files and directories (starting with a dot, e.g. .git, .env) often
+  # contain sensitive metadata, version control history, or environment
+  # configurations. Serving these files should be globally disabled.
+  - name: "2.5.3 Ensure hidden file serving is disabled"
     block:
+    # 2.5.3 Ensure hidden file serving is disabled | Audit
+    - name: "2.5.3 Ensure hidden file serving is disabled | Audit"
+      shell:
+        cmd: |
+          if [ ! -d /etc/nginx ] || ! command -v nginx >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          loaded_configuration=$(nginx -T 2>/dev/null)
+          if [ -z "$loaded_configuration" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          hidden_file_location=$(printf '%s\n' "$loaded_configuration" | grep -A3 -E 'location[[:space:]]+[^{]*\\\.' || true)
+          if [ -z "$hidden_file_location" ]; then
+              echo 'not_configured'
+          elif printf '%s\n' "$hidden_file_location" | grep -qE '(deny[[:space:]]+all|return[[:space:]]+40[34])'; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
+      changed_when: false
+      register: nginx_hidden_files_status
+
     # Extract audit result
     - set_fact:
         nginx_hidden_files_check:
-          name: 2.5.3 Ensure hidden file serving is disabled
-          scored: false
+          id: nginx_hidden_file_serving_disabled
+          name: "2.5.3 Ensure hidden file serving is disabled"
+          scored: true
           automated: false
-          remediation: |
-            Consider to add the block bellow of the existing confuguration files under each location context:
-
-            location ~ /\.well-known\/acme-challenge {
-              allow all;
-            }
+          remediation_status: "{{ true if nginx_hidden_files_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_hidden_files_check] }}"
       changed_when: false
+
+    # 2.5.3 Ensure hidden file serving is disabled | Remediation
+    - name: "2.5.3 Ensure hidden file serving is disabled | Remediation"
+      file:
+        path: "/etc/nginx/snippets"
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+      when: not audit_only and not nginx_hidden_files_check.remediation_status
+
+    # 2.5.3 Ensure hidden file serving is disabled | Remediation
+    #
+    # The deny rules live in a snippet rather than in /etc/nginx/conf.d because
+    # conf.d/*.conf is included from the http context, where the location
+    # directive is rejected by nginx and the whole configuration fails to load.
+    - name: "2.5.3 Ensure hidden file serving is disabled | Remediation"
+      copy:
+        dest: "/etc/nginx/snippets/00-cis-hidden-files.conf"
+        mode: "0640"
+        owner: root
+        group: root
+        content: |
+          # Requests for hidden files and directories are refused.
+          #
+          # HTTP-01 certificate renewal needs /.well-known/acme-challenge/ to stay
+          # reachable. Where Let's Encrypt is in use, place the exception ahead of
+          # the deny rule in the serving context:
+          #
+          #     location ^~ /.well-known/acme-challenge/ {
+          #         allow all;
+          #         default_type "text/plain";
+          #     }
+          location ~ /\. {
+              deny all;
+              return 404;
+          }
+      notify:
+      - "restart nginx"
+      - "config test"
+      when: not audit_only and not nginx_hidden_files_check.remediation_status
+
+    # 2.5.3 Ensure hidden file serving is disabled | Remediation
+    - name: "2.5.3 Ensure hidden file serving is disabled | Remediation"
+      debug:
+        msg:
+        - "The deny rules have been written to /etc/nginx/snippets/00-cis-hidden-files.conf and take effect once every server block includes them."
+        - "Add the following line to each server block that serves content:"
+        - "include /etc/nginx/snippets/00-cis-hidden-files.conf;"
+        - "Where HTTP-01 certificate renewal is in use, keep a 'location ^~ /.well-known/acme-challenge/ { allow all; default_type \"text/plain\"; }' block ahead of the include."
+        - "Verify with 'curl -k -I https://127.0.0.1/.git/HEAD' that the server answers 403 Forbidden or 404 Not Found."
+      when: not audit_only and not nginx_hidden_files_check.remediation_status
     tags:
-    - "web_server_level_2"
-    when: "'web_server_level_2' in levels"
+    - "load_balancer_level_1"
+    - "reverse_proxy_level_1"
+    - "web_server_level_1"
+    when: |
+          ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
+          or ('web_server_level_1' in levels or 'web_server_level_2' in levels)
 
 
 
   # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure
   #
-  # The server and x-powered-by header may specify the underlying technology used by an
-  # application. The NGINX reverse proxy may pass these headers if not explicitly directed
-  # to remove them.
+  # When NGINX acts as a reverse proxy it forwards headers sent by the upstream
+  # application (e.g. "X-Powered-By: Custom_APP" or "Server: Apache/2.4"). These
+  # headers should be stripped before the response reaches the client to prevent
+  # information disclosure about the backend infrastructure.
   - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure"
     block:
     # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit
     - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit"
       shell:
-        cmd: grep -E '^([^#.]){0,}proxy_hide_header*.+[;]' /etc/nginx/nginx.conf | grep -iq 'X-Powered-By' && echo 'configured' || echo 'not_configured'
+        cmd: |
+          if [ ! -d /etc/nginx ] || ! command -v nginx >/dev/null 2>&1; then
+              echo 'not_configured'
+              exit 0
+          fi
+          hide_header_directives=$(nginx -T 2>/dev/null | grep -Ei '^[[:space:]]*(proxy|fastcgi)_hide_header[[:space:]]' || true)
+          if [ -z "$hide_header_directives" ]; then
+              echo 'not_configured'
+              exit 0
+          fi
+          powered_by_hidden=$(printf '%s\n' "$hide_header_directives" | grep -ciE "hide_header[[:space:]]+[\"']?X-Powered-By[\"']?[[:space:]]*;")
+          server_hidden=$(printf '%s\n' "$hide_header_directives" | grep -ciE "hide_header[[:space:]]+[\"']?Server[\"']?[[:space:]]*;")
+          if [ "$powered_by_hidden" -gt 0 ] && [ "$server_hidden" -gt 0 ]; then
+              echo 'configured'
+          else
+              echo 'not_configured'
+          fi
       changed_when: false
-      register: nginx_x_powred_by_header_status
-
-    # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit
-    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Audit"
-      shell:
-        cmd: grep -E '^([^#.]){0,}proxy_hide_header*.+[;]' /etc/nginx/nginx.conf | grep -iq 'Server' && echo 'configured' || echo 'not_configured'
-      changed_when: false
-      register: nginx_server_header_status
+      register: nginx_hidden_headers_status
 
     # Extract audit result
     - set_fact:
         nginx_hidden_headers_check:
-          name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure
+          id: nginx_reverse_proxy_no_information_disclosure
+          name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure"
           scored: true
-          automated: true
-          remediation_status: "{{ true if (nginx_x_powred_by_header_status.stdout == 'configured' and nginx_server_header_status.stdout == 'configured') else false }}"
+          automated: false
+          remediation_status: "{{ true if nginx_hidden_headers_status.stdout == 'configured' else false }}"
       changed_when: false
 
     # Appending audit result
@@ -187,28 +428,41 @@
     - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation"
       lineinfile:
         path: /etc/nginx/nginx.conf
-        regexp: '[#]{0,}[\s]{0,}proxy_hide_header*.+[;]'
-        state: absent
-      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_x_powred_by_header_status.stdout == 'configured')
+        regexp: '^\s*proxy_hide_header\s+.?X-Powered-By.?\s*;'
+        line: "\tproxy_hide_header X-Powered-By;"
+        insertafter: '^([^#.]){0,}http\s{0,}\{'
+        state: present
+      notify:
+      - "restart nginx"
+      - "config test"
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status
 
     # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
-    - name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
+    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation"
       lineinfile:
-        dest: "/etc/nginx/nginx.conf"
-        regexp: "^(([\\s]{0,}|[\t]{0,})proxy_hide_header) 'X-Powered-By';"
-        line: "\tproxy_hide_header 'X-Powered-By';"
+        path: /etc/nginx/nginx.conf
+        regexp: '^\s*proxy_hide_header\s+.?Server.?\s*;'
+        line: "\tproxy_hide_header Server;"
         insertafter: '^([^#.]){0,}http\s{0,}\{'
-      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_x_powred_by_header_status.stdout == 'configured')
+        state: present
+      notify:
+      - "restart nginx"
+      - "config test"
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status
 
     # 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
-    - name: 2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation
-      lineinfile:
-        dest: "/etc/nginx/nginx.conf"
-        regexp: "^(([\\s]{0,}|[\t]{0,})proxy_hide_header) 'Server';"
-        line: "\tproxy_hide_header 'Server';"
-        insertafter: '^([^#.]){0,}http\s{0,}\{'
-      when: not audit_only and not nginx_hidden_headers_check.remediation_status and not (nginx_server_header_status.stdout == 'configured')
+    - name: "2.5.4 Ensure the NGINX reverse proxy does not enable information disclosure | Remediation"
+      debug:
+        msg:
+        - "The directive family depends on the upstream protocol and only the HTTP proxy case is applied automatically."
+        - "For FastCGI upstreams (fastcgi_pass, e.g. PHP-FPM) add the equivalent directives to the relevant http, server or location block:"
+        - "fastcgi_hide_header X-Powered-By;"
+        - "fastcgi_hide_header Server;"
+        - "Verify with 'curl -k -I https://127.0.0.1 | grep -Ei \"^(Server|X-Powered-By)\"' that no backend details or unmasked version numbers are returned."
+      when: not audit_only and not nginx_hidden_headers_check.remediation_status
     tags:
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: "('load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) \nor ('load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) \n"
+    when: |
+          ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)

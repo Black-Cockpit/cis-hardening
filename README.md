@@ -39,7 +39,7 @@ distribution and major version:
 Each benchmark is evaluated at the requested CIS profile: `server_level_1`,
 `server_level_2`, `workstation_level_1`, or `workstation_level_2`.
 
-The `nginx` role covers the CIS NGINX Benchmark (v2.0.1) on Enterprise Linux
+The `nginx` role covers the CIS NGINX Benchmark (v3.0.0) on Enterprise Linux
 and Debian-family systems, including containerized NGINX, at the web-server,
 load-balancer and reverse-proxy profiles.
 

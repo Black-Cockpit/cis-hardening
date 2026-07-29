@@ -1,0 +1,210 @@
+# Build and install the headers-more dynamic module for the running NGINX.
+#
+# The module is not part of the benchmark; it backs the optional
+# security_best_practices.hide_server_header setting, which clears the Server
+# response header entirely instead of only hiding the version.
+#
+# A dynamic module is only loadable by a binary built with --with-compat, and
+# it must be compiled against the exact NGINX version that will load it, so
+# both the NGINX source and the module release are resolved at run time from
+# the running binary and from the module's release feed.
+#
+# The compiler toolchain is transient: only packages that were missing before
+# the build are installed, and they are removed again once the build finishes,
+# whether or not it succeeded.
+
+# Resolve the running NGINX version, its module directory and whether the
+# build accepts external dynamic modules
+- name: "{{ rule }} | Remediation"
+  shell:
+    cmd: |
+      version="$(nginx -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)"
+      modules_path="$(nginx -V 2>&1 | tr ' ' '\n' | grep -- '--modules-path=' | head -n 1 | cut -d= -f2)"
+      nginx -V 2>&1 | grep -q -- '--with-compat' && compat=yes || compat=no
+      printf '%s\n%s\n%s\n' "$version" "${modules_path:-/usr/lib64/nginx/modules}" "$compat"
+  changed_when: false
+  register: nginx_build_facts
+
+# Split the collected build facts into individual variables
+- set_fact:
+    nginx_running_version: "{{ nginx_build_facts.stdout_lines[0] | default('') }}"
+    nginx_modules_path: "{{ nginx_build_facts.stdout_lines[1] | default('') }}"
+    nginx_supports_compat: "{{ (nginx_build_facts.stdout_lines[2] | default('no')) == 'yes' }}"
+  changed_when: false
+
+# Report and stop when the running build cannot load external dynamic modules
+- name: "{{ rule }} | Remediation"
+  debug:
+    msg: "Skipping headers-more: this NGINX build lacks --with-compat, so an externally built dynamic module cannot be loaded"
+  when: not nginx_supports_compat
+
+# The remaining steps only apply to a compat-enabled build with a known version
+- name: "{{ rule }} | Remediation"
+  block:
+  # The toolchain differs per platform; name it once so the install and the
+  # later removal work from the same list
+  - set_fact:
+      headers_more_packages: "{{ headers_more_packages_rhel if target_platform == 'rhel' else headers_more_packages_debian }}"
+    changed_when: false
+
+  # Record which packages are already installed, so the cleanup only removes
+  # what this build added
+  - name: "{{ rule }} | Remediation"
+    package_facts:
+      manager: auto
+
+  # Everything from the toolchain list that the host does not already carry
+  - set_fact:
+      headers_more_added_packages: "{{ headers_more_packages | reject('in', ansible_facts.packages) | list }}"
+    changed_when: false
+
+  # Install the toolchain, then build, then always give the toolchain back
+  - block:
+    # Install the compiler and development headers for this platform
+    - include_tasks:
+        file: "{{ target_platform }}/install_headers_more_dependencies.yml"
+
+    # Resolve the latest module release tag from the project's release feed,
+    # falling back to the tag list when no release is published
+    - name: "{{ rule }} | Remediation"
+      shell:
+        cmd: |
+          tag="$(curl -fsSL https://api.github.com/repos/openresty/headers-more-nginx-module/releases/latest 2>/dev/null \
+                 | grep -m1 '"tag_name"' | cut -d'"' -f4)"
+          if [ -z "$tag" ]; then
+              tag="$(curl -fsSL https://api.github.com/repos/openresty/headers-more-nginx-module/tags 2>/dev/null \
+                     | grep -m1 '"name"' | cut -d'"' -f4)"
+          fi
+          printf '%s\n' "$tag"
+      changed_when: false
+      register: headers_more_release_tag
+
+    # A missing tag means the release feed was unreachable; without it there
+    # is no source to build
+    - name: "{{ rule }} | Remediation"
+      fail:
+        msg: "Unable to resolve a headers-more release tag from the project's release feed"
+      when: headers_more_release_tag.stdout | trim == ''
+
+    # Provide a clean build directory for this run
+    - name: "{{ rule }} | Remediation"
+      file:
+        path: "{{ headers_more_build_dir }}"
+        state: absent
+
+    # Recreate the build directory owned by root
+    - name: "{{ rule }} | Remediation"
+      file:
+        path: "{{ headers_more_build_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    # Fetch the NGINX source matching the running version, because a dynamic
+    # module has to be compiled against the version that will load it
+    - name: "{{ rule }} | Remediation"
+      get_url:
+        url: "https://nginx.org/download/nginx-{{ nginx_running_version }}.tar.gz"
+        dest: "{{ headers_more_build_dir }}/nginx-{{ nginx_running_version }}.tar.gz"
+        mode: "0600"
+
+    # Fetch the resolved module release
+    - name: "{{ rule }} | Remediation"
+      get_url:
+        url: "https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/{{ headers_more_release_tag.stdout | trim }}.tar.gz"
+        dest: "{{ headers_more_build_dir }}/headers-more.tar.gz"
+        mode: "0600"
+
+    # Unpack the NGINX source
+    - name: "{{ rule }} | Remediation"
+      unarchive:
+        src: "{{ headers_more_build_dir }}/nginx-{{ nginx_running_version }}.tar.gz"
+        dest: "{{ headers_more_build_dir }}"
+        remote_src: true
+
+    # Unpack the module source
+    - name: "{{ rule }} | Remediation"
+      unarchive:
+        src: "{{ headers_more_build_dir }}/headers-more.tar.gz"
+        dest: "{{ headers_more_build_dir }}"
+        remote_src: true
+
+    # Locate the unpacked module directory, whose name carries the release tag
+    - name: "{{ rule }} | Remediation"
+      shell:
+        cmd: "find {{ headers_more_build_dir }} -maxdepth 1 -type d -name 'headers-more-nginx-module-*' | head -n 1"
+      changed_when: false
+      register: headers_more_source_dir
+
+    # Compile the module alone; make modules leaves the installed NGINX binary
+    # untouched and produces only the shared object
+    - name: "{{ rule }} | Remediation"
+      shell:
+        cmd: |
+          ./configure --with-compat --add-dynamic-module='{{ headers_more_source_dir.stdout | trim }}' \
+          && make modules
+        chdir: "{{ headers_more_build_dir }}/nginx-{{ nginx_running_version }}"
+
+    # Install the shared object next to the modules shipped with the package
+    - name: "{{ rule }} | Remediation"
+      copy:
+        src: "{{ headers_more_build_dir }}/nginx-{{ nginx_running_version }}/objs/ngx_http_headers_more_filter_module.so"
+        dest: "{{ nginx_modules_path }}/ngx_http_headers_more_filter_module.so"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+
+    # Restore the SELinux context so the module can be loaded by the nginx
+    # domain
+    - name: "{{ rule }} | Remediation"
+      shell:
+        cmd: |
+          if command -v restorecon >/dev/null 2>&1; then
+              restorecon -F '{{ nginx_modules_path }}/ngx_http_headers_more_filter_module.so' 2>/dev/null || true
+          fi
+          true
+      changed_when: false
+
+    # Load the module ahead of every other directive, which is where NGINX
+    # requires load_module to appear
+    - name: "{{ rule }} | Remediation"
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^load_module .*ngx_http_headers_more_filter_module\.so;'
+        line: "load_module {{ nginx_modules_path }}/ngx_http_headers_more_filter_module.so;"
+        insertbefore: BOF
+      notify:
+      - config test
+      - restart nginx
+
+    always:
+    # Remove the build tree and the sources it holds
+    - name: "{{ rule }} | Remediation"
+      file:
+        path: "{{ headers_more_build_dir }}"
+        state: absent
+
+    # Give back the toolchain that this build added, leaving any compiler the
+    # host already carried in place
+    - include_tasks:
+        file: "{{ target_platform }}/remove_headers_more_dependencies.yml"
+      when: headers_more_added_packages | length > 0
+  when: nginx_supports_compat and nginx_running_version != ''
+  vars:
+    headers_more_build_dir: /tmp/cis_nginx_headers_more_build
+    headers_more_packages_rhel:
+    - gcc
+    - gcc-c++
+    - make
+    - zlib-devel
+    - pcre2-devel
+    - openssl-devel
+    headers_more_packages_debian:
+    - gcc
+    - g++
+    - make
+    - zlib1g-dev
+    - libpcre2-dev
+    - libssl-dev

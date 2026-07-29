@@ -1,14 +1,22 @@
+# Safety net for the optional module build: the build itself removes its own
+# working directory and hands back the toolchain it installed, so these tasks
+# only cover a run that ended before that cleanup could happen.
+#
+# Nothing here may run during an audit, because an audit must leave the host
+# exactly as it found it.
+
 # Cleanup build directory
 - name: "Post Audit | Cleanup build directory"
   file:
-    path: "/tmp/cis_nginx_build_dir/"
+    path: "/tmp/cis_nginx_headers_more_build"
     state: absent
+  when: not audit_only
 
-# Remove compiler
+# Remove the toolchain packages that this run installed, leaving a compiler
+# the host already carried untouched
 - name: "Post Audit | Remove compiler"
   package:
     name: "{{ item }}"
     state: absent
-  loop:
-  - gcc
-  - make
+  loop: "{{ headers_more_added_packages | default([]) }}"
+  when: not audit_only

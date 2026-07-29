@@ -1,0 +1,8 @@
+# Toolchain and development headers required to compile an NGINX dynamic
+# module on Enterprise Linux. The list is resolved by the caller so the same
+# set can be handed back to the package manager once the build finishes.
+- name: "{{ rule }} | Remediation"
+  yum:
+    name: "{{ headers_more_packages }}"
+    state: present
+    update_cache: true

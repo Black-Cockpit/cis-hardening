@@ -3,64 +3,67 @@
   block:
   # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account
   #
-  # The nginx user directive designates which user account nginx worker processes run
-  # under. Ensuring a non-privileged, dedicated service account is used is a defense in
-  # depth measure to limit what an attacker who compromises the account can do.
+  # The user directive in the main configuration designates the operating system
+  # account under which the NGINX worker processes run. This account should be
+  # exclusively dedicated to NGINX, have no login capabilities, and possess no
+  # elevated system privileges.
   - name: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account"
     block:
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit
     - name: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit"
       shell:
-        cmd: grep -Pi -- '^\h*user\h+[^;\n\r]+\h*;.*$' /etc/nginx/nginx.conf | awk '{print $2}' | sed -e 's/;//g' | sed -e 's/\s*//g' || echo ''
+        cmd: nginx -T 2>/dev/null | grep -Pi -- '^\h*user\h+[^;\n\r]+\h*;.*$' | head -n 1 | awk '{print $2}' | sed -e 's/;//g' -e 's/\s*//g' || echo ''
       changed_when: false
-      register: nginx_user_status
-    
+      register: nginx_worker_user_status
+
     # Define remediation status
     - set_fact:
-        remediation_status: "{{ true if (nginx_user_status.stdout != '' and  nginx_user_status.stdout == nginx_user ) else false }}"
+        remediation_status: "{{ true if nginx_worker_user_status.stdout != '' else false }}"
       changed_when: false
 
-    # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit
-    - name: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit"
-      shell:
-        cmd: sudo -l -U {{ nginx_user }} | grep -iq 'not allowed to run sudo' && echo configured || echo not_configured
-      changed_when: false
-      register: nginx_user_privileges_status
-      when: remediation_status and not container
-
-    # Update remediation status
-    - set_fact:
-        remediation_status: "{{ true if (remediation_status and (nginx_user_privileges_status.stdout | default('configured')) == 'configured' ) else false }}"
-      changed_when: false
-      when: remediation_status
-    
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit
     - name: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit"
       shell:
         cmd: |
-          if groups "{{ nginx_user }}" &> /dev/null; then
-              nginx_user_groups_count=$(groups "{{ nginx_user }}" | wc -l)
-              nginx_group=$(groups "{{ nginx_user }}" | awk -F ':' '{printf $1}' | sed -e 's@\s*@@g' | head -n 1 || echo '')
-              [[ "$nginx_user_groups_count" -eq 1 ]] && [[ "$nginx_group" == "{{ nginx_group }}" ]] && echo configured || echo not_configured
+          nginx_worker_user='{{ nginx_worker_user_status.stdout }}'
+          if id "$nginx_worker_user" &> /dev/null; then
+              nginx_worker_user_id=$(id -u "$nginx_worker_user")
+              privileged_group_memberships=$(id -nG "$nginx_worker_user" | tr ' ' '\n' | grep -Ex '(root|wheel|sudo)' || true)
+              [[ "$nginx_worker_user_id" -ne 0 ]] && [[ -z "$privileged_group_memberships" ]] && echo configured || echo not_configured
           else
               echo not_configured
           fi
       changed_when: false
-      register: nginx_user_groups_status
+      register: nginx_worker_user_privileges_status
       when: remediation_status
 
     # Update remediation status
     - set_fact:
-        remediation_status: "{{ true if (remediation_status and (nginx_user_groups_status.stdout | default()) == 'configured' ) else false }}"
+        remediation_status: "{{ true if (remediation_status and (nginx_worker_user_privileges_status.stdout | default('not_configured')) == 'configured') else false }}"
+      changed_when: false
+      when: remediation_status
+
+    # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit
+    - name: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Audit"
+      shell:
+        cmd: sudo -l -U "{{ nginx_worker_user_status.stdout }}" | grep -iq 'not allowed to run sudo' && echo configured || echo not_configured
+      changed_when: false
+      register: nginx_worker_user_sudo_status
+      when: remediation_status and not container
+
+    # Update remediation status
+    - set_fact:
+        remediation_status: "{{ true if (remediation_status and (nginx_worker_user_sudo_status.stdout | default('configured')) == 'configured') else false }}"
       changed_when: false
       when: remediation_status
 
     # Extract audit result
     - set_fact:
         nginx_user_check:
+          id: nginx_dedicated_service_account
           name: 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account
           scored: true
-          automated: true
+          automated: false
           remediation_status: "{{ true if remediation_status else false }}"
       changed_when: false
 
@@ -68,22 +71,25 @@
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_user_check] }}"
       changed_when: false
-    
+
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
     - include_tasks:
         file: "common/create_nginx_user.yml"
       vars:
         rule: "2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account"
       when: not audit_only and not nginx_user_check.remediation_status
-    
+
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
     - name: 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
       replace:
         path: "/etc/nginx/nginx.conf"
         regexp: '[#]{0,}[\s]{0,}user\s*.+[;]'
         replace: "user {{ nginx_user }};"
-      when: not audit_only and not nginx_user_check.remediation_status and nginx_user_status.stdout != ''
-    
+      notify:
+      - "config test"
+      - "restart nginx"
+      when: not audit_only and not nginx_user_check.remediation_status
+
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
     - name: 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
       lineinfile:
@@ -92,21 +98,26 @@
         line: "user {{ nginx_user }};"
         state: present
         insertbefore: BOF
-      when: not audit_only and not nginx_user_check.remediation_status and nginx_user_status.stdout == '' 
+      notify:
+      - "config test"
+      - "restart nginx"
+      when: not audit_only and not nginx_user_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)
 
 
 
   # 2.2.2 Ensure the NGINX service account is locked
   #
-  # The nginx user account should have a valid password, but the account should be
-  # locked.
+  # The NGINX service account must not have a usable password and should be
+  # explicitly locked in the system's shadow file to prevent direct login or
+  # password-based privilege escalation.
   - name: "2.2.2 Ensure the NGINX service account is locked"
     block:
     # 2.2.2 Ensure the NGINX service account is locked | Audit
@@ -116,13 +127,14 @@
           passwd -S "{{ nginx_user }}" | grep -Eq '^({{ nginx_user }})*.(L |LK )' && echo locked || echo not_locked
       changed_when: false
       register: nginx_user_password_lock_status
-    
+
     # Extract audit result
     - set_fact:
         nginx_user_password_lock_check:
+          id: nginx_service_account_locked
           name: 2.2.2 Ensure the NGINX service account is locked
           scored: true
-          automated: true
+          automated: false
           remediation_status: "{{ true if nginx_user_password_lock_status.stdout == 'locked' else false }}"
       changed_when: false
 
@@ -130,7 +142,7 @@
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_user_password_lock_check] }}"
       changed_when: false
-    
+
     # 2.2.2 Ensure the NGINX service account is locked | Remediation
     - name: 2.2.2 Ensure the NGINX service account is locked | Remediation
       shell:
@@ -142,48 +154,51 @@
     - "reverse_proxy_level_1"
     when: |
           not container
-          and (('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels))
-  
+          and (('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels))
+
 
 
   # 2.2.3 Ensure the NGINX service account has an invalid shell
   #
-  # The nginx account should not have the ability to log in, so the /sbin/nologin shell should
-  # be set for the account.
+  # The NGINX service account must be configured with an invalid login shell to
+  # prevent interactive access.
   - name: "2.2.3 Ensure the NGINX service account has an invalid shell"
     block:
     # 2.2.3 Ensure the NGINX service account has an invalid shell | Audit
     - name: "2.2.3 Ensure the NGINX service account has an invalid shell | Audit"
-      user:
-        name: "{{ nginx_user }}"
+      shell:
+        cmd: getent passwd "{{ nginx_user }}" | awk -F ':' '{print $NF}' || echo ''
       changed_when: false
       register: nginx_user_shell_status
-    
+
     # Extract audit result
     - set_fact:
         nginx_user_shell_check:
+          id: nginx_service_account_invalid_shell
           name: 2.2.3 Ensure the NGINX service account has an invalid shell
           scored: true
-          automated: true
-          remediation_status: "{{ true if nginx_user_shell_status.shell == nginx_user_shell else false }}"
+          automated: false
+          remediation_status: "{{ true if (nginx_user_shell_status.stdout | trim) in ['/sbin/nologin', '/usr/sbin/nologin', '/bin/nologin', '/bin/false'] else false }}"
       changed_when: false
 
     # Appending audit result
     - set_fact:
         audit_result: "{{ (audit_result | default([])) + [nginx_user_shell_check] }}"
       changed_when: false
-    
+
     # 2.2.3 Ensure the NGINX service account has an invalid shell | Remediation
     - include_tasks:
         file: "tasks/common/create_nginx_user.yml"
       vars:
-        rule: 2.2.3 Ensure the NGINX service account has an invalid shell
+        rule: "2.2.3 Ensure the NGINX service account has an invalid shell"
       when: not audit_only and not nginx_user_shell_check.remediation_status
     tags:
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: | 
-          ('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) 
-          or ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels) 
+    when: |
+          ('web_server_level_1' in levels or 'web_server_level_2' in levels)
+          or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels)
+          or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)

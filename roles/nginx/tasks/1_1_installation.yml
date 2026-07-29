@@ -3,24 +3,35 @@
   block:
   # 1.1.1 Ensure NGINX is installed
   #
-  # The CIS NGINX Benchmark recommends using the NGINX binary provided by your
-  # vendor for most situations.
+  # An NGINX installation must be present on the system. To ensure support for
+  # modern security standards (such as TLS 1.3 and HTTP/3) and to mitigate known
+  # vulnerabilities, the installed version must meet the benchmark's minimum
+  # version floor.
   - name: "1.1.1 Ensure NGINX is installed"
     block:
     # 1.1.1 Ensure NGINX is installed | Audit
     - name: "1.1.1 Ensure NGINX is installed | Audit"
       shell:
-        cmd: command -v nginx &> /dev/null && echo installed || echo not_installed
+        cmd: |
+          current_version="$(nginx -V 2>&1 | grep -oE 'nginx/[0-9]+(\.[0-9]+)+' | cut -d '/' -f 2)"
+          if [ -z "$current_version" ]; then
+            echo not_installed
+          elif [ "$(printf '%s\n' '{{ cis_defaults.nginx_minimum_version }}' "$current_version" | sort -V | head -n 1)" = '{{ cis_defaults.nginx_minimum_version }}' ]; then
+            echo compliant
+          else
+            echo outdated
+          fi
       changed_when: false
-      register: nginx_status
+      register: nginx_version_status
 
     # Extract audit result
     - set_fact:
         nginx_check:
+          id: nginx_installed
           name: 1.1.1 Ensure NGINX is installed
           scored: true
-          automated: true
-          remediation_status: "{{ true if nginx_status.stdout == 'installed' else false }}"
+          automated: false
+          remediation_status: "{{ true if nginx_version_status.stdout == 'compliant' else false }}"
       changed_when: false
 
     # Appending audit result
@@ -38,52 +49,4 @@
     - "web_server_level_1"
     - "load_balancer_level_1"
     - "reverse_proxy_level_1"
-    when: "('web_server_level_1' in levels or 'load_balancer_level_1' in levels or 'reverse_proxy_level_1' in levels) and not ('web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels)"
-
-
-
-  # 1.1.2 Ensure NGINX is installed from source
-  #
-  # Installing NGINX directly from source allows you to install NGINX without the use of a
-  # package manager.
-  - name: "1.1.2 Ensure NGINX is installed from source"
-    block:
-    # 1.1.2 Ensure NGINX is installed from source | Audit
-    - name: "1.1.2 Ensure NGINX is installed from source | Audit"
-      shell:
-        cmd: command -v nginx &> /dev/null && echo installed || echo not_installed
-      changed_when: false
-      register: nginx_from_source_status
-
-    # Extract audit result
-    - set_fact:
-        nginx_from_source_check:
-          name: 1.1.2 Ensure NGINX is installed from source
-          scored: false
-          automated: false
-          remediation_status: "{{ true if nginx_from_source_status.stdout == 'installed' else false }}"
-      changed_when: false
-
-    # Appending audit result
-    - set_fact:
-        audit_result: "{{ (audit_result | default([])) + [nginx_from_source_check] }}"
-      changed_when: false
-
-    # 1.1.2 Ensure NGINX is installed from source | Remediation
-    - include_tasks:
-        file: "{{ target_platform }}/install_nginx_from_source_dependencies.yml"
-      vars:
-        rule: "1.1.2 Ensure NGINX is installed from source"
-      when: not audit_only and not nginx_from_source_check.remediation_status
-
-    # 1.1.2 Ensure NGINX is installed from source | Remediation
-    - include_tasks:
-        file: "common/install_nginx_from_source.yml"
-      vars:
-        rule: "1.1.2 Ensure NGINX is installed from source"
-      when: not audit_only and not nginx_from_source_check.remediation_status
-    tags:
-    - "web_server_level_2"
-    - "load_balancer_level_2"
-    - "reverse_proxy_level_2"
-    when: "'web_server_level_2' in levels or 'load_balancer_level_2' in levels or 'reverse_proxy_level_2' in levels"
+    when: "('web_server_level_1' in levels or 'web_server_level_2' in levels) or ('load_balancer_level_1' in levels or 'load_balancer_level_2' in levels) or ('reverse_proxy_level_1' in levels or 'reverse_proxy_level_2' in levels)"
