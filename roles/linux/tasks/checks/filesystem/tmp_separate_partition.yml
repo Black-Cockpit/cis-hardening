@@ -22,7 +22,10 @@
       remediation: "Consider to mount /tmp is a separate partition and update /etc/fstab"
   changed_when: false
 
-# Appending audit result
+# Enable and start tmp.mount so /tmp is backed by its own tmpfs partition.
+# Starting the unit shadows the contents of /tmp, including the module payload
+# the task itself executes from. TMPDIR stages that payload under /run, which
+# stays reachable once the mount is in place.
 - name: "tmp_separate_partition | Remediation"
   systemd:
     name: tmp.mount
@@ -30,6 +33,8 @@
     masked: false
     daemon_reload: yes
     state: started
+  environment:
+    TMPDIR: /run
   when: not audit_only and not tmp_mount.remediation_status
 
 # Record the verdict for this check
