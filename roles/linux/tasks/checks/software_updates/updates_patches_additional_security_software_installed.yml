@@ -16,12 +16,15 @@
   # Extract audit result
   changed_when: false
 
-# Appending audit result
+# Apply the pending security updates. Disabling best candidate selection lets the
+# transaction resolve to a lower package build, which is required while the
+# repositories publish the subpackages of one source package at different builds.
 - name: "updates_patches_additional_security_software_installed | Remediation"
   yum:
     name: "*"
     security: true
     update_cache: true
+    nobest: true
     state: latest
   when: not audit_only and not system_update_check.remediation_status
 
