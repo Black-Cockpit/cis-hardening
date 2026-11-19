@@ -195,12 +195,15 @@
     # 2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit
     #
     # A mode is compliant when it clears the 0133 mask, that is no owner execute bit, no
-    # group write or execute bit, and no write or execute bit for others.
+    # group write or execute bit, and no write or execute bit for others. A PID file that
+    # does not exist (NGINX stopped) has nothing to secure, so it passes and is never
+    # created or modified by the remediation.
     - name: "2.3.3 Ensure the NGINX process ID (PID) file is secured | Audit"
       shell:
         cmd: |
           pid_file_path='{{ nginx_pid_file_path_status.stdout }}'
-          if [ -z "$pid_file_path" ] || [ ! -e "$pid_file_path" ]; then echo not_configured; exit 0; fi
+          if [ -z "$pid_file_path" ]; then echo not_configured; exit 0; fi
+          if [ ! -e "$pid_file_path" ]; then echo configured; exit 0; fi
           pid_file_ownership="$(stat -Lc '%U:%G' "$pid_file_path" 2>/dev/null)"
           pid_file_mode="$(stat -Lc '%a' "$pid_file_path" 2>/dev/null)"
           if [ -z "$pid_file_mode" ]; then echo not_configured; exit 0; fi

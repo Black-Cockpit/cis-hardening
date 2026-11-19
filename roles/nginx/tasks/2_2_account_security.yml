@@ -80,10 +80,14 @@
       when: not audit_only and not nginx_user_check.remediation_status
 
     # 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
+    #
+    # Anchored to the start of the line so that only the active user directive is
+    # rewritten: an unanchored pattern also hits variables such as $remote_user
+    # inside log_format, and uncommenting a #user line would add a second directive.
     - name: 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
       replace:
         path: "/etc/nginx/nginx.conf"
-        regexp: '[#]{0,}[\s]{0,}user\s*.+[;]'
+        regexp: '^[ \t]*user[ \t]+[^;\n]+;'
         replace: "user {{ nginx_user }};"
       notify:
       - "config test"
@@ -94,7 +98,7 @@
     - name: 2.2.1 Ensure that NGINX is run using a non-privileged, dedicated service account | Remediation
       lineinfile:
         path: "/etc/nginx/nginx.conf"
-        regexp: 'user {{ nginx_user }};'
+        regexp: '^[\s]*user[\s]+[^;]+;'
         line: "user {{ nginx_user }};"
         state: present
         insertbefore: BOF
